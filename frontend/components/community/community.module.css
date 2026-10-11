@@ -1,9 +1,8 @@
-/* Design tokens match components/home/home.module.css (same reason: this
-   page should read as the same product as the main page while the Next.js
-   migration is still partial). Layout follows
-   assignment-frontend/community/index.html's left-nav / feed / right-sidebar
-   structure, re-themed to REV.CC's light tone instead of the legacy dark
-   INVEN-style board. */
+/* Community screens. The list page (and the left nav / right sidebar it
+   shares with the post editor) use the white theme: tokens come from
+   components/common/theme.module.css on .page / .leftNav / .rightSidebar.
+   .shell keeps the older tokens for the post detail, editor and member
+   pages until their own redesign step. */
 .shell {
   --accent: #3478c7;
   --line: #edeef0;
@@ -48,148 +47,6 @@
   font-size: 13px;
 }
 
-/* --- Header (same structure as components/home/home.module.css's header) --- */
-.header {
-  /* display:block overrides a stray unscoped `header{display:flex;
-     justify-content:space-between}` in app/globals.css (leftover from the
-     old dark-theme prototype) — without it, .headerInner (this element's
-     only child) becomes an auto-margin flex item and gets centered as one
-     block instead of letting its own flex children spread edge to edge. */
-  display: block;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  flex-shrink: 0;
-  height: 72px;
-  background: #fffffff5;
-  backdrop-filter: blur(15px);
-  border-bottom: 1px solid var(--line);
-}
-
-.headerInner {
-  max-width: 1800px;
-  height: 100%;
-  margin: auto;
-  padding: 0 40px;
-  display: flex;
-  align-items: center;
-  gap: 28px;
-}
-
-.logo {
-  flex: none;
-  display: flex;
-  align-items: center;
-}
-
-.searchWrap {
-  /* Sole flex:1 child between the (fixed-width) logo and right-hand group —
-     it absorbs all leftover header width, and justify-content:center keeps
-     .search (capped at max-width below) centered within that space. */
-  flex: 1 1 0%;
-  min-width: 0;
-  display: flex;
-  justify-content: center;
-}
-
-.search {
-  position: relative;
-  width: 100%;
-  max-width: 540px;
-}
-
-.search input {
-  width: 100%;
-  border: 1px solid #e5e7e9;
-  border-radius: 10px;
-  padding: 12px 16px 12px 40px;
-  font-size: 14px;
-  background: #f7f8f9;
-  color: var(--ink);
-}
-
-.search input::placeholder {
-  color: #a0a5aa;
-}
-
-.searchIcon {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 13px;
-  color: #9aa0a6;
-  pointer-events: none;
-}
-
-.rightGroup {
-  display: flex;
-  align-items: center;
-  flex: none;
-  gap: 28px;
-}
-
-.nav {
-  display: flex;
-  flex: none;
-  white-space: nowrap;
-  gap: 26px;
-  font-size: 14px;
-  font-weight: 650;
-}
-
-.nav a:hover {
-  color: var(--accent);
-}
-
-.nav a[aria-current='page'] {
-  color: var(--accent);
-  font-weight: 750;
-}
-
-.headerActions {
-  display: flex;
-  flex: none;
-  white-space: nowrap;
-  align-items: center;
-  gap: 12px;
-  font-size: 13px;
-}
-
-.bell {
-  position: relative;
-  font-size: 13px;
-  font-weight: 650;
-  line-height: 1;
-  border: 0;
-  background: none;
-  padding: 0;
-  color: inherit;
-}
-
-.bell:hover {
-  color: var(--accent);
-}
-
-.bellCount {
-  position: absolute;
-  top: -7px;
-  right: -9px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 10px;
-  padding: 1px 5px;
-}
-
-.username {
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .secondary {
   border: 1px solid #e3e5e7;
   border-radius: 8px;
@@ -221,346 +78,451 @@
   text-decoration: underline;
 }
 
-/* Header action button ("내 활동") — unlike .textLink above, this sits in a
-   row with plain-text siblings (알림/username/로그아웃), so it stays the
-   same neutral color/size as them at rest and only turns accent on
-   hover/focus, instead of always looking like an active link. */
-.activityButton {
-  border: 0;
-  background: none;
-  padding: 0;
-  font-size: 13px;
-  font-weight: 650;
-  color: inherit;
-}
-
-.activityButton:hover {
-  color: var(--accent);
-}
-
 .notice {
-  max-width: 1800px;
+  max-width: 1320px;
   margin: 12px auto 0;
-  padding: 0 40px;
+  padding: 0 32px;
   font-size: 13px;
   color: #a43e3e;
 }
 
-/* --- Three-column layout --- */
-.layout {
-  /* flex: 1 0 auto — grows to fill the column below the (flex-shrink:0)
-     header, so a short/filtered-empty result still pushes <SiteFooter>
-     to the bottom of the viewport instead of leaving it right under the
-     fold. Grid itself is unaffected: a flex item can also be a grid
-     container for its own children. */
+
+/* --- Page (white theme) ---
+   Everything below the header on the list page sits in .page, which also
+   carries theme.module.css's tokens (set in community-list.tsx). The left
+   nav and right sidebar carry the theme class themselves, so the post
+   editor (which reuses them) gets the same look. */
+.page {
   flex: 1 0 auto;
-  max-width: 1800px;
   width: 100%;
-  margin: 32px auto 72px;
-  padding: 0 8px;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* --- Three-column layout (list and editor) --- */
+.layout {
+  flex: 1 0 auto;
+  max-width: 1320px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 28px 32px 72px;
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr) 300px;
-  column-gap: 64px;
+  grid-template-columns: 220px minmax(0, 1fr) 280px;
+  column-gap: 24px;
   align-items: start;
 }
 
 /* --- Left nav ---
-   position:sticky + the grid's align-items:start above (so this item keeps
-   its own short height instead of being stretched to the row's height,
-   leaving it room to travel) is what makes it follow the scroll instead of
-   scrolling away with the page. top:84px clears the 72px sticky header. */
+   sticky + the grid's align-items:start keep it in view while scrolling;
+   top clears the sticky site header. */
 .leftNav {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px;
   position: sticky;
-  top: 84px;
+  top: 88px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 10px;
 }
 
 .leftNavHeading {
-  font-size: 16px;
-  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 8px 8px;
 }
 
 .categoryList {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .categoryButton,
 .categoryActive {
-  display: block;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   width: 100%;
   text-align: left;
   border: 0;
-  border-radius: 7px;
-  padding: 10px 15px;
-  font-size: 15px;
-  line-height: 1.15;
+  border-radius: 3px;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 14px;
   font-weight: 650;
-  background: transparent;
-  color: #5d6166;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.categoryButton::after,
+.categoryActive::after {
+  content: '\203A';
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
 }
 
 .categoryButton:hover {
-  background: #f5f6f7;
+  background: var(--bg);
+  color: var(--ink);
 }
 
 .categoryActive {
-  background: var(--accent);
-  color: #fff;
+  background: var(--lime);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.categoryActive::after {
+  color: var(--ink);
 }
 
 .writeLink {
   display: block;
-  text-align: center;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
   background: var(--ink);
-  color: #fff;
-  border-radius: 7px;
-  padding: 9px;
-  font-size: 13px;
-  font-weight: 700;
-  margin-bottom: 10px;
+  color: #fff !important;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
 }
 
 .writeLink:hover {
-  background: #3a3f45;
+  background: #2b302c;
 }
 
 .shortcuts {
   border-top: 1px solid var(--line);
-  padding-top: 8px;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
 }
 
 .shortcuts h3 {
-  font-size: 17px;
+  margin: 0 8px 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   color: var(--muted);
-  margin: 0 0 4px;
 }
 
 .shortcutButton,
-.shortcutActive {
+.shortcutActive,
+.shortcutLink {
   display: block;
   width: 100%;
   text-align: left;
   border: 0;
-  border-radius: 7px;
-  padding: 10px 15px;
-  font-size: 15px;
-  line-height: 1.3;
-  background: transparent;
-  color: #5d6166;
+  border-radius: 3px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
 }
 
-.shortcutButton:hover {
-  background: #f5f6f7;
+.shortcutButton:hover,
+.shortcutLink:hover {
+  background: var(--bg);
+  color: var(--ink);
 }
 
 .shortcutActive {
-  background: #edf4ff;
-  color: var(--accent);
-  font-weight: 650;
-}
-
-.shortcutLink {
-  display: block;
-  padding: 5px 7px;
-  font-size: 13px;
-  color: #5d6166;
-}
-
-.shortcutLink:hover {
-  color: var(--accent);
+  color: var(--ink);
+  font-weight: 800;
+  box-shadow: inset 3px 0 0 var(--lime);
 }
 
 /* --- Feed section --- */
 .feedSection {
   min-width: 0;
+  margin: 0;
+  display: grid;
+  gap: 18px;
 }
 
 .feedHeading {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 16px;
-  margin-bottom: 18px;
 }
 
 .eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.6px;
-  color: var(--accent);
-  margin: 0 0 4px;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--lime-ink);
 }
 
 .feedHeading h1 {
-  font-size: 24px;
   margin: 0;
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.feedHeading .muted {
+  margin: 6px 0 0;
+}
+
+.writeCta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius);
+  background: var(--lime);
+  color: var(--ink) !important;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.writeCta:hover {
+  background: var(--lime-hover);
+}
+
+/* Category chips for widths where the left nav is hidden. */
+.categoryChips {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.categoryChips button {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.categoryChips button[aria-pressed='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+  font-weight: 700;
+}
+
+.listPanel {
+  margin: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  min-width: 0;
+}
+
+.listHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.listHead h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .searchForm {
   display: flex;
   gap: 8px;
-  margin-bottom: 14px;
+}
+
+.searchForm input,
+.feedControls select,
+.feedControls input {
+  min-width: 0;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  padding: 0 10px;
 }
 
 .searchForm input {
   flex: 1;
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 11px 14px;
+}
+
+.searchForm input:focus,
+.feedControls select:focus,
+.feedControls input:focus {
+  outline: 2px solid var(--ink);
+  outline-offset: -1px;
+}
+
+.page .secondary {
+  height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 0 14px;
+  font: inherit;
   font-size: 13px;
+  font-weight: 700;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.page .secondary:hover {
+  border-color: var(--ink);
+  background: #fff;
 }
 
 .feedControls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 14px;
+  gap: 8px 10px;
+  margin: 10px 0 4px;
   font-size: 13px;
   color: var(--muted);
 }
 
 .feedControls label {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-
-.feedControls select,
-.feedControls input {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 7px 10px;
-  font-size: 13px;
-  color: var(--ink);
 }
 
 .activityScope {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #edf4ff;
-  border-radius: 10px;
-  padding: 10px 14px;
-  margin-bottom: 14px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--lime);
+  background: var(--bg);
   font-size: 13px;
 }
 
 .searchSummary {
+  margin: 10px 0 0;
   font-size: 13px;
   color: var(--muted);
-  margin: 0 0 10px;
-}
-
-.feedTableHeading {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 110px 90px 56px 56px 56px;
-  gap: 12px;
-  padding: 0 4px 10px;
-  border-bottom: 1px solid var(--line);
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.feedTableHeading span:not(:first-child) {
-  text-align: center;
 }
 
 .feedList {
-  min-height: 120px;
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
 }
 
 .feedRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 110px 90px 56px 56px 56px;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  padding: 14px 4px;
-  /* Explicit, not inherited — app/globals.css has an unscoped `article`
-     background/border-radius rule for the old dark garage prototype that
-     this would otherwise fall through to if left unset. */
-  background: #fff;
-  color: var(--ink);
-  border: none;
+  gap: 4px 16px;
+  padding: 13px 0;
   border-bottom: 1px solid var(--line);
-  border-radius: 0;
-  transition: background 0.15s ease;
 }
 
-.feedRow:hover {
-  background: #f6f8fb;
+.feedMain {
+  min-width: 0;
 }
 
-.feedTitleCell {
+.feedTitle {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.feedTitle:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--lime);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.feedMeta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.feedThumb {
-  flex: none;
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  object-fit: cover;
-  background: linear-gradient(135deg, #eef1f5, #f8f9fb);
-}
-
-.feedTitleText {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-
-.feedTitleText strong {
-  font-size: 14px;
-  font-weight: 650;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  gap: 4px 10px;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .feedCategory {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
   font-size: 11px;
-  color: var(--accent);
-}
-
-.feedAuthor,
-.feedAuthorWithdrawn {
-  font-size: 13px;
-  color: #5d6166;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 18px;
+  color: var(--text);
   white-space: nowrap;
 }
 
+.feedAuthor {
+  color: var(--text);
+}
+
 .feedAuthor:hover {
-  color: var(--accent);
+  color: var(--ink);
+  text-decoration: underline;
 }
 
 .feedAuthorWithdrawn {
   color: var(--muted);
 }
 
-.feedDate {
+.feedStats {
+  display: flex;
+  gap: 12px;
   font-size: 12px;
   color: var(--muted);
-  text-align: center;
+  white-space: nowrap;
 }
 
-.feedStat {
-  font-size: 12px;
-  color: var(--muted);
-  text-align: center;
+.feedStats b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.feedThumbLink,
+.feedThumbEmpty {
+  width: 64px;
+}
+
+.feedThumb {
+  display: block;
+  width: 64px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: var(--bg);
+}
+
+.moreButton {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
 }
 
 .empty {
@@ -575,30 +537,35 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
+  line-height: 1.5;
 }
 
 .sideSection {
+  margin: 0;
+  background: var(--panel, #fff);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 16px;
+  border-radius: var(--radius, 4px);
+  padding: 16px 18px;
 }
 
 .sideSection h2 {
-  font-size: 25px;
+  font-size: 15px;
+  font-weight: 800;
   margin: 0 0 4px;
 }
 
 .garageMini {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   margin-top: 10px;
 }
 
 .garageMiniPhoto {
   width: 100%;
   aspect-ratio: 4 / 3;
-  border-radius: 10px;
+  border-radius: 3px;
   object-fit: cover;
   margin-bottom: 4px;
 }
@@ -606,10 +573,11 @@
 .verifiedBadge {
   display: inline-block;
   font-size: 11px;
-  color: #1f9d5c;
-  border: 1px solid #1f9d5c;
-  border-radius: 999px;
-  padding: 2px 8px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--lime);
+  border-radius: 3px;
+  padding: 1px 7px;
   width: fit-content;
 }
 
@@ -630,47 +598,64 @@
 }
 
 .recentList a:hover {
-  color: var(--accent);
+  text-decoration: underline;
 }
 
 /* --- Responsive --- */
-@media (max-width: 1100px) {
+@media (max-width: 1180px) {
   .layout {
-    grid-template-columns: minmax(0, 1fr) 280px;
-    padding: 0 8px;
+    grid-template-columns: minmax(0, 1fr) 260px;
   }
   .leftNav {
     display: none;
   }
+  .categoryChips {
+    display: flex;
+  }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 860px) {
   .layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 20px;
+    padding: 20px 20px 56px;
+  }
+  .notice {
     padding: 0 20px;
   }
-  .headerInner {
-    gap: 12px;
-    padding: 0 20px;
+}
+
+@media (max-width: 600px) {
+  .feedHeading {
+    flex-direction: column;
+    align-items: stretch;
   }
-  .searchWrap {
-    display: none;
+  .feedHeading h1 {
+    font-size: 24px;
   }
-  .nav {
-    gap: 12px;
-    font-size: 12px;
+  .writeCta {
+    justify-content: center;
   }
-  .feedTableHeading {
-    display: none;
+  .listPanel {
+    padding: 16px 14px;
   }
   .feedRow {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'main thumb'
+      'stats thumb';
+    align-items: start;
   }
-  .feedAuthor,
-  .feedAuthorWithdrawn,
-  .feedDate,
-  .feedStat {
-    text-align: left;
+  .feedMain {
+    grid-area: main;
+  }
+  .feedStats {
+    grid-area: stats;
+  }
+  .feedThumbLink {
+    grid-area: thumb;
+  }
+  .feedThumbEmpty {
+    display: none;
   }
 }

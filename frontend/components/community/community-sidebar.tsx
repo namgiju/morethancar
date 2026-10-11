@@ -8,12 +8,22 @@ import {postUrl} from '../../lib/format';
 import {readRecentPosts, RECENT_POSTS_STORAGE_KEY, type RecentPost} from '../../lib/recent-posts';
 import PopularList from '../home/popular-list';
 import MyGarageMini from './my-garage-mini';
+import theme from '../common/theme.module.css';
 import styles from './community.module.css';
 
 // Right sidebar shared by the list and the editor: "지금 인기글" (추천순
 // TOP5, independent of the page's filters), MY GARAGE and "최근 본 글".
-// `children` go first (the editor's writing guidelines).
-export default function CommunitySidebar({session, children}: {session: SessionUser | null | undefined; children?: ReactNode}) {
+// `children` go first (the editor's writing guidelines). The list page hides
+// "지금 인기글" (showPopular={false}) because its TIMING BOARD shows the ranking.
+export default function CommunitySidebar({
+  session,
+  children,
+  showPopular = true,
+}: {
+  session: SessionUser | null | undefined;
+  children?: ReactNode;
+  showPopular?: boolean;
+}) {
   const [popularPosts, setPopularPosts] = useState<CommunityPost[]>([]);
   const [popularFailed, setPopularFailed] = useState(false);
   const loadPopular = useCallback(() => {
@@ -22,7 +32,9 @@ export default function CommunitySidebar({session, children}: {session: SessionU
       .then(setPopularPosts)
       .catch(() => setPopularFailed(true));
   }, []);
-  useEffect(() => loadPopular(), [loadPopular]);
+  useEffect(() => {
+    if (showPopular) loadPopular();
+  }, [loadPopular, showPopular]);
 
   // Local only, same key as the legacy site (lib/recent-posts.ts).
   const [recentPosts, setRecentPosts] = useState<RecentPost[]>([]);
@@ -43,22 +55,24 @@ export default function CommunitySidebar({session, children}: {session: SessionU
   }, []);
 
   return (
-    <aside className={styles.rightSidebar} aria-label="커뮤니티 사이드바">
+    <aside className={`${theme.theme} ${styles.rightSidebar}`} aria-label="커뮤니티 사이드바">
       {children}
-      <section className={styles.sideSection}>
-        <h2>지금 인기글</h2>
-        <p className={styles.muted}>추천 수를 기준으로 모았어요.</p>
-        {popularFailed ? (
-          <p className={styles.empty}>
-            인기글을 불러오지 못했어요.{' '}
-            <button type="button" className={styles.textLink} onClick={loadPopular}>
-              다시 확인
-            </button>
-          </p>
-        ) : (
-          <PopularList posts={popularPosts} />
-        )}
-      </section>
+      {showPopular && (
+        <section className={styles.sideSection}>
+          <h2>지금 인기글</h2>
+          <p className={styles.muted}>추천 수를 기준으로 모았어요.</p>
+          {popularFailed ? (
+            <p className={styles.empty}>
+              인기글을 불러오지 못했어요.{' '}
+              <button type="button" className={styles.textLink} onClick={loadPopular}>
+                다시 확인
+              </button>
+            </p>
+          ) : (
+            <PopularList posts={popularPosts} />
+          )}
+        </section>
+      )}
       <section className={styles.sideSection}>
         <h2>MY GARAGE</h2>
         <MyGarageMini user={session} />

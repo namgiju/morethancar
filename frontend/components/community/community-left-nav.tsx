@@ -1,6 +1,7 @@
 'use client';
 
 import {CATEGORY_TABS, HEADINGS, newPostHref, SCOPE_LABELS, type Category, type Scope} from './categories';
+import theme from '../common/theme.module.css';
 import styles from './community.module.css';
 
 type Props = {
@@ -14,7 +15,7 @@ type Props = {
 // "＋ 글쓰기", activity shortcuts and the jump to "최근 본 글".
 export default function CommunityLeftNav({category, scope, onCategory, onScope}: Props) {
   return (
-    <aside className={styles.leftNav} aria-label="커뮤니티 메뉴">
+    <aside className={`${theme.theme} ${styles.leftNav}`} aria-label="커뮤니티 메뉴">
       <h2 className={styles.leftNavHeading}>커뮤니티</h2>
       <div className={styles.categoryList} role="group" aria-label="게시판 분류">
         {CATEGORY_TABS.map((value) => (
