@@ -141,7 +141,10 @@ content_admin_logs (id, entity_type 'MOTORSPORT_EVENT'|'SPOT'|…, entity_id, ac
 관리자(`/api/board/admin/*`, `requireCurrentAdmin`):
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| POST/PUT/DELETE | `/admin/motorsport/events[/:id]` | 일정 등록·수정·삭제(소프트). 출처·확인일 필수 |
+| POST/PUT | `/admin/motorsport/events[/:id]` | 일정 등록(기본 초안, `publish:true`면 공개)·수정(MANAGER, 다른 운영자 일정 포함). 출처·확인일 필수 |
+| POST | `/admin/motorsport/events/:id/publish`·`/hide`·`/verify` | 공개·비공개·확인일 갱신(MANAGER) |
+| DELETE·POST | `/admin/motorsport/events/:id`·`/:id/restore` | 소프트 삭제·복원(**ADMIN**) |
+| GET | `/admin/motorsport/logs` | 감사 로그 |
 | POST/PUT | `/admin/motorsport/series`, `/venues` | 시리즈·장소 관리 |
 | GET | `/admin/motorsport/stale` | 앞으로 60일 안의 일정 중 확인일이 14일 넘은 것(재확인 대기열) |
 | GET | `/admin/spots?status=PENDING` | 승인 대기 목록 |
@@ -191,6 +194,26 @@ content_admin_logs (id, entity_type 'MOTORSPORT_EVENT'|'SPOT'|…, entity_id, ac
 
 ---
 
+## 5-1. 운영 권한 (2026-10-12 확정, 1단계에서 구현)
+
+콘텐츠는 여러 운영자가 코드 없이 웹 관리자 화면에서 관리한다. 역할: `USER < MANAGER < ADMIN`(`users.role`).
+
+| 작업 | USER | MANAGER | ADMIN |
+|---|---|---|---|
+| 공개 일정·스팟 조회, 후기 작성, 스팟 제보 | ✅ | ✅ | ✅ |
+| 일정 등록·수정(다른 운영자가 등록한 일정 포함)·공개·비공개·확인일 갱신, 시리즈·장소 관리 | | ✅ | ✅ |
+| 스팟 등록·수정, 제보 승인·반려 (V7 단계) | | ✅ | ✅ |
+| 일정·스팟 소프트 삭제·복원 | | | ✅ |
+| 운영자 지정·해제 | | | ✅ |
+| 기존 커뮤니티 관리(신고 처리, 회원 제재, 게시글 강제 삭제, 차량 인증) | | | ✅ |
+
+- **권한 검사는 모두 백엔드**에서 한다. board-service는 `requireCurrentStaff(db, user, minRole)`(admin-access.js)로 세션 역할과 **현재 DB 역할·상태**를 매 요청 확인하고, 권한은 DB 역할로 판단한다. 콘텐츠 API는 `/api/board/admin/motorsport`에 ADMIN 전용 `adminRouter`보다 먼저 붙어 있어, MANAGER는 기존 `/api/board/admin/*`(신고·회원·게시글)에 들어가지 못한다. 기존 "role === ADMIN" 검사는 하나도 바꾸지 않았다.
+- **역할 변경은 Spring 한 곳**(`AdminMemberController`)에서만 한다: `GET /api/admin/members/operators`, `PUT /api/admin/members/{id}/role {role}`(ADMIN 전용). 관리자 행 잠금 후 요청자 재확인, 자기 자신 변경 금지, 마지막 유효 ADMIN 강등 금지, 탈퇴 회원 변경 금지, 이용 제한 회원에게 운영자 권한 부여 금지. 바뀌면 대상의 모든 세션이 무효(auth_version 증가) — 이전 권한의 세션으로는 접근할 수 없다. 기록은 `admin_member_actions`에 `ROLE:USER>MANAGER`(기존 회원 수정 API는 `UPDATE:ROLE(USER>MANAGER)`).
+- MANAGER도 ADMIN처럼 권한을 먼저 해제해야 탈퇴할 수 있다(`ADMIN_ROLE` 409).
+- V6의 `users_role_check`(USER·MANAGER·ADMIN)는 `NOT VALID`다. 운영 반영 전에 Neon의 기존 role 값을 읽기 전용으로 확인하고 `ALTER TABLE users VALIDATE CONSTRAINT users_role_check`를 따로 한다.
+- **공개 상태**(`publication`): DRAFT(작성 중) → PUBLISHED ↔ HIDDEN. 공개 API는 PUBLISHED이고 삭제되지 않은 일정만 보여 준다. 진행 상태(`status`: 예정·잠정·변경·취소)와는 별개다.
+- **감사 로그**(`content_admin_logs`): 수행자 id·당시 DB 역할, 대상 종류·id, 작업(CREATE·UPDATE·PUBLISH·HIDE·VERIFY·DELETE·RESTORE), 시각, 변경 전후 행, 사유를 변경과 같은 트랜잭션에 남긴다. 거부된 요청은 남지 않는다.
+
 ## 6. 관리자 기능
 
 `/admin`에 탭 2개 추가(기존 패널 구조와 같은 목록 + 다이얼로그).
@@ -219,8 +242,8 @@ content_admin_logs (id, entity_type 'MOTORSPORT_EVENT'|'SPOT'|…, entity_id, ac
 | 단계 | 내용 | 산출물 |
 |---|---|---|
 | 0 | 결정 사항 확정(§9, 완료), 카카오 콘솔에서 지도 쿼터·도메인 확인(사람, 스팟 단계 전까지) | 결정 기록 |
-| 1 | V6 모터스포츠 테이블 + `content_admin_logs` + 관리자 API + 공개 조회 API + board-service 테스트 | 마이그레이션, `motorsport.js`, 테스트 |
-| 2 | `/admin` 모터스포츠 탭(등록·수정·재확인 대기열) | 관리자 UI |
+| 1 | V6 모터스포츠 테이블 + `content_admin_logs` + 운영 API(MANAGER 이상) + 공개 조회 API + MANAGER 역할·운영자 권한 API(Spring) + 테스트 **(완료 2026-10-12)** | 마이그레이션, `motorsport.js`, 테스트 |
+| 2 | 관리자 화면 리디자인(최신 화이트 테마) + `/admin/motorsport`(등록·수정·공개/비공개·확인일·삭제/복원·시리즈/장소·이력) + `/admin/users`(운영자 권한, ADMIN) | 관리자 UI |
 | 3 | `/motorsport` 캘린더·리스트·상세, 메인 미리보기 실데이터, 헤더 메뉴 활성화 | 공개 화면 |
 | 4 | 게시글 ↔ 일정 연결(V6 컬럼은 1단계에 포함), 글쓰기·글 상세·일정 상세 연결 UI | 후기 연결 |
 | 5 | V7 스팟 테이블 + 사진 공개 규칙 확장 + 제보·승인 API + 테스트 | `spots.js`, image-references 수정 |
