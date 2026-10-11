@@ -1,0 +1,28 @@
+/* morethancar design tokens (white theme, references/badges/레퍼런스최종.png).
+   Put `.theme` on the root of every redesigned area (site header, main page,
+   community list). Custom properties inherit, so the nearest `.theme` wins
+   over an outer page's old tokens.
+
+   The old token names (--ink, --line, --muted, --bg, --accent) are defined
+   here too, so older components rendered inside a themed area (the header's
+   내 활동 / 알림 panels, MY GARAGE mini card, popular list) take the new
+   palette without being rewritten. */
+.theme {
+  --bg: #f6f7f4;
+  --panel: #ffffff;
+  --ink: #0e100f;
+  --text: #2c302b;
+  --muted: #747a72;
+  --line: #e2e4df;
+  --line-strong: #c9ccc4;
+  --lime: #c8f53a;
+  --lime-hover: #b7e824;
+  /* Slightly deeper lime for P1–P3 text so it reads on white. */
+  --lime-podium: #a8d61a;
+  /* Lime is too light for small text on white; text accents use this. */
+  --lime-ink: #4a7300;
+  --accent: #4a7300;
+  --radius: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Noto Sans KR', sans-serif;
+  color: var(--ink);
+}

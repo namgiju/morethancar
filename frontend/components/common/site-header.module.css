@@ -1,0 +1,320 @@
+/* Site-wide header. Tokens come from theme.module.css (on the same element).
+   app/globals.css still styles bare `header`, `nav` and `small` elements
+   (first dark prototype), so those properties are reset here. */
+.header {
+  display: block;
+  height: auto;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #fffffff2;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+:where(.header) :where(a) {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* family only: a `font` shorthand here would also reset the font-size of
+   single-class buttons below (.activityButton) because this selector is
+   more specific. */
+.header button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.inner {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 32px;
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(200px, 300px) auto;
+  grid-template-areas: 'logo nav search account';
+  align-items: center;
+  gap: 28px;
+}
+
+.logo {
+  grid-area: logo;
+  display: flex;
+  align-items: center;
+}
+
+/* The wordmark PNG has wide built-in padding; this keeps the visible
+   letters aligned with the content edge below. */
+.logoImage {
+  margin-left: -10px;
+}
+
+.nav {
+  grid-area: nav;
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 24px;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.nav a {
+  padding: 6px 0;
+  border-bottom: 2px solid transparent;
+}
+
+.nav a:hover {
+  border-bottom-color: var(--lime);
+}
+
+.nav a[aria-current='page'] {
+  border-bottom-color: var(--ink);
+  font-weight: 800;
+}
+
+.soon {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 6px 0;
+  color: var(--muted);
+  cursor: default;
+}
+
+.soon small {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--lime-ink);
+}
+
+.search {
+  grid-area: search;
+  position: relative;
+  display: flex;
+}
+
+.search input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0 40px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.search input:focus {
+  outline: 2px solid var(--ink);
+  outline-offset: -1px;
+  background: #fff;
+}
+
+.search button {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.account {
+  grid-area: account;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 36px;
+}
+
+.activityButton {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: #fff;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.activityButton:hover {
+  border-color: var(--ink);
+}
+
+.bell {
+  position: relative;
+  display: inline-flex;
+  border: 0;
+  background: none;
+  padding: 2px;
+  color: var(--ink);
+}
+
+.bellCount {
+  position: absolute;
+  top: -5px;
+  right: -8px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--lime);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 17px;
+  text-align: center;
+}
+
+.userMenu {
+  position: relative;
+}
+
+.userMenu summary {
+  list-style: none;
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+.userMenu summary::-webkit-details-marker {
+  display: none;
+}
+
+.userMenu summary:focus-visible,
+.bell:focus-visible,
+.activityButton:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.avatar {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--lime);
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.userMenuPanel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 180px;
+  display: grid;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  z-index: 30;
+}
+
+.userMenuPanel strong {
+  padding: 8px 10px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+
+.userMenuPanel a,
+.userMenuPanel button {
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text);
+  border-radius: 3px;
+}
+
+.userMenuPanel a:hover,
+.userMenuPanel button:hover {
+  background: var(--bg);
+}
+
+.loginButton {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff !important;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .inner {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'logo search account'
+      'nav nav nav';
+    gap: 0 20px;
+    padding-top: 10px;
+  }
+  .nav {
+    padding: 4px 0 6px;
+  }
+}
+
+@media (max-width: 860px) {
+  .inner {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+
+@media (max-width: 600px) {
+  .inner {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'logo account'
+      'search search'
+      'nav nav';
+    padding-top: 8px;
+    row-gap: 8px;
+  }
+  .logoImage {
+    height: 38px !important;
+  }
+  .account {
+    justify-content: flex-end;
+  }
+  /* 내 활동 stays reachable from the account menu. */
+  .activityButton {
+    display: none;
+  }
+  .nav {
+    gap: 2px 16px;
+    font-size: 13px;
+  }
+}

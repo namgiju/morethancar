@@ -1,4 +1,4 @@
-import {FlagIcon} from './icons';
+import {FlagIcon} from '../common/icons';
 import styles from './main.module.css';
 
 // One schedule entry. Track days (서킷 스포츠주행 가능일) and spectator races are

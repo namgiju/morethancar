@@ -1,12 +1,12 @@
 'use client';
 
-import {useEffect, useState} from 'react';
-import type {BoardPeriod, GarageEntry, Post, SessionUser, SiteStats} from '../../lib/home-types';
-import {ApiError, fetchSession, fetchUnreadCount, logout} from '../../lib/home-api';
+import type {BoardPeriod, GarageEntry, Post, SiteStats} from '../../lib/home-types';
 import {compactCount} from '../../lib/format';
 import SiteFooter from '../footer/site-footer';
-import MainHeader from './main-header';
-import TimingBoard from './timing-board';
+import SiteHeader from '../common/site-header';
+import TimingBoard from '../common/timing-board';
+import theme from '../common/theme.module.css';
+import {useCommunitySession} from '../community/use-community-session';
 import LatestPosts from './latest-posts';
 import ServiceShortcuts from './service-shortcuts';
 import GarageShowcase from './garage-showcase';
@@ -33,49 +33,12 @@ export default function HomeShell({
   garage: GarageEntry[];
   stats: SiteStats | null;
 }) {
-  const [session, setSession] = useState<SessionUser | null | undefined>(undefined);
-  const [unread, setUnread] = useState(0);
-  const [sessionError, setSessionError] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const user = await fetchSession();
-        if (cancelled) return;
-        setSession(user);
-        if (user) setUnread(await fetchUnreadCount());
-      } catch {
-        if (!cancelled) {
-          setSession(null);
-          setSessionError(true);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function handleLogout() {
-    setBusy(true);
-    try {
-      await logout();
-      setSession(null);
-      setUnread(0);
-    } catch (error) {
-      // 로그아웃 실패는 조용히 무시하지 않고 세션을 다시 확인해 화면을 맞춘다.
-      if (!(error instanceof ApiError)) setSessionError(true);
-      setSession(await fetchSession().catch(() => null));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const auth = useCommunitySession();
+  const {session, sessionError} = auth;
 
   return (
-    <div className={styles.shell}>
-      <MainHeader session={session} unread={unread} busy={busy} onLogout={handleLogout} />
+    <div className={`${theme.theme} ${styles.shell}`}>
+      <SiteHeader auth={auth} />
 
       {sessionError && (
         <p className={styles.notice} role="status">
@@ -128,10 +91,11 @@ export default function HomeShell({
           </section>
 
           <TimingBoard
-            initialPosts={initialBoard.posts}
-            initialPeriod={initialBoard.period}
-            initialFailed={initialBoardFailed}
+            size={5}
+            headingId="timing-board-title"
+            initial={{...initialBoard, failed: initialBoardFailed}}
             now={renderedAt}
+            moreHref="/community?sort=popular"
           />
 
           <LatestPosts posts={latestPosts} now={renderedAt} />

@@ -1,5 +1,5 @@
 import {SERVICES} from '../../lib/services';
-import {ChevronIcon, ServiceIcon} from './icons';
+import {ChevronIcon, ServiceIcon} from '../common/icons';
 import styles from './main.module.css';
 
 // Shortcut row under the first screen. Services without a page yet are shown

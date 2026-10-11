@@ -4,21 +4,8 @@
    app/globals.css still carries unscoped element rules from the first dark
    prototype (header, main, nav, section, small …); the classes below reset
    what they touch so this page doesn't inherit them. */
+/* Tokens: components/common/theme.module.css (also on this element). */
 .shell {
-  --bg: #f6f7f4;
-  --panel: #ffffff;
-  --ink: #0e100f;
-  --text: #2c302b;
-  --muted: #747a72;
-  --line: #e2e4df;
-  --line-strong: #c9ccc4;
-  --lime: #c8f53a;
-  --lime-hover: #b7e824;
-  /* Slightly deeper lime for P1–P3 text so it reads on white. */
-  --lime-podium: #a8d61a;
-  /* Lime is too light for text on white; accents that are text use this. */
-  --lime-ink: #4a7300;
-  --radius: 4px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -34,8 +21,10 @@
   text-decoration: none;
 }
 
+/* family only, so it doesn't override sizes set by shared components
+   (site header, TIMING BOARD) rendered inside this page. */
 .shell button {
-  font: inherit;
+  font-family: inherit;
   cursor: pointer;
 }
 
@@ -56,227 +45,6 @@
   border: 0;
 }
 
-/* ---------- Header ---------- */
-.header {
-  display: block;
-  height: auto;
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: #fffffff2;
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--line);
-}
-
-.headerInner {
-  max-width: 1320px;
-  margin: 0 auto;
-  padding: 0 32px;
-  min-height: 64px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(200px, 300px) auto;
-  grid-template-areas: 'logo nav search account';
-  align-items: center;
-  gap: 28px;
-}
-
-.logo {
-  grid-area: logo;
-  display: flex;
-  align-items: center;
-}
-
-/* The wordmark PNG has wide built-in padding; this crops none of it, it only
-   keeps the left edge aligned with the content below. */
-.logoImage {
-  margin-left: -10px;
-}
-
-.nav {
-  grid-area: nav;
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 24px;
-  font-size: 14px;
-  font-weight: 650;
-}
-
-.nav a {
-  padding: 6px 0;
-  border-bottom: 2px solid transparent;
-}
-
-.nav a:hover {
-  border-bottom-color: var(--lime);
-}
-
-.navSoon {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  padding: 6px 0;
-  color: var(--muted);
-  cursor: default;
-}
-
-.navSoon small {
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  color: var(--lime-ink);
-}
-
-.search {
-  grid-area: search;
-  position: relative;
-  display: flex;
-}
-
-.search input {
-  width: 100%;
-  min-width: 0;
-  height: 38px;
-  padding: 0 40px 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: 13px;
-}
-
-.search input:focus {
-  outline: 2px solid var(--ink);
-  outline-offset: -1px;
-  background: #fff;
-}
-
-.search button {
-  position: absolute;
-  right: 4px;
-  top: 4px;
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-}
-
-.account {
-  grid-area: account;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 36px;
-}
-
-.bell {
-  position: relative;
-  display: inline-flex;
-  color: var(--ink);
-}
-
-.bellCount {
-  position: absolute;
-  top: -6px;
-  right: -9px;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--lime);
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 17px;
-  text-align: center;
-}
-
-.userMenu {
-  position: relative;
-}
-
-.userMenu summary {
-  list-style: none;
-  cursor: pointer;
-  border-radius: 999px;
-}
-
-.userMenu summary::-webkit-details-marker {
-  display: none;
-}
-
-.userMenu summary:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-}
-
-.avatar {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--lime);
-  font-weight: 800;
-  font-size: 14px;
-}
-
-.userMenuPanel {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  min-width: 180px;
-  display: grid;
-  padding: 8px;
-  background: #fff;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  z-index: 30;
-}
-
-.userMenuPanel strong {
-  padding: 8px 10px;
-  font-size: 13px;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 4px;
-}
-
-.userMenuPanel a,
-.userMenuPanel button {
-  padding: 8px 10px;
-  border: 0;
-  background: none;
-  text-align: left;
-  font-size: 13px;
-  color: var(--text);
-  border-radius: 3px;
-}
-
-.userMenuPanel a:hover,
-.userMenuPanel button:hover {
-  background: var(--bg);
-}
-
-.loginButton {
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 16px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: #fff !important;
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 .notice {
   max-width: 1320px;
   width: 100%;
@@ -288,6 +56,9 @@
 
 /* ---------- Layout ---------- */
 .main {
+  /* Main page only: panels, CTA and shortcut block use 10px corners (the
+     header and community keep theme.module.css's 4px). */
+  --radius: 10px;
   max-width: 1320px;
   width: 100%;
   margin: 0 auto;
@@ -295,11 +66,12 @@
   flex: 1;
 }
 
+/* stretch: TIMING BOARD and 방금 올라온 글 share the same top and bottom edge. */
 .firstScreen {
   display: grid;
   grid-template-columns: minmax(240px, 0.9fr) minmax(0, 2.1fr) minmax(260px, 1fr);
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
 }
 
 /* ---------- Brand column ---------- */
@@ -391,7 +163,6 @@
 }
 
 /* ---------- Shared panel bits ---------- */
-.board,
 .latest,
 .lowerPanel {
   margin: 0;
@@ -479,202 +250,6 @@
   color: var(--muted);
   vertical-align: middle;
   letter-spacing: 0;
-}
-
-/* ---------- TIMING BOARD ---------- */
-.boardHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.boardTitle {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px 10px;
-}
-
-.boardCaption {
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0;
-  color: var(--muted);
-}
-
-.segment {
-  display: inline-flex;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  padding: 2px;
-}
-
-.segment button {
-  border: 0;
-  background: none;
-  padding: 3px 11px;
-  border-radius: 999px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.segment button[aria-pressed='true'] {
-  background: var(--ink);
-  color: #fff;
-  font-weight: 700;
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 12px 0 6px;
-}
-
-.chips button {
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
-  font-size: 12px;
-  color: var(--text);
-}
-
-.chips button:hover {
-  border-color: var(--line-strong);
-}
-
-.chips button[aria-pressed='true'] {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: #fff;
-  font-weight: 700;
-}
-
-.boardList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  transition: opacity 0.15s ease;
-}
-
-.boardList[data-loading] {
-  opacity: 0.5;
-}
-
-.boardList li + li {
-  border-top: 1px solid var(--line);
-}
-
-.boardRow {
-  display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) auto auto;
-  grid-template-areas: 'pos main stats thumb';
-  align-items: center;
-  gap: 4px 16px;
-  padding: 13px 4px 13px 0;
-}
-
-.boardRow:hover .rowTitle {
-  text-decoration: underline;
-  text-decoration-color: var(--lime);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
-}
-
-.position {
-  grid-area: pos;
-  justify-self: start;
-  font-size: 26px;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: -0.04em;
-  line-height: 1;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-  padding: 3px 6px 3px 0;
-}
-
-/* Podium (P1–P3) in the signature lime; P4 onward stay black. */
-.boardRow[data-pos='1'] .position,
-.boardRow[data-pos='2'] .position,
-.boardRow[data-pos='3'] .position {
-  color: var(--lime-podium);
-}
-
-.rowMain {
-  grid-area: main;
-  min-width: 0;
-}
-
-.rowTitle {
-  display: block;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.4;
-  color: var(--ink);
-}
-
-.vehicle {
-  color: var(--text);
-}
-
-.newTag {
-  padding: 0 5px;
-  border-radius: 3px;
-  background: var(--ink);
-  color: var(--lime);
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 16px;
-  letter-spacing: 0.04em;
-}
-
-.rowStats {
-  grid-area: stats;
-  display: flex;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.rowStats b {
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-
-.rowThumbEmpty {
-  grid-area: thumb;
-  width: 64px;
-}
-
-.rowThumb {
-  grid-area: thumb;
-  width: 64px;
-  height: 44px;
-  object-fit: cover;
-  border-radius: 3px;
-  background: var(--bg);
-  display: block;
-}
-
-.moreLink {
-  display: inline-block;
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.moreLink:hover {
-  color: var(--ink);
 }
 
 /* ---------- Latest ---------- */
@@ -919,17 +494,6 @@ a.shortcut:hover .shortcutChevron {
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1180px) {
-  .headerInner {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      'logo search account'
-      'nav nav nav';
-    gap: 0 20px;
-    padding-top: 10px;
-  }
-  .nav {
-    padding: 4px 0 6px;
-  }
   .firstScreen {
     grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
   }
@@ -963,7 +527,6 @@ a.shortcut:hover .shortcutChevron {
 }
 
 @media (max-width: 860px) {
-  .headerInner,
   .main,
   .notice {
     padding-left: 20px;
@@ -991,9 +554,6 @@ a.shortcut:hover .shortcutChevron {
 }
 
 @media (max-width: 600px) {
-  .logoImage {
-    height: 38px !important;
-  }
   .shortcut,
   .shortcut:last-child {
     grid-column: auto;
@@ -1004,40 +564,12 @@ a.shortcut:hover .shortcutChevron {
   .shortcutChevron {
     display: block;
   }
-  .headerInner {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      'logo account'
-      'search search'
-      'nav nav';
-    padding-top: 8px;
-    row-gap: 8px;
-  }
-  .account {
-    justify-content: flex-end;
-  }
-  .nav {
-    gap: 2px 16px;
-    font-size: 13px;
-  }
   .main {
     padding-top: 20px;
   }
-  .board,
   .latest,
   .lowerPanel {
     padding: 16px 14px;
-  }
-  .boardRow {
-    grid-template-columns: 46px minmax(0, 1fr) auto;
-    grid-template-areas:
-      'pos main thumb'
-      'pos stats thumb';
-    column-gap: 12px;
-    align-items: start;
-  }
-  .position {
-    font-size: 22px;
   }
   .shortcuts {
     grid-template-columns: minmax(0, 1fr);

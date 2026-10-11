@@ -1,6 +1,6 @@
 import type {GarageEntry} from '../../lib/home-types';
 import {imageUrl, memberUrl} from '../../lib/format';
-import {CarIcon} from './icons';
+import {CarIcon} from '../common/icons';
 import styles from './main.module.css';
 
 // "오늘의 차고": up to three public vehicles from GET /api/board/garage, picked
