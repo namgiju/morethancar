@@ -26,6 +26,7 @@ import CommentSection from './comment-section';
 import PostContext from './post-context';
 import CommunityDialog, {type DialogSpec} from './community-dialog';
 import SiteFooter from '../footer/site-footer';
+import theme from '../common/theme.module.css';
 import styles from './community.module.css';
 import detailStyles from './post-detail.module.css';
 
@@ -323,7 +324,7 @@ export default function PostDetail({postId}: {postId: number}) {
   const loginNext = encodeURIComponent(detail.status === 'ready' ? postUrl(detail.post) : pathname);
 
   return (
-    <div className={styles.shell}>
+    <div className={`${theme.theme} ${styles.shell}`}>
       <CommunityHeader
         auth={auth}
         search={search}
@@ -350,7 +351,7 @@ export default function PostDetail({postId}: {postId: number}) {
 
         {detail.status === 'ready' ? (
           <div className={detailStyles.layout}>
-            <aside className={detailStyles.sidebar} aria-label="게시글 작성자">
+            <aside className={`${detailStyles.sidebar} ${detailStyles.authorColumn}`} aria-label="게시글 작성자">
               <AuthorCard post={detail.post} author={author} />
             </aside>
             <article className={detailStyles.article}>
@@ -373,7 +374,7 @@ export default function PostDetail({postId}: {postId: number}) {
                 onDelete={requestCommentDelete}
               />
             </article>
-            <aside className={detailStyles.sidebar} aria-label="관련 콘텐츠">
+            <aside className={`${detailStyles.sidebar} ${detailStyles.contextColumn}`} aria-label="관련 콘텐츠">
               <PostContext post={detail.post} author={author} />
             </aside>
           </div>

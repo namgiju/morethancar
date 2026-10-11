@@ -19,6 +19,7 @@ import CommunitySidebar from './community-sidebar';
 import SiteFooter from '../footer/site-footer';
 import {HEADINGS, isCategory} from './categories';
 import {useCommunitySession} from './use-community-session';
+import theme from '../common/theme.module.css';
 import styles from './community.module.css';
 import editorStyles from './post-editor.module.css';
 
@@ -258,7 +259,7 @@ export default function PostEditor({postId}: {postId?: number}) {
   const heading = isEdit ? '게시글 수정' : '새 글 작성';
 
   return (
-    <div className={styles.shell}>
+    <div className={`${theme.theme} ${styles.shell}`}>
       <CommunityHeader
         auth={auth}
         search={search}

@@ -1,80 +1,100 @@
-/* Auth screens (/login, later /signup and /password-reset). Same light
-   tokens as community.module.css. app/globals.css still styles bare
-   `main`/`section`/`header` for the old prototype, so the classes below
-   reset the properties those rules set. */
+/* Auth screens (/login, /signup, /password-reset). White theme: tokens
+   come from components/common/theme.module.css, which auth-shell.tsx puts
+   on the same element as .page. Small radii, thin rules, black type and a
+   lime primary action, like the main page and community.
+   app/globals.css still styles bare `main`/`section`/`header`/`small` for
+   the old prototype, so the classes below reset the properties those rules
+   set. */
 .page {
-  --accent: #3478c7;
-  --line: #edeef0;
-  --ink: #262a2f;
-  --muted: #85888d;
-  --danger: #c4413a;
-  --ok: #2f8a4c;
+  --danger: #b23a32;
+  --danger-bg: #f8e5e3;
   min-height: 100vh;
   max-width: none;
   margin: 0;
   padding: 48px 16px;
   display: grid;
   place-items: center;
-  background: #f5f6f8;
+  background: var(--bg);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
-  line-height: 1.6;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .panel {
   width: min(100%, 420px);
   margin: 0;
-  padding: 36px 32px 24px;
-  background: #fff;
+  padding: 32px 32px 22px;
+  background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-top: 3px solid var(--ink);
+  border-radius: var(--radius);
 }
 
 .panel h1 {
   margin: 4px 0 6px;
   font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
 }
 
 .panel a {
-  color: var(--accent);
+  color: var(--ink);
+  font-weight: 700;
   text-decoration: none;
+}
+
+.panel a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--lime);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
 .logo {
   display: inline-block;
-  margin-bottom: 24px;
+  margin: -8px 0 10px -4px;
+}
+
+.panel .logo:hover {
+  text-decoration: none;
 }
 
 .eyebrow {
   margin: 0;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.08em;
-  color: var(--muted);
+  color: var(--lime-ink);
 }
 
 .description {
-  margin: 0 0 20px;
+  margin: 0 0 22px;
   color: var(--muted);
   font-size: 14px;
 }
 
+/* Status line (errors, 가입 완료 / 비밀번호 변경 완료, 인증번호 발송). */
 .message {
   margin: 0 0 16px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-left: 3px solid;
+  border-radius: 0 var(--radius) var(--radius) 0;
   font-size: 14px;
+  font-weight: 600;
   outline: none;
 }
 
 .message[data-kind='error'] {
-  background: #fdf0ef;
+  border-left-color: var(--danger);
+  background: var(--danger-bg);
   color: var(--danger);
 }
 
 .message[data-kind='success'] {
-  background: #eef8f1;
-  color: var(--ok);
+  border-left-color: var(--lime);
+  background: var(--bg);
+  color: var(--ink);
 }
 
 .form {
@@ -87,18 +107,36 @@
 }
 
 .form label {
-  font-size: 14px;
-  font-weight: 600;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .form input {
   width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 11px 12px;
+  min-width: 0;
+  height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 0 12px;
   font: inherit;
+  font-size: 15px;
   color: var(--ink);
   background: #fff;
+}
+
+.form input::placeholder {
+  color: #a3a8a0;
+}
+
+.form input:focus {
+  outline: 2px solid var(--ink);
+  outline-offset: -1px;
+}
+
+.form input:read-only {
+  background: var(--bg);
+  color: var(--text);
 }
 
 .usernameField {
@@ -112,13 +150,20 @@
 
 .secondary {
   flex-shrink: 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
   padding: 0 14px;
   background: #fff;
   color: var(--ink);
   font: inherit;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
+}
+
+.secondary:hover:not(:disabled) {
+  border-color: var(--ink);
 }
 
 .secondary:disabled {
@@ -133,27 +178,44 @@
 }
 
 .fieldHelp[data-kind='success'] {
-  color: var(--ok);
+  color: var(--lime-ink);
+  font-weight: 700;
 }
 
 .fieldHelp[data-kind='error'] {
   color: var(--danger);
+  font-weight: 700;
 }
 
 .consents {
   display: grid;
   gap: 6px;
-  margin: 4px 0 0;
-  padding: 0;
+  margin: 8px 0 0;
+  padding: 12px 0 0;
   border: 0;
+  border-top: 1px solid var(--line);
 }
 
-.consents label {
+.form .consents label {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
   font-size: 13px;
   font-weight: 400;
+}
+
+.form .consents input {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  flex-shrink: 0;
+  accent-color: var(--ink);
+}
+
+.consents span {
+  color: var(--lime-ink);
+  font-weight: 700;
 }
 
 .srOnly {
@@ -171,32 +233,46 @@
   position: relative;
 }
 
-.passwordField input {
+.form .passwordField input {
   padding-right: 64px;
 }
 
 .toggle {
   position: absolute;
   top: 50%;
-  right: 8px;
+  right: 6px;
   transform: translateY(-50%);
   border: 0;
+  border-radius: 3px;
+  padding: 4px 8px;
   background: none;
   color: var(--muted);
-  font-size: 13px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
 }
 
+.toggle:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+
 .submit {
-  margin-top: 12px;
+  margin-top: 14px;
+  height: 46px;
   border: 0;
-  border-radius: 10px;
-  padding: 12px;
-  background: var(--accent);
-  color: #fff;
+  border-radius: var(--radius);
+  background: var(--lime);
+  color: var(--ink);
   font: inherit;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
   cursor: pointer;
+}
+
+.submit:hover:not(:disabled) {
+  background: var(--lime-hover);
 }
 
 .submit:disabled {
@@ -206,31 +282,72 @@
 
 .switch {
   margin: 14px 0 0;
-  font-size: 14px;
+  font-size: 13px;
   text-align: center;
   color: var(--muted);
 }
 
+/* "또는" between two thin rules. */
 .divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin: 18px 0 12px;
-  text-align: center;
   font-size: 12px;
   color: var(--muted);
 }
 
-.kakao {
-  display: block;
-  padding: 12px;
-  border-radius: 10px;
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--line);
+}
+
+/* Kakao keeps its brand yellow (login button guideline). */
+.panel .kakao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  border-radius: var(--radius);
   background: #fee500;
-  color: #191919 !important;
-  font-weight: 700;
-  text-align: center;
+  color: #191919;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.panel .kakao:hover {
+  background: #f5dc00;
+  text-decoration: none;
 }
 
 .copyright {
-  margin: 24px 0 0;
+  margin: 22px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
   font-size: 12px;
   color: var(--muted);
   text-align: center;
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 20px 12px;
+    place-items: start center;
+  }
+  .panel {
+    padding: 24px 18px 18px;
+  }
+  .panel h1 {
+    font-size: 24px;
+  }
+}
+
+/* /password-reset's code step shows the ID/email form and the code form
+   together: separate them with a rule. */
+.panel form + form {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }

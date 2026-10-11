@@ -1,14 +1,8 @@
-/* Community screens. The list page (and the left nav / right sidebar it
-   shares with the post editor) use the white theme: tokens come from
-   components/common/theme.module.css on .page / .leftNav / .rightSidebar.
-   .shell keeps the older tokens for the post detail, editor and member
-   pages until their own redesign step. */
+/* Community screens (list, post detail, editor, member garage, public
+   vehicle) all use the white theme: tokens come from
+   components/common/theme.module.css, which every community page puts on
+   the same element as .shell. */
 .shell {
-  --accent: #3478c7;
-  --line: #edeef0;
-  --ink: #262a2f;
-  --muted: #85888d;
-  --bg: #ffffff;
   background: var(--bg);
   color: var(--ink);
   min-height: 100vh;
@@ -48,16 +42,19 @@
 }
 
 .secondary {
-  border: 1px solid #e3e5e7;
-  border-radius: 8px;
-  padding: 9px 16px;
+  height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 0 14px;
+  font: inherit;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 700;
   background: #fff;
+  color: var(--ink);
 }
 
 .secondary:hover {
-  background: #f5f6f6;
+  border-color: var(--ink);
 }
 
 .secondary:disabled {
@@ -374,24 +371,6 @@
   outline-offset: -1px;
 }
 
-.page .secondary {
-  height: 36px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  padding: 0 14px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  background: #fff;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.page .secondary:hover {
-  border-color: var(--ink);
-  background: #fff;
-}
-
 .feedControls {
   display: flex;
   flex-wrap: wrap;
@@ -581,11 +560,14 @@
   width: fit-content;
 }
 
+/* minmax(0, 1fr): a grid item's min-width defaults to its content, so a
+   long nowrap title would otherwise widen the sidebar past the viewport. */
 .recentList {
   list-style: none;
   margin: 10px 0 0;
   padding: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 

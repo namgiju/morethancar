@@ -168,7 +168,7 @@ export default function CommunityList() {
   const listTitle = scope ? SCOPE_LABELS[scope] : sort === 'popular' ? '추천순 게시글' : '최신 게시글';
 
   return (
-    <div className={styles.shell}>
+    <div className={`${theme.theme} ${styles.shell}`}>
       <CommunityHeader
         auth={auth}
         search={searchInput}

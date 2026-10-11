@@ -5,6 +5,7 @@ import {usePathname} from 'next/navigation';
 import CommunityHeader from './community-header';
 import type {CommunitySession} from './use-community-session';
 import SiteFooter from '../footer/site-footer';
+import theme from '../common/theme.module.css';
 import styles from './community.module.css';
 import detailStyles from './post-detail.module.css';
 
@@ -28,7 +29,7 @@ export default function CommunityPage({auth, notice, children}: {auth: Community
   const pathname = usePathname();
   const [search, setSearch] = useState('');
   return (
-    <div className={styles.shell}>
+    <div className={`${theme.theme} ${styles.shell}`}>
       <CommunityHeader
         auth={auth}
         search={search}

@@ -15,6 +15,7 @@ import ProfileEditDialog from './profile-edit-dialog';
 import VehicleManageDialog from './vehicle-manage-dialog';
 import VehicleRegistrationDialog from './vehicle-registration-dialog';
 import WithdrawDialog from './withdraw-dialog';
+import theme from '../common/theme.module.css';
 import styles from './my-garage.module.css';
 
 type GarageState =
@@ -72,7 +73,7 @@ export default function MyGarage() {
   }, [session, notify]);
 
   return (
-    <div className={styles.shell}>
+    <div className={`${theme.theme} ${styles.shell}`}>
       <CommunityHeader
         auth={auth}
         search=""
@@ -85,6 +86,7 @@ export default function MyGarage() {
       <main className={styles.main}>
         <div className={styles.heading}>
           <div>
+            <p className={styles.headingEyebrow}>MY GARAGE</p>
             <h1>내 차고</h1>
             <p>나의 자동차 생활을 기록하는 공간, morethancar</p>
           </div>
@@ -109,19 +111,9 @@ export default function MyGarage() {
           </p>
         )}
         {session && state.status === 'ready' && (
-          <>
-            <section className={styles.panel} aria-labelledby="profile-title">
-              <div className={styles.panelHeadingRow}>
-                <h2 id="profile-title">내 프로필</h2>
-                <div>
-                  <button type="button" className={styles.registerButton} onClick={() => setProfileEditOpen(true)}>
-                    프로필 편집
-                  </button>{' '}
-                  <button type="button" className={styles.dangerText} onClick={() => setWithdrawOpen(true)}>
-                    회원 탈퇴
-                  </button>
-                </div>
-              </div>
+          <div className={styles.dashboard}>
+            <section className={`${styles.panel} ${styles.profileCard}`} aria-labelledby="profile-title">
+              <h2 id="profile-title">내 프로필</h2>
               {state.member.coverImageId && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img className={styles.coverPhoto} src={imageUrl(state.member.coverImageId)} alt="프로필 커버" />
@@ -135,41 +127,53 @@ export default function MyGarage() {
                     {[...state.member.username][0] || ''}
                   </div>
                 )}
-                <div>
+                <div className={styles.profileName}>
                   <strong>{state.member.username}</strong>
                   {state.member.bio && <p className={styles.empty}>{state.member.bio}</p>}
                 </div>
               </div>
               <BadgeList badges={state.member.badges} empty="아직 획득한 인장이 없습니다. 차량 인증을 완료하면 오너 인장이 표시됩니다." />
-            </section>
-            <div className={styles.grid}>
-            <section className={styles.panel} aria-labelledby="garage-title">
-              <h2 id="garage-title">대표 차량</h2>
-              <RepresentativeVehicle
-                vehicles={state.vehicles}
-                member={state.member}
-                onManage={setManageVehicleId}
-                onRequestVerification={setVerifyVehicleId}
-              />
-            </section>
-            <aside className={styles.panel} aria-labelledby="owned-title">
-              <div className={styles.panelHeadingRow}>
-                <h2 id="owned-title">보유 차량</h2>
-                <button type="button" className={styles.registerButton} onClick={() => setRegistrationOpen(true)}>
-                  차량 등록
+              <div className={styles.profileActions}>
+                <button type="button" className={styles.registerButton} onClick={() => setProfileEditOpen(true)}>
+                  프로필 편집
+                </button>
+                <button type="button" className={styles.dangerText} onClick={() => setWithdrawOpen(true)}>
+                  회원 탈퇴
                 </button>
               </div>
-              <OwnedVehicleList
-                vehicles={state.vehicles}
-                member={state.member}
-                busyId={repBusyId}
-                onChooseRepresentative={chooseRepresentative}
-                onManage={setManageVehicleId}
-              />
-            </aside>
+            </section>
+            <div className={styles.content}>
+              <div className={styles.grid}>
+                <section className={styles.panel} aria-labelledby="garage-title">
+                  <h2 id="garage-title">대표 차량</h2>
+                  <RepresentativeVehicle
+                    vehicles={state.vehicles}
+                    member={state.member}
+                    onManage={setManageVehicleId}
+                    onRequestVerification={setVerifyVehicleId}
+                  />
+                </section>
+                <aside className={styles.panel} aria-labelledby="owned-title">
+                  <div className={styles.panelHeadingRow}>
+                    <h2 id="owned-title">보유 차량</h2>
+                    <button type="button" className={styles.registerButton} onClick={() => setRegistrationOpen(true)}>
+                      차량 등록
+                    </button>
+                  </div>
+                  <OwnedVehicleList
+                    vehicles={state.vehicles}
+                    member={state.member}
+                    busyId={repBusyId}
+                    onChooseRepresentative={chooseRepresentative}
+                    onManage={setManageVehicleId}
+                  />
+                </aside>
+              </div>
+              <div className={styles.panel}>
+                <Guestbook ownerId={state.member.id} viewer={session ?? null} requireLogin={requireLogin} notify={notify} />
+              </div>
             </div>
-            <Guestbook ownerId={state.member.id} viewer={session ?? null} requireLogin={requireLogin} notify={notify} />
-          </>
+          </div>
         )}
       </main>
       {registrationOpen && (

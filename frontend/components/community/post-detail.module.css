@@ -1,43 +1,61 @@
-/* Post detail page. Lives inside community.module.css's .shell (tokens,
-   header, footer, .notice/.empty/.textLink come from there). Structure follows
-   assignment-frontend/css/style.css's .post-detail-layout: author sidebar /
-   body / related sidebar. Rough layout only — fine tuning comes later.
+/* Post detail page, plus the pieces it shares with the member garage /
+   public vehicle pages (community-page.tsx), the confirm dialog and the
+   header's 내 활동 / 알림 panels. White theme: tokens come from
+   components/common/theme.module.css on the page root (and on the site
+   header, which hosts the panels). Fallbacks after var() cover the dialog
+   and panel rules, which can render outside a themed page.
 
-   app/globals.css still has unscoped `main`, `article` and `section` rules
-   from the old dark garage prototype (max-width, dark background, margins),
-   so every such element here gets a class that resets those properties. */
+   app/globals.css still has unscoped `main`, `article`, `section` and
+   `small` rules from the old dark garage prototype (max-width, dark
+   background, margins, gray text), so every such element here gets a class
+   that resets those properties. */
 
 .page {
   flex: 1 0 auto;
   width: 100%;
-  max-width: 1800px;
-  margin: 28px auto 72px;
-  padding: 0 16px;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 24px 32px 72px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .backLink {
   display: inline-block;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   font-size: 13px;
+  font-weight: 700;
   color: var(--muted);
 }
 
 .backLink:hover {
-  color: var(--accent);
+  color: var(--ink);
 }
 
 .notice {
   min-height: 20px;
   margin: 0 0 8px;
   font-size: 13px;
-  color: var(--accent);
+  font-weight: 700;
+  color: var(--lime-ink);
 }
 
+/* Author card / body / related posts. Same column rhythm as the list page
+   (community.module.css's .layout): side columns 240 / 280, 24px gaps. */
 .layout {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 320px;
-  gap: 48px;
+  grid-template-columns: 240px minmax(0, 1fr) 280px;
+  grid-template-areas: 'author article context';
+  gap: 24px;
   align-items: start;
+}
+
+.authorColumn {
+  grid-area: author;
+}
+
+.contextColumn {
+  grid-area: context;
 }
 
 .sidebar {
@@ -49,33 +67,41 @@
 
 .article,
 .statusBox {
+  grid-area: article;
   min-width: 0;
   margin: 0;
-  background: #fff;
+  background: var(--panel);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 28px;
+  border-radius: var(--radius);
+  padding: 32px 36px;
 }
 
 .muted {
   font-size: 12px;
   color: var(--muted);
-  line-height: 1.65;
-  margin: 5px 0;
+  line-height: 1.6;
+  margin: 4px 0;
 }
 
 /* --- Body --- */
 .category {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--lime);
+  color: var(--ink);
   font-size: 12px;
-  font-weight: 700;
-  color: var(--accent);
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .title {
-  font-size: 27px;
-  line-height: 1.45;
-  margin: 9px 0 14px;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.3;
+  margin: 12px 0 14px;
   overflow-wrap: anywhere;
 }
 
@@ -83,17 +109,20 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  color: #8a929b;
+  gap: 4px 14px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
 }
 
 .text {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 15px;
-  line-height: 1.9;
-  margin: 30px 0;
+  font-size: 16px;
+  line-height: 1.85;
+  color: var(--text);
+  margin: 28px 0;
   min-height: 100px;
 }
 
@@ -105,40 +134,54 @@
 
 .gallery img {
   width: 100%;
-  max-height: 550px;
+  max-height: 560px;
   object-fit: contain;
-  background: #f6f8fa;
-  border-radius: 12px;
+  background: var(--bg);
+  border-radius: var(--radius);
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   border-block: 1px solid var(--line);
-  padding: 18px 0;
-  margin: 24px 0;
+  padding: 16px 0;
+  margin: 28px 0;
 }
 
 .actions button {
-  min-height: 40px;
-  border: 1px solid #e2e7ee;
-  border-radius: 8px;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
   background: #fff;
   color: var(--ink);
-  padding: 8px 12px;
-  font-size: 12px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.actions button:hover {
+  border-color: var(--ink);
 }
 
 .actions button[aria-pressed='true'] {
-  color: #2462b4;
-  background: #edf4ff;
-  border-color: #98b8e0;
+  background: var(--lime);
+  border-color: var(--lime);
+  color: var(--ink);
 }
 
-.actions .danger,
-.dangerText {
-  color: #c4473a;
+.actions button[aria-pressed='true']:hover {
+  background: var(--lime-hover);
+  border-color: var(--lime-hover);
+}
+
+.actions .danger {
+  color: #c4413a;
+}
+
+.actions .danger:hover {
+  border-color: #c4413a;
 }
 
 /* --- Badges --- */
@@ -151,14 +194,16 @@
 .badges h3,
 .card h3,
 .comments h3 {
-  font-size: 14px;
-  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 14px;
 }
 
 .badgeList {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .badge,
@@ -166,19 +211,20 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   font-size: 12px;
 }
 
 .badge {
-  min-width: 150px;
-  padding: 12px;
-  background: #f5f7fa;
+  min-width: 160px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
 }
 
 .badgeCompact {
-  padding: 4px;
-  font-size: 11px;
+  padding: 2px 0;
+  font-size: 12px;
 }
 
 .badge p {
@@ -188,15 +234,17 @@
 .badgeMark {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 34px;
+  width: 28px;
+  height: 32px;
   flex-shrink: 0;
-  background: var(--accent);
-  color: #fff;
+  background: var(--ink);
+  color: var(--lime);
+  font-size: 13px;
+  font-weight: 900;
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
 }
 
-/* --- Comments --- */
+/* --- Comments (also the guestbook and public vehicle records) --- */
 .comments {
   margin: 0;
 }
@@ -205,60 +253,81 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px;
-  margin: 22px 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin: 0 0 18px;
+  background: #fff;
+}
+
+.commentForm:focus-within {
+  border-color: var(--ink);
 }
 
 .commentForm textarea {
   border: 0;
+  outline: 0;
   resize: vertical;
   min-height: 78px;
   font: inherit;
   font-size: 14px;
+  line-height: 1.6;
   background: transparent;
   color: var(--ink);
 }
 
 .primary {
   align-self: flex-end;
+  min-height: 36px;
   border: 0;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
-  padding: 9px 16px;
+  border-radius: var(--radius, 4px);
+  background: var(--lime, #c8f53a);
+  color: var(--ink, #0e100f);
+  padding: 0 16px;
+  font: inherit;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 800;
+}
+
+.primary:hover {
+  background: var(--lime-hover, #b7e824);
 }
 
 .replyLabel {
-  background: #eef4fb;
-  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg);
+  border-left: 3px solid var(--lime);
+  padding: 6px 10px;
   font-size: 12px;
-  border-radius: 6px;
 }
 
 .comment {
   border-bottom: 1px solid var(--line);
-  padding: 18px 0;
+  padding: 16px 0;
 }
 
 .comment p {
   font-size: 14px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  margin: 8px 0;
+  color: var(--text);
+  margin: 6px 0 0;
+}
+
+.comment small {
+  color: var(--muted);
 }
 
 .reply {
-  margin-left: 28px;
-  border-left: 2px solid #eaf0f7;
+  margin-left: 24px;
+  border-left: 2px solid var(--line-strong);
   padding-left: 16px;
 }
 
 .deleted p {
-  color: #9ba1a7;
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -266,9 +335,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  font-size: 11px;
-  color: #9299a0;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .textButton,
@@ -276,12 +345,14 @@
   border: 0;
   background: none;
   padding: 0;
-  font-size: 11px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--muted);
 }
 
 .dangerText {
-  color: #c4473a;
+  color: #c4413a;
 }
 
 .textButton:hover,
@@ -289,20 +360,27 @@
   text-decoration: underline;
 }
 
+.textButton:hover {
+  color: var(--ink);
+}
+
 .emptyComments {
-  padding: 24px 0;
+  padding: 28px 0;
   text-align: center;
   font-size: 13px;
   color: var(--muted);
 }
 
 .memberLink {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
 }
 
 .memberLink:hover {
-  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: var(--lime);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
 .memberWithdrawn {
@@ -313,17 +391,17 @@
 .card {
   margin: 0;
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 20px;
-  background: #fff;
+  border-radius: var(--radius);
+  padding: 18px;
+  background: var(--panel);
   overflow: hidden;
 }
 
 .authorCover {
   display: block;
-  width: calc(100% + 40px);
-  height: 150px;
-  margin: -20px -20px 16px;
+  width: calc(100% + 36px);
+  height: 132px;
+  margin: -18px -18px 16px;
   object-fit: cover;
 }
 
@@ -342,10 +420,10 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: #eef2f7;
-  color: var(--accent);
+  background: var(--ink);
+  color: var(--lime);
   font-size: 24px;
-  font-weight: 700;
+  font-weight: 800;
   object-fit: cover;
 }
 
@@ -356,22 +434,32 @@
 }
 
 .verified {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 3px;
+  background: var(--lime);
+  color: var(--ink);
   font-size: 11px;
-  font-weight: 700;
-  color: #2f8a57;
+  font-weight: 800;
 }
 
 .stats {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 18px 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 16px 0 18px;
+  border: 1px solid var(--line);
+  background: var(--line);
 }
 
 .stats div {
-  background: #f6f8fa;
-  border-radius: 8px;
+  background: #fff;
   padding: 8px 10px;
+}
+
+/* 가입일 gets its own row; 게시글 / 댓글 / 받은 추천 share the next one. */
+.stats div:first-child {
+  grid-column: 1 / -1;
 }
 
 .stats dt {
@@ -381,15 +469,16 @@
 
 .stats dd {
   margin: 2px 0 0;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .contextRow {
   display: flex;
   gap: 10px;
   align-items: center;
-  padding: 12px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -401,7 +490,7 @@
 .relatedAvatar {
   width: 48px;
   height: 48px;
-  border-radius: 8px;
+  border-radius: 3px;
   object-fit: cover;
   flex-shrink: 0;
 }
@@ -409,9 +498,9 @@
 .relatedAvatar {
   display: grid;
   place-items: center;
-  background: #eef2f7;
-  color: var(--accent);
-  font-weight: 700;
+  background: var(--bg);
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .contextRow > div {
@@ -420,58 +509,43 @@
 
 .contextRow strong {
   display: block;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.6;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
 .contextRow:hover strong {
-  color: #2462b4;
+  text-decoration: underline;
+  text-decoration-color: var(--lime);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
 .carPhoto {
   display: block;
   width: 100%;
-  height: 130px;
+  aspect-ratio: 16 / 10;
+  height: auto;
   object-fit: cover;
-  border-radius: 8px;
-  margin-top: 14px;
+  border-radius: 3px;
+  margin-top: 12px;
 }
 
 .boardLink {
   display: block;
-  margin-top: 16px;
+  margin-top: 14px;
   padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #f6f8fa;
-  font-size: 12px;
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: #fff !important;
+  font-size: 13px;
+  font-weight: 800;
   text-align: center;
 }
 
 .boardLink:hover {
-  background: #edf4ff;
-  color: #2462b4;
-}
-
-@media (max-width: 1100px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-  .article {
-    order: -1;
-  }
-}
-
-@media (max-width: 650px) {
-  .page {
-    padding: 0 16px;
-  }
-  .article,
-  .statusBox {
-    padding: 20px;
-  }
+  background: #2b302c;
 }
 
 .actions button:disabled,
@@ -480,51 +554,101 @@
   cursor: wait;
 }
 
+/* --- Responsive ---
+   ≤1180px: the body takes the full width, author and related posts sit
+   side by side under it. ≤760px: one column (body, author, related). */
+@media (max-width: 1180px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'article article'
+      'author context';
+  }
+}
+
+@media (max-width: 860px) {
+  .page {
+    padding: 20px 20px 56px;
+  }
+}
+
+@media (max-width: 760px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'article'
+      'author'
+      'context';
+    gap: 16px;
+  }
+  .article,
+  .statusBox {
+    padding: 22px 18px;
+  }
+  .title {
+    font-size: 23px;
+  }
+  .text {
+    font-size: 15px;
+  }
+  .reply {
+    margin-left: 12px;
+    padding-left: 12px;
+  }
+}
+
 /* --- Confirm / reason dialog (community-dialog.tsx) --- */
 .dialog {
   width: min(440px, calc(100% - 32px));
-  border: 0;
-  border-radius: 14px;
+  border: 1px solid var(--line, #e2e4df);
+  border-radius: 6px;
   padding: 24px;
-  color: #262a2f;
+  color: var(--ink, #0e100f);
   background: #fff;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 24px 60px rgba(14, 16, 15, 0.18);
 }
 
 .dialog::backdrop {
-  background: rgba(15, 20, 28, 0.45);
+  background: rgba(14, 16, 15, 0.45);
 }
 
 .dialog h2 {
   margin: 0 0 8px;
   font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .dialog p {
   margin: 0 0 14px;
   font-size: 13px;
-  color: #6b7076;
+  color: var(--muted, #747a72);
 }
 
 .dialog label {
   display: grid;
   gap: 6px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .dialog textarea {
   font: inherit;
   font-size: 14px;
-  border: 1px solid #e2e7ee;
-  border-radius: 8px;
+  border: 1px solid var(--line-strong, #c9ccc4);
+  border-radius: var(--radius, 4px);
   padding: 10px;
   resize: vertical;
 }
 
+.dialog textarea:focus {
+  outline: 2px solid var(--ink, #0e100f);
+  outline-offset: -1px;
+}
+
 .dialog .dialogError {
   margin: 10px 0 0;
-  color: #c4473a;
+  color: #c4413a;
 }
 
 .dialogActions {
@@ -536,21 +660,27 @@
 
 .dialogCancel,
 .dialogDanger {
-  border-radius: 8px;
-  padding: 9px 16px;
+  min-height: 36px;
+  border-radius: var(--radius, 4px);
+  padding: 0 16px;
+  font: inherit;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .dialogCancel {
-  border: 1px solid #e3e5e7;
+  border: 1px solid var(--line-strong, #c9ccc4);
   background: #fff;
-  color: #262a2f;
+  color: var(--ink, #0e100f);
+}
+
+.dialogCancel:hover {
+  border-color: var(--ink, #0e100f);
 }
 
 .dialogDanger {
   border: 0;
-  background: #c4473a;
+  background: #c4413a;
   color: #fff;
 }
 
@@ -582,7 +712,7 @@
   border: 0;
   background: none;
   font-size: 16px;
-  color: var(--muted, #85888d);
+  color: var(--muted, #747a72);
 }
 
 .panelActions {
@@ -593,25 +723,31 @@
 
 .panelActions a,
 .panelActions button {
-  border: 1px solid #e2e7ee;
-  border-radius: 8px;
+  border: 1px solid var(--line-strong, #c9ccc4);
+  border-radius: var(--radius, 4px);
   background: #fff;
-  color: #262a2f;
-  padding: 9px 14px;
+  color: var(--ink, #0e100f);
+  padding: 8px 14px;
   font-size: 13px;
+  font-weight: 700;
+}
+
+.panelActions a:hover,
+.panelActions button:hover {
+  border-color: var(--ink, #0e100f);
 }
 
 .panelRow {
   display: grid;
   gap: 4px;
   padding: 12px 0;
-  border-bottom: 1px solid #edeef0;
+  border-bottom: 1px solid var(--line, #e2e4df);
   font-size: 13px;
 }
 
 .panelRow a {
-  font-weight: 600;
-  color: #262a2f;
+  font-weight: 700;
+  color: var(--ink, #0e100f);
 }
 
 .panelRow p {
@@ -619,51 +755,62 @@
 }
 
 .panelRow small {
-  color: #85888d;
+  color: var(--muted, #747a72);
 }
 
 .unread a::before {
   content: '● ';
-  color: #3478c7;
+  color: var(--lime-ink, #4a7300);
 }
 
 /* --- Member garage / public vehicle (single column) --- */
 .single {
   max-width: 960px;
   margin: 0 auto;
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 28px;
+  border-radius: var(--radius);
+  padding: 32px 36px;
+}
+
+.single > .comments {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
 }
 
 .garageCards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 14px;
-  margin: 16px 0;
+  margin: 18px 0;
 }
 
 .garageCard {
   display: grid;
   gap: 4px;
-  padding: 12px;
+  padding: 10px 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius);
   font-size: 13px;
 }
 
 .garageCard:hover {
-  border-color: #98b8e0;
+  border-color: var(--ink);
+}
+
+.garageCard small {
+  color: var(--muted);
 }
 
 .garageCard img,
 .garageCardIcon {
   width: 100%;
-  height: 120px;
-  border-radius: 8px;
+  aspect-ratio: 16 / 10;
+  height: auto;
+  border-radius: 3px;
   object-fit: cover;
-  background: #f6f8fa;
+  background: var(--bg);
 }
 
 .garageCardIcon {
@@ -673,22 +820,31 @@
 }
 
 .recordTitle {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   font-size: 15px;
+  font-weight: 800;
 }
 
 .moreButton {
   display: block;
   margin: 16px auto 0;
-  border: 1px solid #e3e5e7;
-  border-radius: 8px;
+  min-height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
   background: #fff;
-  padding: 9px 16px;
+  color: var(--ink);
+  padding: 0 16px;
+  font: inherit;
   font-size: 13px;
+  font-weight: 700;
 }
 
-@media (max-width: 650px) {
+.moreButton:hover {
+  border-color: var(--ink);
+}
+
+@media (max-width: 760px) {
   .single {
-    padding: 20px;
+    padding: 22px 18px;
   }
 }
