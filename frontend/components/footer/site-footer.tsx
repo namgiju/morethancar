@@ -30,7 +30,6 @@ export default function SiteFooter() {
             <h2>서비스</h2>
             <a href="/community">커뮤니티</a>
             <a href="/home">내 차고</a>
-            <a href="/parts">부품 찾기</a>
           </nav>
           <div className={styles.info}>
             <h2>morethancar</h2>

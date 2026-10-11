@@ -63,7 +63,6 @@ export default function CommunityHeader({auth, search, onSearchChange, onSearchS
               커뮤니티
             </a>
             <a href="/home">내 차고</a>
-            <a href="/parts">부품장터</a>
             {session?.role === 'ADMIN' && <a href="/admin">관리</a>}
           </nav>
           <div className={styles.headerActions}>
