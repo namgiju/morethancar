@@ -25,7 +25,7 @@ try {
   // V3가 적용됐는지: 새 컬럼과 상태 CHECK.
   const columns = (await db.query(
     `SELECT table_name||'.'||column_name AS c FROM information_schema.columns WHERE table_schema=$1
-     AND column_name IN ('withdrawn_at','deleted_at','deleted_by','deleted_reason')`, [schema])).rows.map((r) => r.c).sort();
+     AND table_name IN ('board_posts','users') AND column_name IN ('withdrawn_at','deleted_at','deleted_by','deleted_reason')`, [schema])).rows.map((r) => r.c).sort();
   assert.deepEqual(columns, ["board_posts.deleted_at", "board_posts.deleted_by", "board_posts.deleted_reason", "users.withdrawn_at"]);
   await assert.rejects(db.query("INSERT INTO users(username,password,account_status) VALUES('bad','x','GONE')"), /users_account_status_check/);
 

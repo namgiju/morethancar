@@ -54,7 +54,7 @@ public class WithdrawalService {
     public Map<String, Object> info(long userId) {
         User user = users.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."));
         return Map.of("method", user.getKakaoId() != null ? "KAKAO" : "PASSWORD",
-            "admin", "ADMIN".equals(user.getRole()), "reservedListings", reservedListings(userId), "available", blocks.configured());
+            "admin", user.isOperator(), "reservedListings", reservedListings(userId), "available", blocks.configured());
     }
 
     private int reservedListings(long userId) {
@@ -72,8 +72,9 @@ public class WithdrawalService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
         if (user.getKakaoId() != null)
             throw new Refusal(HttpStatus.BAD_REQUEST, "KAKAO_REAUTH_REQUIRED", "카카오 계정은 카카오 재인증으로 탈퇴해야 합니다. 이 기능은 아직 준비 중입니다.");
-        if ("ADMIN".equals(user.getRole()))
-            throw new Refusal(HttpStatus.CONFLICT, "ADMIN_ROLE", "관리자 권한을 먼저 해제해야 탈퇴할 수 있습니다.");
+        // 관리자(ADMIN)와 콘텐츠 운영자(MANAGER)는 권한을 먼저 해제해야 탈퇴할 수 있다(코드는 기존 ADMIN_ROLE 유지).
+        if (user.isOperator())
+            throw new Refusal(HttpStatus.CONFLICT, "ADMIN_ROLE", "관리자·운영자 권한을 먼저 해제해야 탈퇴할 수 있습니다.");
         if (password == null || password.isEmpty())
             throw new Refusal(HttpStatus.BAD_REQUEST, "PASSWORD_REQUIRED", "현재 비밀번호를 입력해주세요.");
         if (!passwordMatches.test(user.getPassword())) {

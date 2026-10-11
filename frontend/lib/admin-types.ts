@@ -4,7 +4,7 @@
 // wording. No new backend API was added for this screen.
 
 export type MemberStatus = 'ACTIVE' | 'SUSPENDED' | 'DISABLED' | 'WITHDRAWN';
-export type MemberRole = 'USER' | 'ADMIN';
+export type MemberRole = 'USER' | 'MANAGER' | 'ADMIN';
 export type MemberField = 'username' | 'nickname' | 'email';
 
 export type Page<T> = {

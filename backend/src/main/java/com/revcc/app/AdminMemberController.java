@@ -73,7 +73,7 @@ public class AdminMemberController {
     }
     public record Update(@Size(max=100) String nickname, @Email @Size(max=254) String email,
         @NotNull @Pattern(regexp="ACTIVE|SUSPENDED|DISABLED") String status,
-        @NotNull @Pattern(regexp="USER|ADMIN") String role, Instant suspendedUntil) {}
+        @NotNull @Pattern(regexp="USER|MANAGER|ADMIN") String role, Instant suspendedUntil) {}
     @Transactional
     @PatchMapping("/{id}") public Member update(@PathVariable Long id, @Valid @RequestBody Update body,
             @CookieValue(name=SharedSessionService.COOKIE,required=false) String token) {
@@ -109,7 +109,8 @@ public class AdminMemberController {
         List<String> changes=new ArrayList<>();
         if (!Objects.equals(target.getNickname(),body.nickname())) changes.add("NICKNAME");
         if (!Objects.equals(target.getEmail(),email)) changes.add("EMAIL");
-        if (!target.getRole().equals(body.role())) changes.add("ROLE");
+        // 권한 변경은 전후 값을 함께 남긴다(예: ROLE(USER>MANAGER)).
+        if (!target.getRole().equals(body.role())) changes.add("ROLE("+target.getRole()+">"+body.role()+")");
         if (!target.getAccountStatus().equals(body.status()) || !Objects.equals(target.getSuspendedUntil(),body.suspendedUntil())) changes.add("STATUS");
         if (!changes.isEmpty()) {
             target.manage(body.nickname(),email,body.status(),body.role(),body.suspendedUntil());
@@ -118,6 +119,48 @@ public class AdminMemberController {
         }
         return Member.from(target);
     }
+    // --- 운영자 권한 관리(/admin/users, ADMIN 전용) ---
+    // 권한 부여·해제는 이 컨트롤러(Spring) 한 곳에서만 한다. board-service에는 역할을 바꾸는 API가 없다.
+
+    /** MANAGER·ADMIN 목록(탈퇴 제외). */
+    @GetMapping("/operators") public List<Member> operators(@CookieValue(name=SharedSessionService.COOKIE,required=false) String token) {
+        admin(token);
+        return users.findOperators().stream().map(Member::from).toList();
+    }
+
+    public record RoleChange(@NotNull @Pattern(regexp="USER|MANAGER|ADMIN") String role) {}
+
+    /**
+     * 역할만 바꾼다(USER ↔ MANAGER ↔ ADMIN). update()와 같은 보호를 따른다: 관리자 행 잠금 후 요청자 재확인,
+     * 자기 자신 변경 금지, 마지막 유효 관리자 강등 금지, 탈퇴 회원 변경 금지. 이용 제한(정지·비활성화) 회원에게는
+     * 운영자 권한을 줄 수 없다(해제는 가능). 변경되면 대상의 모든 세션이 무효가 되고 전후 역할이 기록된다.
+     */
+    @Transactional
+    @PutMapping("/{id}/role") public Member changeRole(@PathVariable Long id, @Valid @RequestBody RoleChange body,
+            @CookieValue(name=SharedSessionService.COOKIE,required=false) String token) {
+        User actor=admin(token);
+        users.lockAdmins();
+        Instant now=Instant.now();
+        if (!users.isEffectiveAdmin(actor.getId(),now))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "관리자만 접근할 수 있습니다.");
+        User target=user(id);
+        entityManager.refresh(target, LockModeType.PESSIMISTIC_WRITE);
+        if (target.isWithdrawn())
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"탈퇴한 회원의 권한은 변경할 수 없습니다.");
+        if (actor.getId().equals(id))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"자신의 권한은 변경할 수 없습니다.");
+        String from=target.getRole();
+        if (from.equals(body.role())) return Member.from(target);
+        if (!"USER".equals(body.role()) && target.isBlocked())
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"이용이 제한된 회원에게는 운영자 권한을 줄 수 없습니다.");
+        if (target.isEffectiveAdmin() && !"ADMIN".equals(body.role()) && users.countEffectiveAdminsExcept(id,now)==0)
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"마지막 관리자는 강등할 수 없습니다. 다른 관리자를 먼저 지정해주세요.");
+        target.changeRole(body.role());
+        users.saveAndFlush(target);
+        logs.save(new AdminMemberAction(actor.getId(),id,"ROLE:"+from+">"+body.role()));
+        return Member.from(target);
+    }
+
     @PostMapping("/{id}/password-reset") public Map<String,String> reset(@PathVariable Long id,
             @CookieValue(name=SharedSessionService.COOKIE,required=false) String token) {
         User actor=admin(token), target=user(id);

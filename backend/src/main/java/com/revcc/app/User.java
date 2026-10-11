@@ -67,7 +67,14 @@ public class User {
         ("SUSPENDED".equals(getAccountStatus()) && (suspendedUntil == null || suspendedUntil.isAfter(Instant.now()))); }
     // 관리자 기능을 실제로 쓸 수 있는 관리자: ADMIN이면서 정지·비활성화·탈퇴 상태가 아니다.
     public boolean isEffectiveAdmin() { return "ADMIN".equals(role) && !isBlocked(); }
+    // 콘텐츠 운영자(MANAGER) 또는 관리자(ADMIN). 탈퇴 전 권한 해제 확인 등에 쓴다. 관리자 인가는 계속 isEffectiveAdmin만 쓴다.
+    public boolean isOperator() { return "ADMIN".equals(role) || "MANAGER".equals(role); }
     public void invalidateSessions() { authVersion = getAuthVersion() + 1; }
+    // 역할만 바꾼다(운영자 권한 관리). 이전 역할이 담긴 세션은 모두 무효가 되어 새 권한은 다시 로그인할 때 적용된다.
+    public void changeRole(String role) {
+        this.role = role;
+        invalidateSessions();
+    }
     // 상태 전이만 한다(모든 세션 무효화 포함). 개인정보 익명화·데이터 처리는 탈퇴 처리(STEP 10-impl-C)가 함께 한다.
     public void markWithdrawn(Instant at) {
         if (isWithdrawn()) return;

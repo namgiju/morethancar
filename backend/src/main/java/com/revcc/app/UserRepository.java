@@ -30,6 +30,12 @@ public interface UserRepository extends JpaRepository<User, Long>, org.springfra
     @org.springframework.data.jpa.repository.Query("select u from User u where u.role = 'ADMIN' order by u.id")
     java.util.List<User> lockAdmins();
 
+    /** 운영자 권한 관리 화면용: MANAGER·ADMIN 회원(탈퇴 제외). */
+    @org.springframework.data.jpa.repository.Query("""
+        select u from User u where u.role in ('MANAGER','ADMIN')
+        and (u.accountStatus is null or u.accountStatus <> 'WITHDRAWN') order by u.role, u.id""")
+    java.util.List<User> findOperators();
+
     /** 잠금을 잡은 뒤 DB의 최신 상태로 센다. 조건은 User.isEffectiveAdmin()과 같다(ADMIN이고 정지·비활성화·탈퇴가 아님). */
     @org.springframework.data.jpa.repository.Query("""
         select count(u) from User u where u.role = 'ADMIN' and u.id <> :excluded

@@ -194,6 +194,7 @@ export default function MemberDialog({
               권한
               <select value={role} onChange={(e) => setRole(e.target.value as MemberRole)} disabled={readOnly}>
                 <option value="USER">USER</option>
+                <option value="MANAGER">MANAGER</option>
                 <option value="ADMIN">ADMIN</option>
               </select>
             </label>

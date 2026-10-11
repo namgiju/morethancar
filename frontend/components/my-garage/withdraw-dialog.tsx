@@ -32,7 +32,7 @@ export default function WithdrawDialog({onClose}: {onClose: () => void}) {
     if (dialog && !dialog.open) dialog.showModal();
     fetchWithdrawInfo()
       .then((info) => {
-        if (info.admin) setState({status: 'blocked', message: '관리자 권한을 먼저 해제해야 탈퇴할 수 있습니다.'});
+        if (info.admin) setState({status: 'blocked', message: '관리자·운영자 권한을 먼저 해제해야 탈퇴할 수 있습니다.'});
         else if (info.reservedListings > 0)
           setState({
             status: 'blocked',
