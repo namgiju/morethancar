@@ -1,10 +1,9 @@
 'use client';
 
-import {useCallback, useState} from 'react';
-import {usePathname, useRouter, useSearchParams} from 'next/navigation';
-import {useCommunitySession} from '../community/use-community-session';
-import CommunityHeader from '../community/community-header';
-import SiteFooter from '../footer/site-footer';
+import {useEffect, useState} from 'react';
+import {useSearchParams} from 'next/navigation';
+import {ApiError, fetchAdminEvents, fetchStaleEvents} from '../../lib/admin-motorsport';
+import AdminShell, {AdminHeading, hasRole, type NavKey} from './admin-shell';
 import OverviewPanel from './overview-panel';
 import MembersPanel from './members-panel';
 import PostsPanel from './posts-panel';
@@ -14,96 +13,32 @@ import VehiclesPanel from './vehicles-panel';
 import TagsPanel from './tags-panel';
 import styles from './admin.module.css';
 
-const PANELS = [
-  {key: 'overview', label: '대시보드'},
-  {key: 'members', label: '회원 관리'},
-  {key: 'posts', label: '게시글 관리'},
-  {key: 'logs', label: '운영 로그'},
-  {key: 'reports', label: '신고 관리'},
-  {key: 'vehicles', label: '차량 인증 관리'},
-  {key: 'tags', label: '인장 현황'},
-] as const;
-type PanelKey = (typeof PANELS)[number]['key'];
+// Existing ADMIN-only community panels, still addressed as /admin?panel=…
+// (links and bookmarks from before the redesign keep working).
+const PANELS = {
+  members: {label: '회원 관리', description: '회원 검색, 상태·권한 변경, 비밀번호 재설정 요청'},
+  posts: {label: '게시글 관리', description: '게시글 검색과 신고 수 확인'},
+  logs: {label: '운영 로그', description: '관리자 삭제 기록과 원문'},
+  reports: {label: '신고 관리', description: '신고 검토와 처리 결과 기록'},
+  vehicles: {label: '차량 인증 관리', description: '자동차등록증 확인 후 승인·거절'},
+  tags: {label: '인장 현황', description: '인장별 보유 회원 수'},
+} as const;
+type PanelKey = keyof typeof PANELS;
+const isPanelKey = (value: string | null): value is PanelKey => !!value && value in PANELS;
 
-function isPanelKey(value: string | null): value is PanelKey {
-  return PANELS.some((p) => p.key === value);
-}
-
-// /admin — 단일 페이지 + ?panel= 탭 구조로 legacy
-// assignment-frontend/admin/index.html + js/admin.js를 포팅. 관리자 권한은
-// 서버가 매 요청마다 다시 검증하므로(AdminController/AdminMemberController의
-// requireAdmin(), board-service의 requireCurrentAdmin()), 화면은 그 결과를
-// 그대로 반영한다 — 어느 패널의 API 호출이든 401/403을 받으면 즉시 접근
-// 거부 화면으로 전환한다(legacy의 api() 공용 핸들러와 동일).
+// /admin — role-aware dashboard. MANAGER sees content tools only; ADMIN
+// also gets the existing community operations (?panel=) and operator roles.
 export default function AdminApp() {
-  const auth = useCommunitySession();
-  const {session} = auth;
-  const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [denied, setDenied] = useState(false);
-
   const panelParam = searchParams.get('panel');
-  const panel: PanelKey = isPanelKey(panelParam) ? panelParam : 'overview';
+  const panel = isPanelKey(panelParam) ? panelParam : null;
 
-  function setPanel(next: PanelKey) {
-    const params = new URLSearchParams(searchParams);
-    if (next === 'overview') params.delete('panel');
-    else params.set('panel', next);
-    const qs = params.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, {scroll: false});
-  }
-
-  const onAccessDenied = useCallback(() => setDenied(true), []);
-
-  const isAdmin = !!session && session.role === 'ADMIN' && !denied;
-
-  return (
-    <div className={styles.shell}>
-      <CommunityHeader
-        auth={auth}
-        search=""
-        onSearchChange={() => {}}
-        onSearchSubmit={(value) => {
-          window.location.href = value ? `/community?q=${encodeURIComponent(value)}` : '/community';
-        }}
-        loginNext={encodeURIComponent(pathname)}
-      />
-      <main className={styles.main}>
-        {session === undefined && !denied && <p className={styles.notice}>관리자 정보를 확인하고 있어요.</p>}
-        {session === null && !denied && (
-          <div className={styles.loginRequired}>
-            <p>이 페이지는 관리자 계정으로 로그인해야 접근할 수 있습니다.</p>
-            <a href={`/login?next=${encodeURIComponent(pathname)}`}>로그인하기</a>
-          </div>
-        )}
-        {session !== undefined && session !== null && !isAdmin && (
-          <div className={styles.loginRequired}>
-            <h1>관리자만 볼 수 있어요</h1>
-            <p>이 페이지는 관리자 계정으로 로그인해야 접근할 수 있습니다.</p>
-            <a href="/home">내 홈으로 돌아가기</a>
-          </div>
-        )}
-        {isAdmin && (
+  if (panel) {
+    return (
+      <AdminShell active={panel as NavKey} require="ADMIN">
+        {({onAccessDenied}) => (
           <>
-            <div className={styles.heading}>
-              <p className={styles.eyebrow}>ADMIN</p>
-              <h1>morethancar 관리자</h1>
-            </div>
-            <nav className={styles.tabs} aria-label="관리자 메뉴">
-              {PANELS.map((p) => (
-                <button
-                  key={p.key}
-                  type="button"
-                  className={`${styles.tabButton} ${panel === p.key ? styles.tabActive : ''}`}
-                  aria-current={panel === p.key ? 'page' : undefined}
-                  onClick={() => setPanel(p.key)}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </nav>
-            {panel === 'overview' && <OverviewPanel onAccessDenied={onAccessDenied} />}
+            <AdminHeading eyebrow="커뮤니티 운영" title={PANELS[panel].label} description={PANELS[panel].description} />
             {panel === 'members' && <MembersPanel onAccessDenied={onAccessDenied} />}
             {panel === 'posts' && <PostsPanel onAccessDenied={onAccessDenied} />}
             {panel === 'logs' && <LogsPanel onAccessDenied={onAccessDenied} />}
@@ -112,8 +47,123 @@ export default function AdminApp() {
             {panel === 'tags' && <TagsPanel onAccessDenied={onAccessDenied} />}
           </>
         )}
-      </main>
-      <SiteFooter />
-    </div>
+      </AdminShell>
+    );
+  }
+
+  return (
+    <AdminShell active="dashboard" require="MANAGER">
+      {({session, onAccessDenied}) => (
+        <>
+          <AdminHeading
+            eyebrow="ADMIN"
+            title="관리자 대시보드"
+            description={
+              hasRole(session, 'ADMIN')
+                ? '콘텐츠와 커뮤니티 운영, 운영자 권한을 한곳에서 관리합니다.'
+                : '모터스포츠 일정 등 콘텐츠를 등록하고 관리합니다.'
+            }
+          />
+          <ContentSummary onAccessDenied={onAccessDenied} />
+          {hasRole(session, 'ADMIN') && (
+            <>
+              <OverviewPanel onAccessDenied={onAccessDenied} />
+              <section className={styles.panel} aria-labelledby="community-ops-title">
+                <h2 id="community-ops-title">커뮤니티 운영</h2>
+                <div className={styles.cardGrid}>
+                  {(Object.keys(PANELS) as PanelKey[]).map((key) => (
+                    <a key={key} className={styles.navCard} href={`/admin?panel=${key}`}>
+                      <strong>{PANELS[key].label}</strong>
+                      <span>{PANELS[key].description}</span>
+                      <em>열기 →</em>
+                    </a>
+                  ))}
+                  <a className={styles.navCard} href="/admin/users">
+                    <strong>운영자 권한</strong>
+                    <span>MANAGER 지정·해제, ADMIN 지정과 변경 기록</span>
+                    <em>열기 →</em>
+                  </a>
+                </div>
+              </section>
+            </>
+          )}
+        </>
+      )}
+    </AdminShell>
+  );
+}
+
+type Counts = {published: number; draft: number; hidden: number; stale: number};
+
+// Content numbers for MANAGER and ADMIN: totals per publication state (the
+// admin list API's `total`) and the re-verification queue.
+function ContentSummary({onAccessDenied}: {onAccessDenied: () => void}) {
+  const [counts, setCounts] = useState<Counts | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetchAdminEvents({publication: 'PUBLISHED'}),
+      fetchAdminEvents({publication: 'DRAFT'}),
+      fetchAdminEvents({publication: 'HIDDEN'}),
+      fetchStaleEvents(),
+    ])
+      .then(([p, d, h, s]) => {
+        if (!cancelled) setCounts({published: p.total, draft: d.total, hidden: h.total, stale: s.events.length});
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        if (e instanceof ApiError && (e.status === 401 || e.status === 403)) onAccessDenied();
+        else setError(e instanceof Error ? e.message : '콘텐츠 현황을 불러오지 못했어요.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [onAccessDenied]);
+
+  const tiles: [keyof Counts, string][] = [
+    ['published', '공개 일정'],
+    ['draft', '초안'],
+    ['hidden', '비공개'],
+    ['stale', '재확인 필요'],
+  ];
+  return (
+    <section className={styles.panel} aria-labelledby="content-title">
+      <div className={styles.panelTop}>
+        <h2 id="content-title">콘텐츠</h2>
+        <a className={styles.primary} href="/admin/motorsport?new=1">
+          ＋ 일정 등록
+        </a>
+      </div>
+      {error ? (
+        <p className={styles.errorText}>{error}</p>
+      ) : (
+        <div className={styles.statRow}>
+          {tiles.map(([key, label]) => (
+            <div key={key} className={`${styles.statTile} ${key === 'stale' && counts?.stale ? styles.statAlert : ''}`}>
+              <p>{label}</p>
+              <strong>{counts ? counts[key] : '–'}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className={styles.cardGrid}>
+        <a className={styles.navCard} href="/admin/motorsport">
+          <strong>모터스포츠 일정</strong>
+          <span>일정 등록·수정, 공개·비공개, 공식 출처 확인일, 시리즈·장소, 변경 이력</span>
+          <em>열기 →</em>
+        </a>
+        <a className={styles.navCard} href="/admin/motorsport?tab=stale">
+          <strong>재확인 대기열</strong>
+          <span>다가오는 일정 중 공식 출처 확인이 14일 넘게 지난 일정</span>
+          <em>열기 →</em>
+        </a>
+        <div className={`${styles.navCard} ${styles.navCardSoon}`} aria-disabled="true">
+          <strong>와인딩 스팟</strong>
+          <span>스팟 등록·수정과 사용자 제보 승인·반려 (다음 단계)</span>
+          <em>준비 중</em>
+        </div>
+      </div>
+    </section>
   );
 }

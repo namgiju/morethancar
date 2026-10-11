@@ -42,6 +42,18 @@ export type MemberUpdateInput = {
 
 // GET /api/admin/members/:id/actions — adminId is null for a self-withdraw
 // entry (SELF_WITHDRAW:<previous status>), which has no acting admin.
+// GET /api/admin/members/role-history — action is `ROLE:FROM>TO:reason` (role
+// API) or `UPDATE:...ROLE(FROM>TO)...` (member edit dialog).
+export type RoleHistoryEntry = {
+  id: number;
+  adminId: number | null;
+  adminUsername: string | null;
+  userId: number;
+  username: string | null;
+  action: string;
+  createdAt: string;
+};
+
 export type MemberAction = {
   adminId: number | null;
   action: string;

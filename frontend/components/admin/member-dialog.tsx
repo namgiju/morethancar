@@ -20,6 +20,11 @@ function actionText(entry: MemberAction): string {
   if (entry.action.startsWith('SELF_WITHDRAW')) {
     return `${createdAt} · 본인 탈퇴 (탈퇴 전 상태: ${entry.action.split(':')[1] || '-'})`;
   }
+  // 운영자 권한 API: ROLE:FROM>TO:사유
+  const role = /^ROLE:([A-Z]+)>([A-Z]+):?(.*)$/.exec(entry.action);
+  if (role) {
+    return `${createdAt} · 관리자 #${entry.adminId} · 권한 변경: ${role[1]} → ${role[2]}${role[3] ? ` (사유: ${role[3]})` : ''}`;
+  }
   if (entry.action === 'PASSWORD_RESET_REQUEST') {
     return `${createdAt} · 관리자 #${entry.adminId} · 비밀번호 재설정 메일 요청`;
   }

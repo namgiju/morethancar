@@ -27,6 +27,10 @@ class AdminMemberAction {
 }
 interface AdminMemberActionRepository extends JpaRepository<AdminMemberAction,Long> {
     Page<AdminMemberAction> findByUserIdOrderByIdDesc(Long userId, Pageable pageable);
+    /** 권한 변경 기록: 역할 API(ROLE:...)와 회원 수정 API의 권한 변경(UPDATE:...ROLE(...)). */
+    @org.springframework.data.jpa.repository.Query(
+        "select a from AdminMemberAction a where a.action like 'ROLE:%' or a.action like 'UPDATE:%ROLE(%' order by a.id desc")
+    List<AdminMemberAction> findRoleChanges(Pageable pageable);
 }
 
 @RestController
@@ -128,7 +132,27 @@ public class AdminMemberController {
         return users.findOperators().stream().map(Member::from).toList();
     }
 
-    public record RoleChange(@NotNull @Pattern(regexp="USER|MANAGER|ADMIN") String role) {}
+    /** reason: 변경 사유(필수, 200자). 기록에 그대로 남는다(`ROLE:USER>MANAGER:사유`). */
+    public record RoleChange(@NotNull @Pattern(regexp="USER|MANAGER|ADMIN") String role,
+        @NotBlank @Size(max=200) String reason) {}
+
+    /** 최근 권한 변경 기록 50건(누가·누구를·무엇으로·언제). 아이디는 지금 값이다(탈퇴 회원은 익명화된 값). */
+    @GetMapping("/role-history") public List<Map<String,Object>> roleHistory(
+            @CookieValue(name=SharedSessionService.COOKIE,required=false) String token) {
+        admin(token);
+        List<AdminMemberAction> rows=logs.findRoleChanges(PageRequest.of(0,50));
+        Set<Long> ids=new HashSet<>();
+        rows.forEach(r -> { ids.add(r.userId); if (r.adminId!=null) ids.add(r.adminId); });
+        Map<Long,String> names=new HashMap<>();
+        users.findAllById(ids).forEach(u -> names.put(u.getId(),u.getUsername()));
+        return rows.stream().map(r -> {
+            Map<String,Object> row=new LinkedHashMap<>();
+            row.put("id",r.id); row.put("adminId",r.adminId); row.put("adminUsername",names.get(r.adminId));
+            row.put("userId",r.userId); row.put("username",names.get(r.userId));
+            row.put("action",r.action); row.put("createdAt",r.createdAt);
+            return row;
+        }).toList();
+    }
 
     /**
      * 역할만 바꾼다(USER ↔ MANAGER ↔ ADMIN). update()와 같은 보호를 따른다: 관리자 행 잠금 후 요청자 재확인,
@@ -157,7 +181,9 @@ public class AdminMemberController {
             throw new ResponseStatusException(HttpStatus.CONFLICT,"마지막 관리자는 강등할 수 없습니다. 다른 관리자를 먼저 지정해주세요.");
         target.changeRole(body.role());
         users.saveAndFlush(target);
-        logs.save(new AdminMemberAction(actor.getId(),id,"ROLE:"+from+">"+body.role()));
+        // 사유의 줄바꿈·제어 문자는 공백으로 바꿔 한 줄 기록으로 남긴다.
+        String reason=body.reason().replaceAll("\\p{Cntrl}"," ").strip();
+        logs.save(new AdminMemberAction(actor.getId(),id,"ROLE:"+from+">"+body.role()+":"+reason));
         return Member.from(target);
     }
 

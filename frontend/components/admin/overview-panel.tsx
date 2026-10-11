@@ -37,7 +37,7 @@ export default function OverviewPanel({onAccessDenied}: {onAccessDenied: () => v
 
   return (
     <section className={styles.panel}>
-      <h2>대시보드</h2>
+      <h2>커뮤니티 현황</h2>
       {error ? (
         <p className={styles.empty}>{error}</p>
       ) : (

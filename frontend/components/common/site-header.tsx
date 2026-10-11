@@ -76,8 +76,8 @@ export default function SiteHeader({auth, search, onSearchChange, onSearchSubmit
               </span>
             ),
           )}
-          {session?.role === 'ADMIN' && (
-            <a href="/admin" aria-current={pathname === '/admin' ? 'page' : undefined}>
+          {(session?.role === 'ADMIN' || session?.role === 'MANAGER') && (
+            <a href="/admin" aria-current={pathname.startsWith('/admin') ? 'page' : undefined}>
               관리
             </a>
           )}
@@ -127,7 +127,7 @@ export default function SiteHeader({auth, search, onSearchChange, onSearchSubmit
                   <button type="button" onClick={() => setPanel('activity')}>
                     내 활동
                   </button>
-                  {session.role === 'ADMIN' && <a href="/admin">관리</a>}
+                  {(session.role === 'ADMIN' || session.role === 'MANAGER') && <a href="/admin">관리</a>}
                   <button type="button" disabled={logoutBusy} onClick={handleLogout}>
                     로그아웃
                   </button>

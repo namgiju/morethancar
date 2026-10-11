@@ -80,7 +80,7 @@ export default function LoginForm() {
         return fail('로그인 세션을 확인하지 못했습니다. 쿠키 설정을 확인하고 다시 로그인해주세요.');
       }
       leaving = true;
-      window.location.replace(next ?? (user.role === 'ADMIN' ? '/admin' : '/'));
+      window.location.replace(next ?? (user.role === 'ADMIN' || user.role === 'MANAGER' ? '/admin' : '/'));
     } catch (error) {
       if (!(error instanceof ApiError)) fail('서버에 연결하지 못했습니다. 연결 상태를 확인하고 다시 시도해주세요.');
       else if (error.status === 400 || error.status === 401) fail('아이디 또는 비밀번호가 올바르지 않습니다.');

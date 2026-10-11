@@ -51,8 +51,10 @@ class OperatorRoleIntegrationTest {
         if (!"USER".equals(role)) user.manage(null,null,"ACTIVE",role,null);
         return users.saveAndFlush(user);
     }
-    ResultActions putRole(Cookie actor, Long id, String role) throws Exception {
-        var request=put("/api/admin/members/"+id+"/role").contentType("application/json").content(body(Map.of("role",role)));
+    ResultActions putRole(Cookie actor, Long id, String role) throws Exception { return putRole(actor,id,role,"테스트 사유"); }
+    ResultActions putRole(Cookie actor, Long id, String role, String reason) throws Exception {
+        Map<String,Object> payload=new HashMap<>(); payload.put("role",role); if (reason!=null) payload.put("reason",reason);
+        var request=put("/api/admin/members/"+id+"/role").contentType("application/json").content(body(payload));
         return mvc.perform(actor==null ? request : request.cookie(actor));
     }
     String role(User u) { return jdbc.queryForObject("SELECT role FROM users WHERE id=?",String.class,u.getId()); }
@@ -78,7 +80,18 @@ class OperatorRoleIntegrationTest {
         putRole(a,member.getId(),"MANAGER").andExpect(status().isOk());
         putRole(a,member.getId(),"USER").andExpect(status().isOk());
         assertEquals("USER",role(member));
-        assertEquals(List.of("ROLE:USER>MANAGER","ROLE:MANAGER>USER"),actions(member));
+        assertEquals(List.of("ROLE:USER>MANAGER:테스트 사유","ROLE:MANAGER>USER:테스트 사유"),actions(member));
+        // 사유는 필수이고(공백만·누락·200자 초과는 400), 줄바꿈은 한 줄로 기록된다.
+        putRole(a,member.getId(),"MANAGER",null).andExpect(status().isBadRequest());
+        putRole(a,member.getId(),"MANAGER","   ").andExpect(status().isBadRequest());
+        putRole(a,member.getId(),"MANAGER","가".repeat(201)).andExpect(status().isBadRequest());
+        putRole(a,member.getId(),"MANAGER","운영 담당\n지정").andExpect(status().isOk());
+        assertEquals("ROLE:USER>MANAGER:운영 담당 지정",actions(member).get(2));
+        // 최근 권한 변경 기록: 수행자·대상 아이디와 함께 최신순.
+        var history=json(mvc.perform(get("/api/admin/members/role-history").cookie(a)).andExpect(status().isOk()).andReturn());
+        assertEquals("ROLE:USER>MANAGER:운영 담당 지정",history.get(0).get("action").asText());
+        assertEquals(member.getUsername(),history.get(0).get("username").asText());
+        assertEquals(admin.getUsername(),history.get(0).get("adminUsername").asText());
         // 수행자와 시각도 남는다.
         Map<String,Object> last=jdbc.queryForMap("SELECT admin_id,created_at FROM admin_member_actions WHERE user_id=? ORDER BY id DESC LIMIT 1",member.getId());
         assertEquals(admin.getId(),((Number)last.get("admin_id")).longValue());
@@ -97,7 +110,7 @@ class OperatorRoleIntegrationTest {
         putRole(m,admin.getId(),"USER").andExpect(status().isForbidden());
         assertEquals("USER",role(member)); assertEquals("MANAGER",role(manager)); assertEquals("ADMIN",role(admin));
         // 기존 관리자 API(회원 관리·개요·차량 인증)는 MANAGER에게 열리지 않는다.
-        for (String path : List.of("/api/admin/members","/api/admin/members/operators","/api/admin/overview","/api/admin/vehicle-verifications"))
+        for (String path : List.of("/api/admin/members","/api/admin/members/operators","/api/admin/members/role-history","/api/admin/overview","/api/admin/vehicle-verifications"))
             mvc.perform(get(path).cookie(m)).andExpect(status().isForbidden());
         mvc.perform(patch("/api/admin/members/"+member.getId()).cookie(m).contentType("application/json")
             .content(body(Map.of("status","DISABLED","role","USER")))).andExpect(status().isForbidden());

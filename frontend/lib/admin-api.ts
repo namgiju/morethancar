@@ -18,7 +18,9 @@ import type {
   BoardOverview,
   MemberAction,
   MemberField,
+  MemberRole,
   MemberStatus,
+  RoleHistoryEntry,
   MemberUpdateInput,
   ModerationLog,
   Page,
@@ -132,6 +134,24 @@ export async function fetchVehicleVerifications(): Promise<VehicleVerification[]
 // POST /api/admin/vehicle-verifications/:id/approve|reject (Spring core)
 export async function decideVehicleVerification(id: number, action: 'approve' | 'reject'): Promise<VehicleVerification> {
   return apiFetch<VehicleVerification>(`/api/admin/vehicle-verifications/${id}/${action}`, jsonInit('POST', {}));
+}
+
+// --- Operator roles (Spring AdminMemberController, ADMIN only) ---
+
+// GET /api/admin/members/operators — MANAGER and ADMIN members (not withdrawn).
+export async function fetchOperators(): Promise<AdminMember[]> {
+  return apiFetch<AdminMember[]>('/api/admin/members/operators');
+}
+
+// PUT /api/admin/members/:id/role — role only, reason required. The server
+// enforces last-admin and self-change protection and ends the member's sessions.
+export async function changeMemberRole(id: number, role: MemberRole, reason: string): Promise<AdminMember> {
+  return apiFetch<AdminMember>(`/api/admin/members/${id}/role`, jsonInit('PUT', {role, reason}));
+}
+
+// GET /api/admin/members/role-history — latest 50 role changes.
+export async function fetchRoleHistory(): Promise<RoleHistoryEntry[]> {
+  return apiFetch<RoleHistoryEntry[]>('/api/admin/members/role-history');
 }
 
 // GET /api/garage/vehicle-verifications/:id/document — not fetched; the UI
