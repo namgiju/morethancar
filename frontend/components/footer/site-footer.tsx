@@ -22,7 +22,7 @@ export default function SiteFooter() {
         <div className={styles.top}>
           <div className={styles.brand}>
             <a href="/" aria-label="morethancar 홈">
-              <Logo height={32} />
+              <Logo height={60} />
             </a>
             <p>차, 그 이상.</p>
           </div>
