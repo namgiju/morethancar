@@ -243,7 +243,7 @@ content_admin_logs (id, entity_type 'MOTORSPORT_EVENT'|'SPOT'|…, entity_id, ac
 |---|---|---|
 | 0 | 결정 사항 확정(§9, 완료), 카카오 콘솔에서 지도 쿼터·도메인 확인(사람, 스팟 단계 전까지) | 결정 기록 |
 | 1 | V6 모터스포츠 테이블 + `content_admin_logs` + 운영 API(MANAGER 이상) + 공개 조회 API + MANAGER 역할·운영자 권한 API(Spring) + 테스트 **(완료 2026-10-12)** | 마이그레이션, `motorsport.js`, 테스트 |
-| 2 | 관리자 화면 리디자인(최신 화이트 테마) + `/admin/motorsport`(등록·수정·공개/비공개·확인일·삭제/복원·시리즈/장소·이력) + `/admin/users`(운영자 권한, ADMIN) | 관리자 UI |
+| 2 | 관리자 화면 리디자인(최신 화이트 테마) + `/admin/motorsport`(등록·수정·공개/비공개·확인일·삭제/복원·시리즈/장소·이력) + `/admin/users`(운영자 권한, ADMIN) **(완료 2026-10-12, `ed803e1`)** | 관리자 UI |
 | 3 | `/motorsport` 캘린더·리스트·상세, 메인 미리보기 실데이터, 헤더 메뉴 활성화 | 공개 화면 |
 | 4 | 게시글 ↔ 일정 연결(V6 컬럼은 1단계에 포함), 글쓰기·글 상세·일정 상세 연결 UI | 후기 연결 |
 | 5 | V7 스팟 테이블 + 사진 공개 규칙 확장 + 제보·승인 API + 테스트 | `spots.js`, image-references 수정 |
@@ -255,6 +255,12 @@ content_admin_logs (id, entity_type 'MOTORSPORT_EVENT'|'SPOT'|…, entity_id, ac
 A(1~4)를 먼저 끝내고 B(5~8)로 넘어간다. A는 지도·외부 키가 필요 없어 바로 시작할 수 있다.
 
 ---
+
+### 진행 현황 (2026-10-12)
+
+- 1단계 완료 `13ed78f`: V6 + 공개·운영 API + MANAGER 역할·운영자 권한 API. CI run 38154786026 성공.
+- 2단계 완료 `ed803e1`: 관리자 화면 리디자인(`AdminShell`), `/admin/motorsport`, `/admin/users`(사유 필수 + 확인 단계, 권한 변경 기록 API), 파비콘. 검증: Next 빌드·TypeScript 통과(CI에는 프론트 빌드가 없음), `mvn test` 135, `npm test` 53, Playwright 13항목, 13화면 × 3너비 가로 넘침 0.
+- 다음: 3단계(공개 `/motorsport`, 메인 미리보기, 헤더 메뉴) → 4단계(게시글 ↔ 일정 연결) → 5단계 이후 스팟. 운영 반영 전 `users_role_check` VALIDATE와 EC2 자동 시작 차단 필요.
 
 ## 9. 결정 사항 (2026-10-12 확정)
 
