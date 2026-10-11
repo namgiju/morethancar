@@ -1,5 +1,9 @@
 # REV.CC Docker 과제
 
+> 2026-10-11 갱신: 이 문서는 과제 제출 당시 기록이다. 그 뒤 레거시 HTML 프론트엔드(`assignment-frontend/`)와
+> `prototype/`은 삭제했고, `revcc-frontend` 컨테이너는 Next.js(`./frontend`, 이미지 `revcc-frontend:next`)를 제공한다.
+> 아래에 나오는 `assignment-frontend/` 파일 목록은 당시 기록으로만 남긴다.
+
 ## 분석 및 구현 범위
 
 기존 프로젝트는 `frontend/` Next.js 개인 화면, `backend/` Spring Boot API,
@@ -36,7 +40,7 @@ docker compose ps
 | 컨테이너 | 역할 | 내부 포트 |
 | --- | --- | --- |
 | revcc-proxy | Nginx 단일 진입점 | 80 → 호스트 8090 |
-| revcc-frontend | Nginx로 HTML/CSS/Vanilla JS 제공 | 80 |
+| revcc-frontend | Next.js 화면 제공 (제출 당시는 Nginx + HTML/CSS/Vanilla JS) | 80 |
 | revcc-core | Spring Boot 3.5 / Java 23, 회원·차량 | 8080 |
 | revcc-board | Node.js 22 / Express, 게시판·부품 | 3001 |
 | revcc-redis | Redis 7, 공유 로그인 세션 | 6379 |

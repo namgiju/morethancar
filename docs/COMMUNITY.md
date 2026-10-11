@@ -1,5 +1,9 @@
 # REV.CC 커뮤니티 기능
 
+> **레거시 기록 (2026-10-11):** 이 문서의 화면 설명·파일 경로는 삭제된 레거시 HTML 프론트엔드(`assignment-frontend/`) 기준이다.
+> 현재 화면은 `frontend/`(Next.js)이며, 여기서 언급한 `scripts/*-browser.cjs`·`post-detail-live.cjs` 브라우저 검사와
+> `docker-compose.override.yml`·`docker-compose.garage.yml`도 함께 삭제했다. API·운영 관련 내용은 그대로 유효하다.
+
 HTML 화면은 `assignment-frontend/`, API는 `board-service/`에서 제공합니다.
 Next.js `frontend/`와 대문 영역은 이 작업에서 수정하지 않았습니다.
 

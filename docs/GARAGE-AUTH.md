@@ -1,5 +1,9 @@
 # 내 차고 인증·권한 수정 (2026-09-21)
 
+> **레거시 기록 (2026-10-11):** 이 문서의 화면 설명·파일 경로는 삭제된 레거시 HTML 프론트엔드(`assignment-frontend/`) 기준이다.
+> 현재 화면은 `frontend/`(Next.js)이며, 여기서 언급한 `scripts/*-browser.cjs`·`post-detail-live.cjs` 브라우저 검사와
+> `docker-compose.override.yml`·`docker-compose.garage.yml`도 함께 삭제했다. API·운영 관련 내용은 그대로 유효하다.
+
 > 아래는 선행 수정 기록입니다. 현재 내 차고는 `/home`으로 통합되었으며
 > `/garage`는 리다이렉트합니다. 최신 화면/라우팅/검사는 [GARAGE-HOME.md](GARAGE-HOME.md)를 참조하세요.
 

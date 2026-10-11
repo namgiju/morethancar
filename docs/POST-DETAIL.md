@@ -1,5 +1,9 @@
 # 커뮤니티 게시글 상세
 
+> **레거시 기록 (2026-10-11):** 이 문서의 화면 설명·파일 경로는 삭제된 레거시 HTML 프론트엔드(`assignment-frontend/`) 기준이다.
+> 현재 화면은 `frontend/`(Next.js)이며, 여기서 언급한 `scripts/*-browser.cjs`·`post-detail-live.cjs` 브라우저 검사와
+> `docker-compose.override.yml`·`docker-compose.garage.yml`도 함께 삭제했다. API·운영 관련 내용은 그대로 유효하다.
+
 2026-09-21 정정 요청 반영. 레퍼런스는 공개 차고가 아닌 게시글 상세 디자인이다. `/home`은 로그인 사용자의 개인 차고로 유지한다. 직전 미완성 공개 차고 경로, 방명록 UI/API/스키마 변경은 철회했다. 해당 방명록 스키마는 DB에 적용하지 않았다.
 
 ## 화면과 변경 파일

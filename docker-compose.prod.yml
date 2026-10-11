@@ -1,4 +1,4 @@
-# 운영 배포용 오버레이. 로컬 개발 오버레이(override.yml, dev.yml)와 분리해 약한 기본값을
+# 운영 배포용 오버레이. 로컬 개발 오버레이(dev.yml)와 분리해 약한 기본값을
 # 운영에서는 절대 허용하지 않는다: docker-compose.yml에는 로컬 편의용 기본값이 남아있지만,
 # 이 파일을 얹으면 값이 없을 때 기동 자체가 실패한다.
 #
@@ -54,9 +54,10 @@ services:
     networks:
       tunnel:
         ipv4_address: 172.16.238.2
-  # 운영 화면은 Next.js(frontend/)다. 레거시 assignment-frontend는 과제용 docker-compose.yml에만 남는다.
-  # 서비스 이름과 포트(frontend:80)를 그대로 써서 nginx 설정은 바꾸지 않는다(node 사용자도 컨테이너
-  # 안에서는 Docker 기본 sysctl로 80을 열 수 있다). SSR fetch는 edge 네트워크의 proxy를 거쳐 API로 간다.
+  # 운영 화면은 Next.js(frontend/)다. docker-compose.yml도 같은 이미지를 쓰지만, 운영에서 다른 값이
+  # 섞이지 않도록 build·환경변수·healthcheck를 여기서 다시 명시한다. 서비스 이름과 포트(frontend:80)를
+  # 그대로 써서 nginx 설정은 바꾸지 않는다(node 사용자도 컨테이너 안에서는 Docker 기본 sysctl로 80을
+  # 열 수 있다). SSR fetch는 edge 네트워크의 proxy를 거쳐 API로 간다.
   frontend:
     build: ./frontend
     image: revcc-frontend:next

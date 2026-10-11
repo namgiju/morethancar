@@ -1,5 +1,9 @@
 # Community desktop discovery layout
 
+> **레거시 기록 (2026-10-11):** 이 문서의 화면 설명·파일 경로는 삭제된 레거시 HTML 프론트엔드(`assignment-frontend/`) 기준이다.
+> 현재 화면은 `frontend/`(Next.js)이며, 여기서 언급한 `scripts/*-browser.cjs`·`post-detail-live.cjs` 브라우저 검사와
+> `docker-compose.override.yml`·`docker-compose.garage.yml`도 함께 삭제했다. API·운영 관련 내용은 그대로 유효하다.
+
 2026-09-22. Reference: `references/badges/커뮤니티레퍼런스2.png` (filename may use decomposed Korean). `references/ui` and `references/badgex` were not present. The active Vanilla frontend is the only implementation target.
 
 ## Existing flow and reuse

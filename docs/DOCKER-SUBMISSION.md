@@ -1,5 +1,8 @@
 # Docker 과제 제출 및 교수님 시연
 
+> 2026-10-11: 레거시 HTML 프론트엔드(`assignment-frontend/`)와 `docker-compose.override.yml`,
+> `docker-compose.garage.yml`을 삭제했다. `frontend` 서비스는 로컬·운영 모두 Next.js(`./frontend`)를 쓴다.
+
 ## 1. 이미지 빌드 (프로젝트 루트)
 
 아래 네 프로그램 이미지는 Apple Silicon에서는 linux/arm64로 빌드된다.
@@ -8,7 +11,7 @@ Java 23, Node 22, Nginx, PostgreSQL, Redis의 ARM 이미지를 사용하고 amd6
 ```sh
 docker build -t revcc-core:assignment ./backend
 docker build -t revcc-board:assignment ./board-service
-docker build -t revcc-frontend:assignment ./assignment-frontend
+docker build -t revcc-frontend:next ./frontend
 docker build -t revcc-proxy:assignment ./nginx
 docker pull postgres:16
 docker pull redis:7-alpine
@@ -50,8 +53,8 @@ docker compose up -d --wait
 
 ### 운영 배포 (docker-compose.prod.yml)
 
-위의 `docker compose up -d --build --wait`는 **로컬 개발용**이다. `-f` 없이 실행하면 Compose가
-`docker-compose.override.yml`(로컬 HTML 직접 마운트)을 자동으로 병합하고,
+위의 `docker compose up -d --build --wait`는 **로컬 개발용**이다. `-f` 없이 실행하면 Compose는
+로컬에 `docker-compose.override.yml`이 있을 때 그것을 자동으로 병합하고,
 `docker-compose.prod.yml`의 운영 하드닝은 전혀 적용되지 않는다.
 운영 서버에서는 반드시 파일을 명시해 override가 병합되지 않게 한다:
 
@@ -132,7 +135,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml config | grep -E
 docker ps
 docker network inspect revcc-network
 docker exec revcc-proxy nginx -t
-docker exec revcc-frontend ls /usr/share/nginx/html
+docker exec revcc-frontend node --version
 docker exec revcc-core java -version
 docker exec revcc-board node --version
 docker exec revcc-redis redis-cli ping
@@ -210,6 +213,10 @@ Compose 실행에서는 `python3 scripts/assignment-system.py`가 실제 세션 
 Docker Hub 계정 `giju1`에 4개 이미지를 모두 push 완료했다 (Apple Silicon에서 빌드한
 linux/arm64 단일 플랫폼 이미지).
 
+> 제출 당시 `revcc-frontend:assignment`는 레거시 정적 HTML(`assignment-frontend/`, 현재 삭제됨) 이미지였다.
+> 지금 저장소의 frontend는 Next.js이고 로컬 태그는 `revcc-frontend:next`다(`docker-compose.yml`,
+> `scripts/assignment-run.sh`가 이 태그를 쓴다). 아래 명령은 제출 당시 기록이다.
+
 ```sh
 docker login
 export REVCC_HUB=giju1
@@ -242,7 +249,7 @@ done
 docker buildx create --name revcc-multi --use
 docker buildx build --platform linux/amd64,linux/arm64 -t "$REVCC_HUB/revcc-core:assignment" --push ./backend
 docker buildx build --platform linux/amd64,linux/arm64 -t "$REVCC_HUB/revcc-board:assignment" --push ./board-service
-docker buildx build --platform linux/amd64,linux/arm64 -t "$REVCC_HUB/revcc-frontend:assignment" --push ./assignment-frontend
+docker buildx build --platform linux/amd64,linux/arm64 -t "$REVCC_HUB/revcc-frontend:next" --push ./frontend
 docker buildx build --platform linux/amd64,linux/arm64 -t "$REVCC_HUB/revcc-proxy:assignment" --push ./nginx
 ```
 

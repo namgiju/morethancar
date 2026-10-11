@@ -1,5 +1,9 @@
 # REV.CC 회원 간 부품 직거래 장터
 
+> **레거시 기록 (2026-10-11):** 이 문서의 화면 설명·파일 경로는 삭제된 레거시 HTML 프론트엔드(`assignment-frontend/`) 기준이다.
+> 현재 화면은 `frontend/`(Next.js)이며, 여기서 언급한 `scripts/*-browser.cjs`·`post-detail-live.cjs` 브라우저 검사와
+> `docker-compose.override.yml`·`docker-compose.garage.yml`도 함께 삭제했다. API·운영 관련 내용은 그대로 유효하다.
+
 2026-09-22. `/parts`를 기존 예시 호환 조회 화면에서 회원 간 부품 장터로 전환했다. 레퍼런스는 실제 존재하는 `references/badges/부품레퍼런스.png`이며 파일명은 한글 분해형일 수 있다. `references/ui`는 없었다. 기존 커뮤니티 부품 카테고리(`/community?category=parts`, 상세 `/community/parts/{id}`)는 별도로 유지한다.
 
 ## 조사 결과와 범위

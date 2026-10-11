@@ -1,5 +1,9 @@
 # `/home`을 내 차고로 통합
 
+> **레거시 기록 (2026-10-11):** 이 문서의 화면 설명·파일 경로는 삭제된 레거시 HTML 프론트엔드(`assignment-frontend/`) 기준이다.
+> 현재 화면은 `frontend/`(Next.js)이며, 여기서 언급한 `scripts/*-browser.cjs`·`post-detail-live.cjs` 브라우저 검사와
+> `docker-compose.override.yml`·`docker-compose.garage.yml`도 함께 삭제했다. API·운영 관련 내용은 그대로 유효하다.
+
 ## 조사 결과
 
 - 기존 `/home`: 로그인 사용자 대시보드. 중앙은 `GET /api/board/posts?limit=6&sort=latest`로

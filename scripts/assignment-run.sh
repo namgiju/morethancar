@@ -49,7 +49,8 @@ docker run -d --name revcc-board --network revcc-network --network-alias board \
     -e "PGPASSWORD=${POSTGRES_PASSWORD:-revcc}" -e REDIS_URL=redis://redis:6379 -e REDIS_PASSWORD revcc-board:assignment
 wait_for docker exec revcc-board node -e "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-docker run -d --name revcc-frontend --network revcc-network --network-alias frontend revcc-frontend:assignment
+docker run -d --name revcc-frontend --network revcc-network --network-alias frontend \
+    -e PORT=80 -e REVCC_API_ORIGIN=http://proxy revcc-frontend:next
 # -p는 Nginx에만 사용한다. 나머지 서비스는 Docker 네트워크 내부에서만 접근한다.
 docker run -d --name revcc-proxy --network revcc-network --network-alias proxy \
     -p "${REVCC_PORT:-8090}:80" revcc-proxy:assignment
