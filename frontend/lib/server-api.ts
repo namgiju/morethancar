@@ -3,7 +3,7 @@
 // `fetch` during SSR never goes through it, so this calls the backend origin
 // directly. All endpoints used here are public (no auth middleware in
 // board-service), so no session cookie needs to be forwarded.
-import type {GarageEntry, Listing, Post} from './home-types';
+import type {GarageEntry, Listing, Post, SiteStats} from './home-types';
 
 const API_ORIGIN = process.env.REVCC_API_ORIGIN || 'http://localhost:8090';
 
@@ -26,6 +26,16 @@ export async function fetchTodayPostsServer(
 // 동일한 호출(sort=popular, 기간 제한 없음)을 재사용한다. 새 API 없음.
 export async function fetchPopularPostsServer(limit = 10): Promise<Post[]> {
   return serverApi<Post[]>(`/api/board/posts?sort=popular&limit=${limit}`);
+}
+
+// "방금 올라온 글": 같은 목록 API의 최신순.
+export async function fetchLatestPostsServer(limit = 6): Promise<Post[]> {
+  return serverApi<Post[]>(`/api/board/posts?sort=latest&limit=${limit}`);
+}
+
+// 메인 첫 화면의 회원·차량·게시글 수. 이미 있는 공개 집계 API를 그대로 쓴다.
+export async function fetchSiteStatsServer(): Promise<SiteStats> {
+  return serverApi<SiteStats>('/api/board/stats/summary');
 }
 
 export async function fetchPublicGarageServer(): Promise<GarageEntry[]> {

@@ -1,55 +1,42 @@
 'use client';
 
-import {useEffect, useRef, useState, type FormEvent} from 'react';
-import type {GarageEntry, Listing, Post, SessionUser} from '../../lib/home-types';
-import {ApiError, fetchSession, fetchTodayPosts, fetchUnreadCount, logout} from '../../lib/home-api';
-import {CATEGORY_LABELS} from '../../lib/format';
-import Logo from '../common/logo';
+import {useEffect, useState} from 'react';
+import type {BoardPeriod, GarageEntry, Post, SessionUser, SiteStats} from '../../lib/home-types';
+import {ApiError, fetchSession, fetchUnreadCount, logout} from '../../lib/home-api';
+import {compactCount} from '../../lib/format';
 import SiteFooter from '../footer/site-footer';
-import PostCard from './post-card';
-import PopularList from './popular-list';
-import GarageSpotlight from './garage-spotlight';
-import MarketSpotlight from './market-spotlight';
-import Reveal from './reveal';
-import styles from './home.module.css';
+import MainHeader from './main-header';
+import TimingBoard from './timing-board';
+import LatestPosts from './latest-posts';
+import ServiceShortcuts from './service-shortcuts';
+import GarageShowcase from './garage-showcase';
+import MotorsportPreview from './motorsport-preview';
+import styles from './main.module.css';
 
-const CATEGORIES: {value: string; label: string}[] = [
-  {value: '', label: '전체'},
-  ...Object.entries(CATEGORY_LABELS).map(([value, label]) => ({value, label})),
-];
-const PERIODS: {value: string; label: string}[] = [
-  {value: 'today', label: '오늘'},
-  {value: 'week', label: '주간'},
-  {value: '', label: '전체'},
-];
-
+// Main page (/). First screen = brand message + TIMING BOARD + newest posts
+// side by side, so visitors see what the community is talking about without
+// scrolling past a big banner. Below: service shortcuts, 오늘의 차고 and the
+// motorsport schedule preview. The parts market section was removed while the
+// market is paused (its code is kept: components/home/market-spotlight.tsx).
 export default function HomeShell({
-  initialPosts,
-  initialPostsFailed,
-  popularPosts,
-  garageSpotlight,
-  market,
+  renderedAt,
+  initialBoard,
+  initialBoardFailed,
+  latestPosts,
+  garage,
+  stats,
 }: {
-  initialPosts: Post[];
-  initialPostsFailed: boolean;
-  popularPosts: Post[];
-  garageSpotlight: GarageEntry | null;
-  market: Listing[];
+  renderedAt: number;
+  initialBoard: {period: BoardPeriod; posts: Post[]};
+  initialBoardFailed: boolean;
+  latestPosts: Post[] | null;
+  garage: GarageEntry[];
+  stats: SiteStats | null;
 }) {
   const [session, setSession] = useState<SessionUser | null | undefined>(undefined);
   const [unread, setUnread] = useState(0);
   const [sessionError, setSessionError] = useState(false);
   const [busy, setBusy] = useState(false);
-
-  const [category, setCategory] = useState('');
-  const [period, setPeriod] = useState('today');
-  const [posts, setPosts] = useState(initialPosts);
-  const [postsLoading, setPostsLoading] = useState(false);
-  const [postsFailed, setPostsFailed] = useState(initialPostsFailed);
-  const feedTicket = useRef(0);
-  const isFirstFeed = useRef(true);
-
-  const [search, setSearch] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -71,30 +58,6 @@ export default function HomeShell({
     };
   }, []);
 
-  useEffect(() => {
-    // 최초 렌더는 서버에서 이미 받아온 initialPosts를 그대로 쓰고, 필터를
-    // 바꿨을 때만 새로 요청한다(마운트 직후 중복 요청 방지).
-    if (isFirstFeed.current) {
-      isFirstFeed.current = false;
-      return;
-    }
-    const ticket = ++feedTicket.current;
-    setPostsLoading(true);
-    setPostsFailed(false);
-    fetchTodayPosts({category, period, limit: 4})
-      .then((data) => {
-        if (ticket !== feedTicket.current) return;
-        setPosts(data);
-      })
-      .catch(() => {
-        if (ticket !== feedTicket.current) return;
-        setPostsFailed(true);
-      })
-      .finally(() => {
-        if (ticket === feedTicket.current) setPostsLoading(false);
-      });
-  }, [category, period]);
-
   async function handleLogout() {
     setBusy(true);
     try {
@@ -110,73 +73,9 @@ export default function HomeShell({
     }
   }
 
-  function submitSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const value = search.trim();
-    window.location.href = value ? `/community?q=${encodeURIComponent(value)}` : '/community';
-  }
-
-  const heroHref = session ? '/home' : '/login?next=%2F';
-  const moreHref = `/community?sort=popular${category ? `&category=${encodeURIComponent(category)}` : ''}`;
-
   return (
     <div className={styles.shell}>
-      <header className={styles.header}>
-        <div className={styles.headerInner}>
-          <a href="/" className={styles.logo} aria-label="morethancar 홈">
-            <Logo height={56} />
-          </a>
-          <div className={styles.searchWrap}>
-            <form className={styles.search} role="search" onSubmit={submitSearch}>
-              <label className={styles.srOnly} htmlFor="home-search">
-                차종, 게시글, 유저 검색
-              </label>
-              <span className={styles.searchIcon} aria-hidden="true">
-                🔍
-              </span>
-              <input
-                id="home-search"
-                type="search"
-                placeholder="차종, 게시글, 유저 검색"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                maxLength={100}
-              />
-            </form>
-          </div>
-          <div className={styles.rightGroup}>
-            <nav className={styles.nav} aria-label="주 메뉴">
-              <a href="/" aria-current="page">
-                홈
-              </a>
-              <a href="/community">커뮤니티</a>
-              <a href="/home">내 차고</a>
-              <a href="/parts">부품장터</a>
-              {session?.role === 'ADMIN' && <a href="/admin">관리</a>}
-            </nav>
-            <div className={styles.headerActions}>
-              <span className={styles.bell} aria-label={unread ? `읽지 않은 알림 ${unread}개` : '새 알림 없음'}>
-                알림{unread > 0 && <span className={styles.bellCount}>{unread}</span>}
-              </span>
-              {session ? (
-                <>
-                  <span className={styles.avatar} aria-hidden="true">
-                    {session.username.slice(0, 1).toUpperCase()}
-                  </span>
-                  <span className={styles.username}>{session.username} 님</span>
-                  <button type="button" className={styles.secondary} disabled={busy} onClick={handleLogout}>
-                    로그아웃
-                  </button>
-                </>
-              ) : (
-                <a className={styles.secondary} href="/login?next=%2F">
-                  로그인 / 가입
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <MainHeader session={session} unread={unread} busy={busy} onLogout={handleLogout} />
 
       {sessionError && (
         <p className={styles.notice} role="status">
@@ -184,106 +83,67 @@ export default function HomeShell({
         </p>
       )}
 
-      <section className={styles.hero} aria-labelledby="hero-title">
-        <div className={styles.heroCopy}>
-          <h1 id="hero-title" className={styles.heroTitle}>
-            <span style={{animationDelay: '80ms'}}>당신의 드라이빙이</span>
-            <span style={{animationDelay: '180ms'}}>콘텐츠가 되는 곳</span>
-            <span style={{animationDelay: '280ms'}}>morethancar</span>
-          </h1>
-          <a className={styles.heroCta} href={heroHref}>
-            지금, 내 차고 만들기 <span className={styles.arrow}>→</span>
-          </a>
-        </div>
-        <div className={styles.heroVisual} aria-hidden="true">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/main/hero-drive.jpg" alt="" />
-          <div className={styles.heroOverlay} />
-        </div>
-      </section>
-
-      <section className={styles.mainGrid} aria-label="morethancar 메인 콘텐츠">
-        <section className={styles.feedSection} aria-labelledby="today-posts-title">
-          <div className={styles.sectionHeading}>
-            <h2 id="today-posts-title">오늘의 인기글</h2>
-            <a className={styles.textLink} href={moreHref}>
-              더보기 →
-            </a>
-          </div>
-          <div className={styles.feedFilters}>
-            <div className={styles.filterGroup} role="group" aria-label="카테고리 선택">
-              {CATEGORIES.map((c) => (
-                <button
-                  key={c.value || 'all'}
-                  type="button"
-                  className={category === c.value ? styles.filterActive : ''}
-                  aria-pressed={category === c.value}
-                  onClick={() => setCategory(c.value)}
-                >
-                  {c.label}
-                </button>
-              ))}
+      <main className={styles.main}>
+        <div className={styles.firstScreen}>
+          <section className={styles.brand} aria-labelledby="brand-title">
+            <p className={styles.eyebrow}>MORE THAN A CAR</p>
+            <h1 id="brand-title" className={styles.brandTitle}>
+              차, 그 이상의
+              <br />
+              이야기.
+            </h1>
+            <p className={styles.brandLead}>
+              자동차와 모터스포츠를 좋아하는 사람들이 모여 정보와 경험을 나누는 곳, morethancar.
+            </p>
+            <div className={styles.ctaRow}>
+              {session ? (
+                <a className={styles.cta} href="/home">
+                  내 차고로 가기 <span aria-hidden="true">→</span>
+                </a>
+              ) : (
+                <a className={styles.cta} href="/signup">
+                  지금 시작하기 <span aria-hidden="true">→</span>
+                </a>
+              )}
+              <a className={styles.ctaGhost} href="/community">
+                커뮤니티 둘러보기
+              </a>
             </div>
-            <div className={styles.filterGroup} role="group" aria-label="기간 선택">
-              {PERIODS.map((p) => (
-                <button
-                  key={p.value || 'all-time'}
-                  type="button"
-                  className={period === p.value ? styles.filterActive : ''}
-                  aria-pressed={period === p.value}
-                  onClick={() => setPeriod(p.value)}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className={styles.postGrid} aria-live="polite" aria-busy={postsLoading}>
-            {postsFailed ? (
-              <p className={styles.empty}>이야기를 불러오지 못했어요. 새로고침해주세요.</p>
-            ) : !posts.length ? (
-              <p className={styles.empty}>
-                {period === 'today' ? '오늘 등록된 이야기가 아직 없어요.' : '조건에 맞는 이야기가 없어요.'}
-              </p>
-            ) : (
-              posts.map((post, i) => (
-                <Reveal key={post.id} delayMs={i * 60}>
-                  <PostCard post={post} />
-                </Reveal>
-              ))
+            {stats && (
+              <dl className={styles.stats}>
+                <div>
+                  <dt>커뮤니티 회원</dt>
+                  <dd>{compactCount(stats.memberCount)}</dd>
+                </div>
+                <div>
+                  <dt>등록된 차량</dt>
+                  <dd>{compactCount(stats.vehicleCount)}</dd>
+                </div>
+                <div>
+                  <dt>누적 게시글</dt>
+                  <dd>{compactCount(stats.postCount)}</dd>
+                </div>
+              </dl>
             )}
-          </div>
-        </section>
+          </section>
 
-        <aside className={styles.sidebar} aria-labelledby="popular-title">
-          <div className={styles.sectionHeading}>
-            <h2 id="popular-title">실시간 인기</h2>
-          </div>
-          <PopularList posts={popularPosts} />
-        </aside>
-      </section>
+          <TimingBoard
+            initialPosts={initialBoard.posts}
+            initialPeriod={initialBoard.period}
+            initialFailed={initialBoardFailed}
+            now={renderedAt}
+          />
 
-      <section className={styles.lowerGrid} aria-label="내 차고 · 부품장터 미리보기">
-        <section className={styles.sidebarSection} aria-labelledby="garage-spotlight-title">
-          <div className={styles.sectionHeading}>
-            <h2 id="garage-spotlight-title">오늘의 차고</h2>
-          </div>
-          <Reveal>
-            <GarageSpotlight vehicle={garageSpotlight} />
-          </Reveal>
-        </section>
-        <section className={styles.sidebarSection} aria-labelledby="market-spotlight-title">
-          <div className={styles.sectionHeading}>
-            <h2 id="market-spotlight-title">장터 새 매물</h2>
-            <a className={styles.textLink} href="/parts">
-              전체보기 →
-            </a>
-          </div>
-          <Reveal>
-            <MarketSpotlight listings={market} />
-          </Reveal>
-        </section>
-      </section>
+          <LatestPosts posts={latestPosts} now={renderedAt} />
+        </div>
+
+        <ServiceShortcuts />
+
+        <div className={styles.lowerGrid}>
+          <GarageShowcase vehicles={garage} />
+          <MotorsportPreview events={[]} />
+        </div>
+      </main>
 
       <SiteFooter />
     </div>

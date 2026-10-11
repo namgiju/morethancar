@@ -48,3 +48,15 @@ export type Listing = {
   createdAt: string;
   views: number;
 };
+
+// GET /api/board/stats/summary (board-service community.js). Only the counts
+// the main page shows are typed; soldPartsCount belongs to the paused market.
+export type SiteStats = {
+  memberCount: number;
+  vehicleCount: number;
+  postCount: number;
+};
+
+// TIMING BOARD period. '' = all time. The API only supports these
+// (board-service: period=today is KST midnight onward, week = last 7 days).
+export type BoardPeriod = 'today' | 'week' | '';

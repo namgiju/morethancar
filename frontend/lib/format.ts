@@ -25,8 +25,10 @@ export function formatMoney(value: number): string {
   return `${value.toLocaleString('ko-KR')}원`;
 }
 
-export function timeAgo(iso: string): string {
-  const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+// `now` lets a server-rendered page pass one fixed render time down to client
+// components so the server HTML and the hydrated client produce the same text.
+export function timeAgo(iso: string, now: number = Date.now()): string {
+  const diffSec = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000));
   if (diffSec < 60) return '방금 전';
   const diffMin = Math.floor(diffSec / 60);
   if (diffMin < 60) return `${diffMin}분 전`;
@@ -34,20 +36,27 @@ export function timeAgo(iso: string): string {
   if (diffHour < 24) return `${diffHour}시간 전`;
   const diffDay = Math.floor(diffHour / 24);
   if (diffDay < 7) return `${diffDay}일 전`;
-  return new Date(iso).toLocaleDateString('ko-KR');
+  return new Date(iso).toLocaleDateString('ko-KR', {timeZone: 'Asia/Seoul'});
+}
+
+// 12.4K style for the main page's stats (real counts from
+// /api/board/stats/summary); below 1,000 the exact number is shown.
+export function compactCount(value: number): string {
+  if (value < 1000) return value.toLocaleString('ko-KR');
+  return new Intl.NumberFormat('en-US', {notation: 'compact', maximumFractionDigits: 1}).format(value);
 }
 
 // "오늘의 차고" 선정 기준: 새 추천 알고리즘/테이블을 만들지 않고, 이미 공개된
 // /api/board/garage 목록(최근 등록 순, 최대 100대) 안에서 사진이 있는 차량을
-// 우선으로 날짜 시드 난수로 하나를 고른다. 같은 날에는 누가 보든 같은 차량이
-// 나오고(= "오늘의"), 날짜가 바뀌면 다른 차량으로 바뀐다. 사진 있는 차량이
-// 하나도 없으면 전체 목록에서 고른다.
-export function pickGarageSpotlight<T extends {imageId: number | null}>(vehicles: T[]): T | null {
+// 우선으로 날짜 기준 순환으로 `count`대를 고른다. 같은 날에는 누가 보든 같은
+// 차량이 나오고(= "오늘의"), 날짜가 바뀌면 시작 차량이 바뀐다. 사진 있는 차량이
+// 모자라면 사진 없는 차량으로 채운다.
+export function pickGarageShowcase<T extends {imageId: number | null}>(vehicles: T[], count: number): T[] {
   const withPhoto = vehicles.filter((v) => v.imageId != null);
-  const pool = withPhoto.length ? withPhoto : vehicles;
-  if (!pool.length) return null;
+  const withoutPhoto = vehicles.filter((v) => v.imageId == null);
   const dayIndex = Math.floor(Date.now() / 86_400_000);
-  return pool[dayIndex % pool.length];
+  const rotate = (list: T[]) => (list.length ? list.map((_, i) => list[(dayIndex + i) % list.length]) : list);
+  return [...rotate(withPhoto), ...rotate(withoutPhoto)].slice(0, count);
 }
 
 // assignment-frontend/js/app.js's dateText(): "2026. 10. 5. 오후 3:12".
