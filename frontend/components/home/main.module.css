@@ -265,7 +265,10 @@
 
 .latestRow {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
+  /* timeAgo()가 7일 지난 글엔 "2026. 12. 31." 형식을 반환한다. -apple-system(San
+     Francisco)로 렌더링하면 이 문자열이 최대 ~78px까지 나가 52px+10px gap을 넘어
+     제목과 겹친다(Windows 기본 폰트는 더 좁아 눈에 띄지 않았다). */
+  grid-template-columns: 70px minmax(0, 1fr);
   gap: 10px;
   padding: 11px 0;
 }

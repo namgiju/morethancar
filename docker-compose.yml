@@ -1,5 +1,7 @@
 
 # 단일 진입점: 호스트에는 proxy만 노출한다. DB 볼륨 이름은 기존 설정을 유지한다.
+# 로컬 개발 DB는 이 파일의 postgres 서비스(아래)뿐이다. 운영 Neon DB(.env의 DB_HOST 등)는
+# docker-compose.prod.yml에서만 읽는다 — 이 파일 어디에도 ${DB_HOST}를 쓰지 않는다.
 services:
   proxy:
     build: ./nginx
@@ -41,9 +43,12 @@ services:
     image: revcc-core:assignment
     container_name: revcc-core
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST}:${DB_PORT:-5432}/${DB_NAME}?sslmode=require
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      # 로컬은 항상 이 compose의 postgres 서비스로만 붙는다. DB_HOST(.env, Neon 운영 DB)는
+      # docker-compose.prod.yml에서만 쓰이고 이 파일은 참조하지 않는다 — 운영 DB 오접속을
+      # 코드 구조로 막는다(scripts/assignment-run.sh와 동일한 접속 정보).
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/revcc
+      POSTGRES_USER: revcc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-revcc}
       REDIS_HOST: redis
       REDIS_PASSWORD: ${REDIS_PASSWORD:-revcc-local-redis}
       SMTP_HOST: ${SMTP_HOST:-localhost}
@@ -76,12 +81,12 @@ services:
     image: revcc-board:assignment
     container_name: revcc-board
     environment:
-      PGHOST: ${DB_HOST}
-      PGPORT: ${DB_PORT:-5432}
-      PGDATABASE: ${DB_NAME}
-      PGUSER: ${DB_USER}
-      PGPASSWORD: ${DB_PASSWORD}
-      PGSSLMODE: require
+      # core와 동일하게 로컬 postgres 서비스로만 붙는다(위 core 주석 참고).
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: revcc
+      PGUSER: revcc
+      PGPASSWORD: ${POSTGRES_PASSWORD:-revcc}
       REDIS_URL: redis://redis:6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-revcc-local-redis}
     depends_on:

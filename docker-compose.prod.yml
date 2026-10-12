@@ -113,6 +113,11 @@ services:
       PG_POOL_MAX: ${BOARD_DB_POOL_MAX:-10}
       PG_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-5000}
       PGHOST: ${DB_HOST:?DB_HOST(Neon 호스트)를 설정해야 배포할 수 있습니다.}
+      # docker-compose.yml(로컬)이 자체 postgres 컨테이너를 쓰도록 바뀌면서 PGPORT/PGSSLMODE를
+      # 더 이상 내보내지 않는다. 예전엔 이 두 값을 그 파일에서 상속받았으니, 병합에 기대지 않도록
+      # 여기서 직접 명시한다(Neon은 SSL 필수).
+      PGPORT: ${DB_PORT:-5432}
+      PGSSLMODE: require
       PGDATABASE: ${DB_NAME:?DB_NAME을 설정해야 배포할 수 있습니다.}
       PGUSER: ${DB_USER:?DB_USER를 설정해야 배포할 수 있습니다.}
       PGPASSWORD: ${DB_PASSWORD:?DB_PASSWORD를 설정해야 배포할 수 있습니다.}
