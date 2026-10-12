@@ -74,3 +74,4 @@ export const carUrl = (id: number) => `/community/cars/${id}`;
 export const listingUrl = (id: number) => `/parts/${id}`;
 
 export const motorsportUrl = (id: number) => `/motorsport/${id}`;
+export const spotUrl = (id: number) => `/spots/${id}`;
