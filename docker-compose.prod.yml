@@ -66,6 +66,7 @@ services:
     environment:
       PORT: "80"
       REVCC_API_ORIGIN: http://proxy
+      KAKAO_MAP_KEY: ${KAKAO_MAP_KEY:-}
     # 기본 healthcheck(GET /)는 메인 SSR이 proxy를 호출하는데, proxy는 frontend가 healthy해야 뜬다.
     # API를 부르지 않는 /login으로 검사해 순환 대기를 피한다.
     healthcheck:

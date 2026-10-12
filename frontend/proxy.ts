@@ -13,7 +13,15 @@ export function proxy(request: NextRequest) {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' blob: data:",
+    // 카카오맵 JS SDK(lib/kakao-maps.ts)의 타일·마커 이미지·XHR용. 이 <script>는 strict-dynamic이
+    // 신뢰된 코드(Next의 nonce 붙은 번들)가 동적으로 추가하므로 script-src에 호스트를 더할 필요는
+    // 없다. 실제 발급된 키로 /spots를 띄워 Network 탭으로 확인한 실제 도메인:
+    // dapi.kakao.com(SDK 스크립트, 이미 허용됨), t1.kakaocdn.net(SDK 본체·커서 이미지),
+    // mts.kakaocdn.net(지도 타일) — 최초 작성 시 추정했던 daumcdn.net이 아니라 kakaocdn.net이었다
+    // (이 CSP가 막고 있어서 지도 컨테이너·현재 위치 마커는 뜨는데 타일만 안 보이는 증상이 있었다,
+    // 2026-10-12 확인). 스킴을 지정하지 않아 로컬 http와 운영 https 둘 다에서 매치된다.
+    "img-src 'self' blob: data: *.kakaocdn.net *.daumcdn.net",
+    "connect-src 'self' https://dapi.kakao.com *.kakaocdn.net *.daumcdn.net",
     "font-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
