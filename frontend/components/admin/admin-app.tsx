@@ -158,11 +158,11 @@ function ContentSummary({onAccessDenied}: {onAccessDenied: () => void}) {
           <span>다가오는 일정 중 공식 출처 확인이 14일 넘게 지난 일정</span>
           <em>열기 →</em>
         </a>
-        <div className={`${styles.navCard} ${styles.navCardSoon}`} aria-disabled="true">
-          <strong>와인딩 스팟</strong>
-          <span>스팟 등록·수정과 사용자 제보 승인·반려 (다음 단계)</span>
-          <em>준비 중</em>
-        </div>
+        <a className={styles.navCard} href="/admin/spots">
+          <strong>스팟 (와인딩·심레이싱)</strong>
+          <span>스팟 등록·수정, 공개·비공개, 변경 이력</span>
+          <em>열기 →</em>
+        </a>
       </div>
     </section>
   );

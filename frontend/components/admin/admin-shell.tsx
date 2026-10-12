@@ -36,8 +36,7 @@ const NAV: {group: string; items: NavItem[]}[] = [
     group: '콘텐츠',
     items: [
       {key: 'motorsport', label: '모터스포츠 일정', href: '/admin/motorsport', min: 'MANAGER'},
-      // Next step (drive spots): add the href when /admin/spots exists.
-      {key: 'spots', label: '와인딩 스팟', min: 'MANAGER'},
+      {key: 'spots', label: '스팟 (와인딩·심레이싱)', href: '/admin/spots', min: 'MANAGER'},
     ],
   },
   {
