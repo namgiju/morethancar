@@ -1,6 +1,6 @@
 # 회원 탈퇴 운영 메모 (STEP 10-impl-C)
 
-정책 결정은 `REVCC_NEXT_TASKS.md`의 STEP 10에 있다. 이 문서는 운영에 필요한 설정과 절차만 적는다.
+정책 결정은 `MORETHANCAR_NEXT_TASKS.md`의 STEP 10에 있다. 이 문서는 운영에 필요한 설정과 절차만 적는다.
 
 ## WITHDRAWAL_HMAC_SECRET
 

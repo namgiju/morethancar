@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * STEP 10-impl-C 회원 탈퇴를 실제 PostgreSQL(Flyway V1~V5)과 Redis로 검증한다. 테이블별 결과를 결정표(REVCC_NEXT_TASKS.md STEP 10)와 대조한다.
+ * STEP 10-impl-C 회원 탈퇴를 실제 PostgreSQL(Flyway V1~V5)과 Redis로 검증한다. 테이블별 결과를 결정표(MORETHANCAR_NEXT_TASKS.md STEP 10)와 대조한다.
  * 게시판 공개 화면에서의 표시(탈퇴한 회원·id 숨김·사진 공개·닫힌 매물 비공개)는 board 시스템 테스트(withdrawal-system.mjs)가 본다.
  */
 @SpringBootTest

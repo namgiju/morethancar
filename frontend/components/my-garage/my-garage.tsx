@@ -26,7 +26,7 @@ type GarageState =
 // /home, the personal garage (formerly assignment-frontend/home/index.html +
 // js/home.js): page shell, representative/owned vehicle cards, registration,
 // editing/records, profile settings, guestbook and withdrawal (STEP 3-1~3-5
-// — see REVCC_NEXT_TASKS.md). Vehicle detail is not re-built here: the cards
+// — see MORETHANCAR_NEXT_TASKS.md). Vehicle detail is not re-built here: the cards
 // link to the public vehicle page from STEP 2-5 (/community/cars/:id).
 export default function MyGarage() {
   const auth = useCommunitySession();

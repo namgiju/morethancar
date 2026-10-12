@@ -2,7 +2,7 @@
 // Field names mirror that API's SQL column aliases — keep in sync with the
 // server, not with any UI wording. Parts compatibility (GET
 // /api/parts/compatibility) is a separate, unrelated garage feature and is
-// intentionally out of scope here (2026-10-06 decision, see REVCC_NEXT_TASKS.md).
+// intentionally out of scope here (2026-10-06 decision, see MORETHANCAR_NEXT_TASKS.md).
 
 export const LISTING_CATEGORIES = {
   wheels: '휠 / 타이어',
