@@ -10,9 +10,12 @@ import {
   updatePost,
   uploadImage,
 } from '../../lib/community-api';
-import type {CommunityPost, MyVehicle, PostInput} from '../../lib/community-types';
+import type {CommunityPost, LinkedMotorsportEvent, MyVehicle, PostInput} from '../../lib/community-types';
 import type {PostCategory} from '../../lib/home-types';
 import {imageUrl, postUrl} from '../../lib/format';
+import {fetchEvents} from '../../lib/motorsport-api';
+import {dateRangeLabel, kstToday} from '../../lib/motorsport';
+import {KIND_LABELS, type PublicEvent} from '../../lib/motorsport-types';
 import CommunityHeader from './community-header';
 import CommunityLeftNav from './community-left-nav';
 import CommunitySidebar from './community-sidebar';
@@ -27,7 +30,7 @@ const MAX_IMAGES = 3;
 const TITLE_MAX = 150;
 const CONTENT_MAX = 5000;
 
-type Fields = Omit<PostInput, 'vehicleId'> & {vehicleId: string};
+type Fields = Omit<PostInput, 'vehicleId' | 'motorsportEventId'> & {vehicleId: string; motorsportEventId: string};
 type LoadState =
   | {status: 'loading'}
   | {status: 'login'}
@@ -36,6 +39,10 @@ type LoadState =
   | {status: 'forbidden'; post: CommunityPost}
   | {status: 'ready'; post: CommunityPost | null};
 type Vehicles = MyVehicle[] | 'loading' | 'error';
+// Select options only need these fields — both PublicEvent (fetched list) and
+// LinkedMotorsportEvent (a post's current link) satisfy this shape.
+type EventOption = Pick<PublicEvent, 'id' | 'kind' | 'title' | 'startsOn' | 'endsOn'>;
+type Events = EventOption[] | 'loading' | 'error';
 
 const snapshot = (fields: Fields) => JSON.stringify(fields);
 
@@ -60,11 +67,23 @@ export default function PostEditor({postId}: {postId?: number}) {
     const value = searchParams.get('category');
     return isCategory(value) ? value : 'free';
   })();
-  const emptyFields: Fields = {category: initialCategory, title: '', content: '', vehicle: '', vehicleId: '', imageIds: []};
+  const emptyFields: Fields = {
+    category: initialCategory,
+    title: '',
+    content: '',
+    vehicle: '',
+    vehicleId: '',
+    motorsportEventId: '',
+    imageIds: [],
+  };
 
   const [load, setLoad] = useState<LoadState>({status: 'loading'});
   const [fields, setFields] = useState<Fields>(emptyFields);
   const [vehicles, setVehicles] = useState<Vehicles>('loading');
+  const [events, setEvents] = useState<Events>('loading');
+  // The post's current link, kept even if it falls outside the fetched event
+  // window or is no longer public — see loadEvents().
+  const [currentLinkedEvent, setCurrentLinkedEvent] = useState<LinkedMotorsportEvent | null>(null);
   const [baseline, setBaseline] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -80,7 +99,7 @@ export default function PostEditor({postId}: {postId?: number}) {
   const leaving = useRef(false);
 
   const dirty = baseline !== null && snapshot(fields) !== baseline;
-  const ready = load.status === 'ready' && Array.isArray(vehicles);
+  const ready = load.status === 'ready' && Array.isArray(vehicles) && Array.isArray(events);
   const post = load.status === 'ready' ? load.post : null;
   const returnTo = post ? postUrl(post) : `/community${isCategory(searchParams.get('category')) ? `?category=${initialCategory}` : ''}`;
 
@@ -99,6 +118,28 @@ export default function PostEditor({postId}: {postId?: number}) {
       setBaseline(snapshot(start));
     } catch {
       if (request === version.current) setVehicles('error');
+    }
+  }, []);
+
+  // Public events in a ~92-day window around today (the public API's own cap —
+  // motorsport.js MAX_RANGE_DAYS), biased toward what's coming up. Unlike
+  // vehicleId, a link outside this window is NOT auto-cleared: if the post's
+  // current link falls outside it but is still public, it's merged into the
+  // option list so the select still shows it (and submitting without touching
+  // the field leaves it alone either way — see postInput's hasOwn check).
+  const loadEvents = useCallback(async (request: number, initial: Fields, linked: LinkedMotorsportEvent | null) => {
+    setEvents('loading');
+    setCurrentLinkedEvent(linked);
+    try {
+      const today = kstToday();
+      const from = new Date(Date.parse(`${today}T00:00:00Z`) - 14 * 86_400_000).toISOString().slice(0, 10);
+      const to = new Date(Date.parse(`${today}T00:00:00Z`) + 78 * 86_400_000).toISOString().slice(0, 10);
+      const {events: list} = await fetchEvents({from, to, limit: 200});
+      if (request !== version.current) return;
+      const inList = list.some((e) => String(e.id) === initial.motorsportEventId);
+      setEvents(linked && !inList ? [linked, ...list] : list);
+    } catch {
+      if (request === version.current) setEvents('error');
     }
   }, []);
 
@@ -146,13 +187,14 @@ export default function PostEditor({postId}: {postId?: number}) {
             content: existing.content,
             vehicle: existing.vehicle || '',
             vehicleId: existing.vehicleId == null ? '' : String(existing.vehicleId),
+            motorsportEventId: existing.motorsportEventId == null ? '' : String(existing.motorsportEventId),
             imageIds: [...existing.imageIds],
           }
         : emptyFields;
       loadedFields.current = initial;
       setFields(initial);
       setLoad({status: 'ready', post: existing});
-      await loadVehicles(request, initial);
+      await Promise.all([loadVehicles(request, initial), loadEvents(request, initial, existing?.linkedMotorsportEvent ?? null)]);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey, postId]);
@@ -240,7 +282,11 @@ export default function PostEditor({postId}: {postId?: number}) {
     busyRef.current = true;
     setBusy(true);
     setFormError('');
-    const input: PostInput = {...fields, vehicleId: fields.vehicleId ? Number(fields.vehicleId) : null};
+    const input: PostInput = {
+      ...fields,
+      vehicleId: fields.vehicleId ? Number(fields.vehicleId) : null,
+      motorsportEventId: fields.motorsportEventId ? Number(fields.motorsportEventId) : null,
+    };
     try {
       const result = post ? await updatePost(post.id, input) : await createPost(input);
       if (request !== version.current) return;
@@ -386,6 +432,47 @@ export default function PostEditor({postId}: {postId?: number}) {
                         내 차고에서 차량 등록 →
                       </a>
                     </>
+                  )}
+                </div>
+
+                <div className={editorStyles.vehicles} aria-live="polite">
+                  {events === 'loading' && <p className={styles.muted}>가까운 모터스포츠 일정을 확인하고 있어요.</p>}
+                  {events === 'error' && (
+                    <>
+                      <p className={styles.muted}>일정을 불러오지 못했어요. 다시 확인 후 작성해주세요.</p>
+                      <button
+                        type="button"
+                        className={styles.secondary}
+                        onClick={() => void loadEvents(version.current, loadedFields.current, currentLinkedEvent)}
+                      >
+                        다시 확인
+                      </button>
+                    </>
+                  )}
+                  {Array.isArray(events) && events.length > 0 && (
+                    <label>
+                      모터스포츠 일정 연결 (선택)
+                      <select
+                        name="motorsportEventId"
+                        value={fields.motorsportEventId}
+                        onChange={(e) => set('motorsportEventId', e.target.value)}
+                      >
+                        <option value="">연결하지 않음</option>
+                        {events.map((event) => (
+                          <option key={event.id} value={String(event.id)}>
+                            {dateRangeLabel(event.startsOn, event.endsOn)} · {KIND_LABELS[event.kind]} · {event.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  {Array.isArray(events) && events.length === 0 && (
+                    <p className={styles.muted}>가까운 모터스포츠 일정이 아직 없어요.</p>
+                  )}
+                  {Array.isArray(events) && fields.motorsportEventId && !currentLinkedEvent && (
+                    <p className={editorStyles.count}>
+                      현재 비공개 처리되었거나 삭제된 일정에 연결되어 있어요. 그대로 두면 연결이 유지돼요.
+                    </p>
                   )}
                 </div>
 

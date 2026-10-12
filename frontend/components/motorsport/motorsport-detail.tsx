@@ -4,6 +4,9 @@ import {useEffect, useState} from 'react';
 import {ApiError, fetchEvent} from '../../lib/motorsport-api';
 import {countryName, dateRangeLabel, eventPhase, kstToday, kstTimeLabel} from '../../lib/motorsport';
 import {KIND_LABELS, PHASE_LABELS, SCOPE_LABELS, type PublicEvent} from '../../lib/motorsport-types';
+import {fetchPosts} from '../../lib/community-api';
+import type {CommunityPost} from '../../lib/community-types';
+import {imageUrl, postUrl} from '../../lib/format';
 import styles from './motorsport.module.css';
 
 const STATUS_NOTE: Record<PublicEvent['status'], string | null> = {
@@ -42,7 +45,10 @@ export default function MotorsportDetail({id}: {id: number}) {
       ) : error || !event ? (
         <p className={styles.empty}>{error || '일정을 찾을 수 없어요.'}</p>
       ) : (
-        <EventDetailBody event={event} />
+        <>
+          <EventDetailBody event={event} />
+          <LinkedPosts eventId={event.id} />
+        </>
       )}
     </div>
   );
@@ -108,5 +114,64 @@ function EventDetailBody({event}: {event: PublicEvent}) {
         {event.verifiedOn} 공식 출처 확인{event.linkedPostCount > 0 && ` · 이 일정에 관한 이야기 ${event.linkedPostCount}개`}
       </p>
     </article>
+  );
+}
+
+// 이 일정에 연결된 커뮤니티 글, 최신순. board-service/src/community.js의
+// motorsportEventId 필터는 linkedPostCount(motorsport.js)와 정확히 같은 조건
+// (motorsport_event_id=X AND NOT deleted)이라 개수가 항상 일치한다.
+function LinkedPosts({eventId}: {eventId: number}) {
+  const [posts, setPosts] = useState<CommunityPost[] | 'loading' | 'error'>('loading');
+
+  useEffect(() => {
+    let active = true;
+    setPosts('loading');
+    fetchPosts({motorsportEventId: eventId, sort: 'latest', limit: 20})
+      .then((rows) => active && setPosts(rows))
+      .catch(() => active && setPosts('error'));
+    return () => {
+      active = false;
+    };
+  }, [eventId]);
+
+  return (
+    <div className={styles.dayPanel}>
+      <div className={styles.panelHead}>
+        <h2>이 일정에 관한 이야기</h2>
+        {Array.isArray(posts) && posts.length > 0 && <span className={styles.panelCaption}>{posts.length}개</span>}
+      </div>
+      {posts === 'loading' ? (
+        <p className={styles.empty}>불러오는 중이에요.</p>
+      ) : posts === 'error' ? (
+        <p className={styles.empty}>이야기를 불러오지 못했어요. 새로고침해주세요.</p>
+      ) : !posts.length ? (
+        <p className={styles.empty}>
+          아직 이 일정에 관한 이야기가 없어요. <a href="/community/new">첫 이야기 남기기 →</a>
+        </p>
+      ) : (
+        <ol className={styles.list}>
+          {posts.map((post) => (
+            <li key={post.id}>
+              <a className={styles.postRow} href={postUrl(post)}>
+                {post.imageIds.length ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className={styles.postThumb} src={imageUrl(post.imageIds[0])} alt="" loading="lazy" />
+                ) : (
+                  <span className={styles.postThumbEmpty} aria-hidden="true" />
+                )}
+                <span className={styles.rowBody}>
+                  <span className={styles.rowTitle}>{post.title}</span>
+                  <span className={styles.rowMeta}>
+                    <span>{post.authorId == null ? post.username : `@${post.username}`}</span>
+                    <span>추천 {post.likeCount}</span>
+                    <span>댓글 {post.commentCount}</span>
+                  </span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }

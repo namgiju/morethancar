@@ -3,7 +3,9 @@
 import {useEffect, useState} from 'react';
 import {fetchPosts} from '../../lib/community-api';
 import type {CommunityPost} from '../../lib/community-types';
-import {imageUrl, postUrl} from '../../lib/format';
+import {imageUrl, motorsportUrl, postUrl} from '../../lib/format';
+import {dateRangeLabel} from '../../lib/motorsport';
+import {KIND_LABELS} from '../../lib/motorsport-types';
 import type {AuthorState} from './post-detail';
 import styles from './post-detail.module.css';
 
@@ -46,6 +48,21 @@ export default function PostContext({post, author}: {post: CommunityPost; author
 
   return (
     <>
+      {/* 비공개 처리되거나 삭제된 일정에 연결된 글은 linkedMotorsportEvent가 null이라
+          (community.js의 서브쿼리) 이 카드도 자연스럽게 숨는다. */}
+      {post.linkedMotorsportEvent && (
+        <section className={styles.card}>
+          <h3>연결된 모터스포츠 일정</h3>
+          <p className={styles.muted}>
+            {KIND_LABELS[post.linkedMotorsportEvent.kind]} · {dateRangeLabel(post.linkedMotorsportEvent.startsOn, post.linkedMotorsportEvent.endsOn)}
+          </p>
+          <strong>{post.linkedMotorsportEvent.title}</strong>
+          <a className={styles.boardLink} href={motorsportUrl(post.linkedMotorsportEvent.id)}>
+            일정 보기 →
+          </a>
+        </section>
+      )}
+
       <section className={styles.card}>
         <h3>{post.linkedVehicle ? '이 글에 연결된 차량' : '관련 차종'}</h3>
         {!authorSettled && !post.linkedVehicle && !post.vehicle ? (

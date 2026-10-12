@@ -40,6 +40,9 @@ const postSelect = `SELECT p.id,p.title,p.content,${unlessWithdrawnSql("u", "p.a
  ${isWithdrawnSql("u")} AS "authorWithdrawn",
  ${unlessWithdrawnSql("u", "p.vehicle_id")} AS "vehicleId",
  ${unlessWithdrawnSql("u", "(SELECT json_build_object('id',v.id,'model',v.model,'year',v.year,'verified',v.verified,'imageId',v.image_id) FROM owner_vehicles v WHERE v.id=p.vehicle_id AND v.owner_id=p.author_id)")} AS "linkedVehicle",
+ p.motorsport_event_id AS "motorsportEventId",
+ (SELECT json_build_object('id',e.id,'kind',e.kind,'title',e.title,'startsOn',to_char(e.starts_on,'YYYY-MM-DD'),'endsOn',to_char(e.ends_on,'YYYY-MM-DD'))
+  FROM motorsport_events e WHERE e.id=p.motorsport_event_id AND e.deleted_at IS NULL AND e.publication='PUBLISHED') AS "linkedMotorsportEvent",
  p.created_at AS "createdAt",p.updated_at AS "updatedAt",p.category,p.vehicle,${existingImageIdsSql("p.image_ids")} AS "imageIds",p.views,
  (SELECT COUNT(*)::int FROM board_comments c WHERE c.post_id=p.id AND NOT c.deleted) AS "commentCount",
  (SELECT COUNT(*)::int FROM board_likes l WHERE l.post_id=p.id) AS "likeCount",
@@ -117,6 +120,17 @@ export function communityRouter({ db, auth }) {
       if (!rows.length) fail(403, "본인 차량만 연결할 수 있어요.");
       linked = rows[0];
     }
+    // 공개(PUBLISHED)·미삭제 일정만 연결할 수 있다 — 존재하지 않거나 초안/비공개/삭제된
+    // 일정 id는 motorsportRouter의 공개 조회와 같은 조건으로 거부한다.
+    let motorsportEventId = null;
+    if (body?.motorsportEventId != null && body.motorsportEventId !== "") {
+      const { rows } = await db.query(
+        "SELECT id FROM motorsport_events WHERE id=$1 AND deleted_at IS NULL AND publication='PUBLISHED'",
+        [positive(body.motorsportEventId)],
+      );
+      if (!rows.length) fail(400, "연결할 일정을 찾을 수 없습니다.");
+      motorsportEventId = rows[0].id;
+    }
     return [
       text(title, 150),
       text(content, 5000),
@@ -125,6 +139,7 @@ export function communityRouter({ db, auth }) {
       linked ? linked.model : text(vehicle, 100, false),
       await images(imageIds, userId),
       linked?.id ?? null,
+      motorsportEventId,
     ];
   }
   router.post("/images", auth, imageLimiter, async (req, res) => {
@@ -173,6 +188,11 @@ export function communityRouter({ db, auth }) {
     if (period && !["today", "week"].includes(period))
       fail(400, "지원하지 않는 기간입니다.");
     if (scope && !req.user) fail(401, "로그인이 필요합니다.");
+    // 모터스포츠 상세(/motorsport/{id})의 "연결된 이야기" 목록이 쓴다. linkedPostCount
+    // (board-service/src/motorsport.js)와 똑같은 조건(motorsport_event_id=X AND NOT deleted)
+    // 이라 두 값이 항상 일치한다.
+    const motorsportEventId =
+      req.query.motorsportEventId === undefined ? null : positive(req.query.motorsportEventId);
     const page = positive(req.query.page ?? 1);
     const limit =
       req.query.limit === undefined
@@ -184,9 +204,10 @@ export function communityRouter({ db, auth }) {
       category,
       `%${model.replace(/[\\%_]/g, "\\$&")}%`,
       period === "today" ? todayStartKst() : period === "week" ? weekAgo() : null,
+      motorsportEventId,
     ];
     // 작성자 검색은 화면에 보이는 이름으로만 한다(탈퇴 회원의 원래 아이디로 글을 찾을 수 없게).
-    let where = ` WHERE (p.title ILIKE $2 OR p.content ILIKE $2 OR ${displayNameSql("u")} ILIKE $2) AND ($3='' OR p.category=$3) AND p.vehicle ILIKE $4 AND ($5::timestamptz IS NULL OR p.created_at>=$5)`;
+    let where = ` WHERE (p.title ILIKE $2 OR p.content ILIKE $2 OR ${displayNameSql("u")} ILIKE $2) AND ($3='' OR p.category=$3) AND p.vehicle ILIKE $4 AND ($5::timestamptz IS NULL OR p.created_at>=$5) AND ($6::int IS NULL OR p.motorsport_event_id=$6)`;
     if (scope === "mine") where += " AND p.author_id=$1";
     if (scope === "bookmarks")
       where +=
@@ -199,7 +220,7 @@ export function communityRouter({ db, auth }) {
         ? '"likeCount" DESC,"commentCount" DESC,p.id DESC'
         : "p.id DESC";
     const { rows } = await db.query(
-      postSelect + where + ` ORDER BY ${order} LIMIT $6 OFFSET $7`,
+      postSelect + where + ` ORDER BY ${order} LIMIT $7 OFFSET $8`,
       [...values, limit, (page - 1) * limit],
     );
     res.json(rows.map(asPost));
@@ -207,8 +228,8 @@ export function communityRouter({ db, auth }) {
   router.post("/posts", auth, postLimiter, async (req, res) => {
     const values = await postInput(req.body, req.user.id);
     const { rows } = await db.query(
-      `INSERT INTO board_posts(title,content,author_id,category,vehicle,image_ids,vehicle_id)
-      VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,title,content,category,author_id AS "authorId"`,
+      `INSERT INTO board_posts(title,content,author_id,category,vehicle,image_ids,vehicle_id,motorsport_event_id)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,title,content,category,author_id AS "authorId"`,
       values,
     );
     res.status(201).json(asPost(rows[0]));
@@ -233,10 +254,16 @@ export function communityRouter({ db, auth }) {
     const values = await postInput(req.body, req.user.id);
     const { rows } = await db.query(
       `UPDATE board_posts SET title=$1,content=$2,category=$4,
-      vehicle=CASE WHEN NOT $9 AND vehicle_id IS NOT NULL THEN vehicle ELSE $5 END,
-      image_ids=$6,vehicle_id=CASE WHEN $9 THEN $7 ELSE vehicle_id END,updated_at=NOW()
-      WHERE id=$8 AND author_id=$3 AND NOT deleted RETURNING id,category`,
-      [...values, req.params.id, Object.hasOwn(req.body ?? {}, "vehicleId")],
+      vehicle=CASE WHEN NOT $10 AND vehicle_id IS NOT NULL THEN vehicle ELSE $5 END,
+      image_ids=$6,vehicle_id=CASE WHEN $10 THEN $7 ELSE vehicle_id END,
+      motorsport_event_id=CASE WHEN $11 THEN $8 ELSE motorsport_event_id END,updated_at=NOW()
+      WHERE id=$9 AND author_id=$3 AND NOT deleted RETURNING id,category`,
+      [
+        ...values,
+        req.params.id,
+        Object.hasOwn(req.body ?? {}, "vehicleId"),
+        Object.hasOwn(req.body ?? {}, "motorsportEventId"),
+      ],
     );
     if (!rows.length) fail(403, "본인이 작성한 글만 수정할 수 있어요.");
     res.json(rows[0]);

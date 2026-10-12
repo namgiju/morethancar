@@ -56,7 +56,7 @@ test("authenticated author is taken from Redis; invalid and unauthenticated post
   );
   assert.equal(result.status, 201);
   assert.equal((await result.json()).authorId, 7);
-  assert.deepEqual(parameters, ["hello", "world", 7, "free", "", [], null]);
+  assert.deepEqual(parameters, ["hello", "world", 7, "free", "", [], null, null]);
 });
 
 // Existing fixtures represent active legacy accounts (session version zero).

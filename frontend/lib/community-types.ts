@@ -18,6 +18,18 @@ export type LinkedVehicle = {
   imageId: number | null;
 };
 
+// Only present when the linked motorsport_events row is still PUBLISHED and
+// not soft-deleted (community.js's subquery resolves to null otherwise, so a
+// post linked to an event that later became hidden/deleted just stops
+// showing the card instead of pointing at a broken page).
+export type LinkedMotorsportEvent = {
+  id: number;
+  kind: 'RACE' | 'TRACK_DAY' | 'EVENT';
+  title: string;
+  startsOn: string;
+  endsOn: string;
+};
+
 // GET /api/board/posts and GET /api/board/posts/:id share this shape.
 // liked/bookmarked/commentCount/likeCount are computed per the requesting
 // session (anonymous requests get liked: false, bookmarked: false).
@@ -34,6 +46,12 @@ export type CommunityPost = {
   vehicle: string;
   vehicleId: number | null;
   linkedVehicle: LinkedVehicle | null;
+  // The event this post is tagged to (optional, set from the editor's "모터스포츠
+  // 일정 연결"). motorsportEventId is the raw column (kept even if the event is
+  // no longer public, so the editor can still show "현재 연결된 일정" context);
+  // linkedMotorsportEvent is only non-null when the event is public right now.
+  motorsportEventId: number | null;
+  linkedMotorsportEvent: LinkedMotorsportEvent | null;
   // First/only vehicle model text for the author, used as a fallback display
   // (e.g. "오너" when absent) — see assignment-frontend/js/app.js renderPost.
   ownerVehicle: string | null;
@@ -143,6 +161,9 @@ export type PostInput = {
   content: string;
   vehicle: string;
   vehicleId: number | null;
+  // Same contract as vehicleId: omitting the key keeps the existing link, an
+  // explicit null unlinks. The editor always sends the key.
+  motorsportEventId: number | null;
   imageIds: number[];
 };
 

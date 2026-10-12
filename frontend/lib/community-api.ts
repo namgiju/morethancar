@@ -52,6 +52,7 @@ export type FetchPostsParams = {
   // board-service returns 401 otherwise (community.js: `if (scope && !req.user)`).
   scope?: '' | 'mine' | 'bookmarks' | 'commented';
   vehicle?: string;
+  motorsportEventId?: number;
   page?: number;
   limit?: number;
 };
@@ -64,6 +65,7 @@ export async function fetchPosts(params: FetchPostsParams = {}): Promise<Communi
   if (params.sort) query.set('sort', params.sort);
   if (params.scope) query.set('scope', params.scope);
   if (params.vehicle) query.set('vehicle', params.vehicle);
+  if (params.motorsportEventId) query.set('motorsportEventId', String(params.motorsportEventId));
   if (params.page) query.set('page', String(params.page));
   if (params.limit) query.set('limit', String(params.limit));
   const qs = query.toString();
