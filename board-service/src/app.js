@@ -4,6 +4,7 @@ import morgan from "morgan";
 import { marketRouter } from "./market.js";
 import { communityRouter } from "./community.js";
 import { motorsportAdminRouter, motorsportRouter } from "./motorsport.js";
+import { spotsAdminRouter, spotsRouter } from "./spots.js";
 
 // Spring과 동일한 쿠키 이름·토큰 형식·Redis 키를 사용한다. TTL은 로그인부터 30분이다.
 export async function sessionUser(redis, cookie = "") {
@@ -67,8 +68,10 @@ export function createApp({ db, redis }) {
   // 콘텐츠 운영 API는 MANAGER 이상(motorsport.js의 requireCurrentStaff)이라 ADMIN 전용 adminRouter보다 먼저 붙인다.
   // 여기서 처리하지 않는 /api/board/admin/* 경로는 그대로 adminRouter(ADMIN 전용)로 넘어간다.
   app.use("/api/board/admin/motorsport", motorsportAdminRouter({ db, auth }));
+  app.use("/api/board/admin/spots", spotsAdminRouter({ db, auth }));
   app.use("/api/board/admin", adminRouter({ db, auth }));
   app.use("/api/board/motorsport", motorsportRouter({ db }));
+  app.use("/api/board/spots", spotsRouter({ db }));
   app.use("/api/board", communityRouter({ db, auth }));
   app.use("/api/parts/listings", marketRouter({ db, auth }));
   app.get("/api/parts/compatibility", (req, res) => {
