@@ -1,50 +1,32 @@
 import {FlagIcon} from '../common/icons';
+import {dateRangeLabel} from '../../lib/motorsport';
+import {KIND_LABELS, type PublicEvent} from '../../lib/motorsport-types';
+import {motorsportUrl} from '../../lib/format';
 import styles from './main.module.css';
 
-// One schedule entry. Track days (서킷 스포츠주행 가능일) and spectator races are
-// kept apart by `kind`, and every entry carries its official link. There is no
-// data source yet, so the main page passes an empty list.
-export type MotorsportEvent = {
-  id: string;
-  kind: 'track-day' | 'race';
-  series: string;
-  title: string;
-  venue: string;
-  startDate: string; // YYYY-MM-DD (KST)
-  endDate?: string;
-  officialUrl: string;
-};
-
-const KIND_LABELS: Record<MotorsportEvent['kind'], string> = {'track-day': '주행일', race: '경기'};
-
-function dateLabel(iso: string): string {
-  const [, m, d] = iso.split('-');
-  return `${m}.${d}`;
-}
-
-// "주요 모터스포츠 일정" preview. With no verified schedule data it shows what the
-// section will cover instead of placeholder dates — no fake events are shown.
-export default function MotorsportPreview({events}: {events: MotorsportEvent[]}) {
+// "모터스포츠 일정" 미리보기: /motorsport와 같은 공개 API(가장 가까운 예정 일정부터)를
+// 서버에서 미리 읽어 온다(lib/server-api.ts의 fetchUpcomingMotorsportServer). 데이터가
+// 없으면(아직 등록된 일정이 없음) 가짜 일정 대신 섹션이 다루는 범위를 안내한다.
+export default function MotorsportPreview({events}: {events: PublicEvent[]}) {
   return (
     <section className={styles.lowerPanel} aria-labelledby="motorsport-title">
       <div className={styles.panelHead}>
-        <h2 id="motorsport-title">
-          모터스포츠 일정 {!events.length && <small className={styles.soonTag}>오픈 예정</small>}
-        </h2>
+        <h2 id="motorsport-title">모터스포츠 일정</h2>
+        <a href="/motorsport">전체 보기 →</a>
       </div>
       {events.length ? (
         <ol className={styles.eventList}>
           {events.map((e) => (
             <li key={e.id}>
-              <a href={e.officialUrl} target="_blank" rel="noopener noreferrer" className={styles.eventRow}>
-                <span className={styles.eventDate}>
-                  {dateLabel(e.startDate)}
-                  {e.endDate && e.endDate !== e.startDate ? ` – ${dateLabel(e.endDate)}` : ''}
-                </span>
+              <a href={motorsportUrl(e.id)} className={styles.eventRow}>
+                <span className={styles.eventDate}>{dateRangeLabel(e.startsOn, e.endsOn)}</span>
                 <span className={styles.tag}>{KIND_LABELS[e.kind]}</span>
                 <span className={styles.eventBody}>
-                  <strong>{e.series}</strong> {e.title}
-                  <small>{e.venue}</small>
+                  <strong>{e.series ? e.series.name : KIND_LABELS[e.kind]}</strong> {e.title}
+                  <small>
+                    {e.venue.name}
+                    {e.venue.region ? ` · ${e.venue.region}` : ''}
+                  </small>
                 </span>
               </a>
             </li>

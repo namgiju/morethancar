@@ -4,6 +4,8 @@
 // directly. All endpoints used here are public (no auth middleware in
 // board-service), so no session cookie needs to be forwarded.
 import type {GarageEntry, Listing, Post, SiteStats} from './home-types';
+import {kstToday} from './motorsport';
+import type {PublicEvent} from './motorsport-types';
 
 const API_ORIGIN = process.env.REVCC_API_ORIGIN || 'http://localhost:8090';
 
@@ -45,4 +47,15 @@ export async function fetchPublicGarageServer(): Promise<GarageEntry[]> {
 export async function fetchLatestListingsServer(limit = 2): Promise<{items: Listing[]; total: number}> {
   const query = new URLSearchParams({sort: 'latest', status: 'selling', limit: String(limit)});
   return serverApi<{items: Listing[]; total: number}>(`/api/parts/listings?${query}`);
+}
+
+// 메인 "모터스포츠 일정" 미리보기: 가장 가까운 예정 일정 N개. 공개 API는 한 번에
+// 최대 92일만 조회하므로(motorsport.js MAX_RANGE_DAYS), 오늘부터 92일 구간을
+// 그대로 쓴다(이벤트는 정렬된 상태로 오므로 앞에서 N개만 쓰면 된다).
+export async function fetchUpcomingMotorsportServer(limit = 3): Promise<PublicEvent[]> {
+  const from = kstToday();
+  const to = new Date(Date.parse(`${from}T00:00:00Z`) + 92 * 86_400_000).toISOString().slice(0, 10);
+  const query = new URLSearchParams({from, to, limit: String(limit)});
+  const {events} = await serverApi<{events: PublicEvent[]}>(`/api/board/motorsport/events?${query}`);
+  return events;
 }

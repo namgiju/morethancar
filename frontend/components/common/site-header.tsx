@@ -25,6 +25,7 @@ type Props = {
 function activeService(pathname: string): ServiceKey | null {
   if (pathname === '/community' || pathname.startsWith('/community/')) return 'community';
   if (pathname === '/home') return 'garage';
+  if (pathname === '/motorsport' || pathname.startsWith('/motorsport/')) return 'motorsport';
   return null;
 }
 

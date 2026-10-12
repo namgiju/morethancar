@@ -1,6 +1,7 @@
 'use client';
 
 import type {BoardPeriod, GarageEntry, Post, SiteStats} from '../../lib/home-types';
+import type {PublicEvent} from '../../lib/motorsport-types';
 import {compactCount} from '../../lib/format';
 import SiteFooter from '../footer/site-footer';
 import SiteHeader from '../common/site-header';
@@ -25,6 +26,7 @@ export default function HomeShell({
   latestPosts,
   garage,
   stats,
+  motorsportEvents,
 }: {
   renderedAt: number;
   initialBoard: {period: BoardPeriod; posts: Post[]};
@@ -32,6 +34,7 @@ export default function HomeShell({
   latestPosts: Post[] | null;
   garage: GarageEntry[];
   stats: SiteStats | null;
+  motorsportEvents: PublicEvent[];
 }) {
   const auth = useCommunitySession();
   const {session, sessionError} = auth;
@@ -105,7 +108,7 @@ export default function HomeShell({
 
         <div className={styles.lowerGrid}>
           <GarageShowcase vehicles={garage} />
-          <MotorsportPreview events={[]} />
+          <MotorsportPreview events={motorsportEvents} />
         </div>
       </main>
 

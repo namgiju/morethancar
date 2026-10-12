@@ -1,0 +1,601 @@
+/* /motorsport — white theme, same tokens as theme.module.css (set on an
+   ancestor by motorsport-page.tsx). Reuses the row/tag/panel language from
+   components/home/main.module.css and components/common/timing-board.module.css
+   instead of introducing a new visual system. */
+.shell {
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.6;
+}
+
+:where(.shell) :where(a) {
+  color: inherit;
+  text-decoration: none;
+}
+
+.shell button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.notice {
+  max-width: 1320px;
+  margin: 12px auto 0;
+  padding: 0 32px;
+  font-size: 13px;
+  color: #a43e3e;
+}
+
+.page {
+  flex: 1 0 auto;
+  width: 100%;
+}
+
+.container {
+  max-width: 1320px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 28px 32px 72px;
+}
+
+.pageHead {
+  margin-bottom: 20px;
+}
+
+.pageHead h1 {
+  margin: 0 0 6px;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.pageHead p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 640px;
+}
+
+/* ---------- Toolbar ---------- */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.monthNav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+}
+
+.monthNav button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.monthNav button:hover {
+  border-color: var(--ink);
+}
+
+.monthNav strong {
+  min-width: 92px;
+  text-align: center;
+  font-weight: 800;
+}
+
+.chevronLeft {
+  transform: rotate(180deg);
+}
+
+.todayButton {
+  width: auto !important;
+  height: 28px !important;
+  padding: 0 10px;
+  border-radius: 999px !important;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted) !important;
+}
+
+.filterGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chips button {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.chips button:hover {
+  border-color: var(--line-strong);
+}
+
+.chips button[aria-pressed='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+  font-weight: 700;
+}
+
+.segment {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 2px;
+}
+
+.segment button {
+  border: 0;
+  background: none;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.segment button[aria-pressed='true'] {
+  background: var(--ink);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ---------- Calendar ---------- */
+.calendarLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  transition: opacity 0.15s ease;
+}
+
+.calendarLayout[data-loading] {
+  opacity: 0.6;
+}
+
+.calendar {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px 10px;
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: center;
+  padding-bottom: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: 8px 2px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+}
+
+.cell:not([data-in-month]) {
+  color: var(--muted);
+  opacity: 0.45;
+}
+
+.cell:hover {
+  background: var(--bg);
+}
+
+.cell[data-today] .cellDate {
+  background: var(--ink);
+  color: #fff;
+}
+
+.cell[data-selected] {
+  border-color: var(--ink);
+  background: var(--bg);
+}
+
+.cellDate {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cellDots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 8px;
+}
+
+.cellDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--lime-ink);
+}
+
+.cellMore {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* ---------- Day panel / list shared bits ---------- */
+.dayPanel,
+.dateGroup {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
+.dateGroups {
+  display: grid;
+  gap: 14px;
+}
+
+.panelHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.panelHead h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.panelCaption {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dateGroupHead {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.list li + li {
+  border-top: 1px solid var(--line);
+}
+
+.empty {
+  margin: 8px 0;
+  padding: 18px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ---------- Event row ---------- */
+.row {
+  display: grid;
+  /* 88px: 날짜 범위 중 가장 긴 "MM.D – MM.DD"(예: "11.30 – 12.31", 13px/800 기준 실측
+     85px) + gap을 더해도 제목과 안 겹치도록. font-size를 지정하지 않아 본문 기본
+     16px이 적용돼 "12.30 – 1.2"가 76px 칸을 넘쳐 제목과 겹쳤던 적이 있다(실측). */
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 2px;
+}
+
+.row:hover .rowTitle {
+  text-decoration: underline;
+  text-decoration-color: var(--lime);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.rowDate {
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding-top: 1px;
+}
+
+.rowDate small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.rowBody {
+  min-width: 0;
+}
+
+.rowTitle {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.rowMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.rowCompact .rowTitle {
+  font-size: 14px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.phaseTag {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.phase-upcoming {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+}
+
+.phase-ongoing {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.phase-ended {
+  background: none;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.statusTag {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 700;
+  background: #fbe9e9;
+  color: #a43e3e;
+  white-space: nowrap;
+}
+
+/* ---------- Detail page ---------- */
+.backLink {
+  display: inline-block;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.backLink:hover {
+  color: var(--ink);
+}
+
+.detailPanel {
+  max-width: 760px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+}
+
+.detailTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.detailTitle {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.detailSeries {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.detailStatusNote {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: #fbe9e9;
+  color: #a43e3e;
+  font-size: 13px;
+}
+
+.detailMeta {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 20px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.detailMeta > div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  font-size: 14px;
+}
+
+.detailMeta dt {
+  color: var(--muted);
+}
+
+.detailMeta dd {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.detailNote {
+  margin: 0 0 20px;
+}
+
+.detailNote h2 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.detailNote p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.detailLink {
+  display: inline-block;
+  height: 38px;
+  line-height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.detailLink:hover {
+  border-color: var(--ink);
+}
+
+.detailFoot {
+  margin: 16px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1180px) {
+  .calendarLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .container {
+    padding: 20px 20px 56px;
+  }
+  .detailPanel {
+    padding: 22px 20px;
+  }
+}
+
+@media (max-width: 760px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filterGroup {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: 16px 14px 48px;
+  }
+  .cell {
+    min-height: 48px;
+    padding: 6px 1px 4px;
+  }
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .rowDate {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .detailMeta > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

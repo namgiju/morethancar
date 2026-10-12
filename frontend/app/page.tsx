@@ -3,6 +3,7 @@ import {
   fetchPublicGarageServer,
   fetchSiteStatsServer,
   fetchTodayPostsServer,
+  fetchUpcomingMotorsportServer,
 } from '../lib/server-api';
 import {pickGarageShowcase} from '../lib/format';
 import type {BoardPeriod, Post} from '../lib/home-types';
@@ -32,11 +33,12 @@ async function loadBoard(): Promise<{period: BoardPeriod; posts: Post[]}> {
 }
 
 export default async function Page() {
-  const [boardResult, latestResult, garageResult, statsResult] = await Promise.allSettled([
+  const [boardResult, latestResult, garageResult, statsResult, motorsportResult] = await Promise.allSettled([
     loadBoard(),
     fetchLatestPostsServer(6),
     fetchPublicGarageServer(),
     fetchSiteStatsServer(),
+    fetchUpcomingMotorsportServer(3),
   ]);
 
   return (
@@ -47,6 +49,7 @@ export default async function Page() {
       latestPosts={latestResult.status === 'fulfilled' ? latestResult.value : null}
       garage={garageResult.status === 'fulfilled' ? pickGarageShowcase(garageResult.value, 3) : []}
       stats={statsResult.status === 'fulfilled' ? statsResult.value : null}
+      motorsportEvents={motorsportResult.status === 'fulfilled' ? motorsportResult.value : []}
     />
   );
 }
