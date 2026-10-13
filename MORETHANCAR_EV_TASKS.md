@@ -760,3 +760,14 @@ type ChangeEntry = PublicVersion & { slug: string; title: string; category: "BUY
 - DB 접속·마이그레이션 실행·Docker 기동/재시작·운영 서버 접속·배포·브랜치 변경·git commit/push — 전부 수행하지 않음(git status/diff로 재확인, `board-service/src/app.js` +3줄과 `frontend/components/common/site-header.tsx` +3줄 외에는 전부 신규 파일).
 - 실제 정책 수치·데이터를 서비스 코드나 fixture 밖에 두지 않았다 — 브라우저 검증에 쓴 합성 fixture 서버는 저장소 밖 스크래치패드에만 있고, 어떤 소스 파일에도 "실제처럼 보이는 임의 샘플"을 심지 않았다.
 - `lib/services.ts`는 건드리지 않았다 — 전기차 메뉴는 여전히 SOON이다(지시대로 보류).
+
+---
+
+### 배포 완료 (2026-10-13)
+
+- **main**: PR #2 머지 커밋 `57d0327`. CI 통과(run 38357882057, Node/Spring 둘 다 success).
+- **EC2 배포**: `54.180.254.40`(`~/rev.cc`), `git pull --ff-only` → `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait`. 전 서비스(proxy/core/board/frontend/redis/cloudflared) healthy.
+- **마이그레이션**: 배포 전 Neon `flyway_schema_history`가 V7(success)인 것을 직접 쿼리로 확인(`docker exec revcc-board node`로 읽기 전용 조회). 배포 전 `pg_dump -Fc`로 백업(`~/rev.cc/backups/pre-v8-20261013-064220.dump`, 94KB)해 **실제로 별도 컨테이너에 복원까지 해 보고** users=3/board_posts=1 확인(복구 가능 확인됨). 배포 후 core 로그: `Current version of schema "public": 7` → `Migrating ... to version "8"` → `Successfully applied 1 migration ... now at version v8`. 1건만 증분 적용됨, 에러 없음.
+- **롤백 준비**: 배포 전 이미지 4개를 `:pre-v8-rollback` 태그로 보존(core `f965b426cc84`/board `dedaf3d0063c`/frontend `2aca363d3370`/proxy `80756a97e4fd`), 이전 git 커밋 `59bff74`. 앱 롤백은 이 태그로 compose 재기동, DB는 이번에 되돌리지 않음(V8은 추가만 하는 마이그레이션이라 롤백 필요성 낮음, 임의로 되돌리지 말라는 지시에 따름).
+- **배포 후 확인**(morethancar.kr, 실제 접속): 메인 제목 문구 반영 확인, `/admin/ev` `200`(비로그인 화면 셸만), `/api/board/admin/ev/policies` 비로그인 `401`, `/api/board/ev/policies` 공개 조회 `200`(정책 0건 — 콘텐츠 미등록, SOON 유지 확인), 없는 slug `404`, 커뮤니티 API/페이지·`/garage`·로그인 페이지 전부 `200`, HSTS 헤더 정상, proxy/core 로그에 5xx·에러 없음(최근 5분 기준).
+- **미확인(계정 필요)**: 실제 MANAGER/ADMIN 로그인으로 `/admin/ev` 내부 화면 확인 — 운영 테스트 계정을 만들지 않기로 해 미실행으로 남김. 사용자가 실제 계정으로 로그인해 확인 필요.
