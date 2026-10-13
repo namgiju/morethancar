@@ -17,6 +17,7 @@ export type NavKey =
   | 'dashboard'
   | 'motorsport'
   | 'spots'
+  | 'ev'
   | 'members'
   | 'posts'
   | 'reports'
@@ -37,6 +38,7 @@ const NAV: {group: string; items: NavItem[]}[] = [
     items: [
       {key: 'motorsport', label: '모터스포츠 일정', href: '/admin/motorsport', min: 'MANAGER'},
       {key: 'spots', label: '스팟 (와인딩·심레이싱)', href: '/admin/spots', min: 'MANAGER'},
+      {key: 'ev', label: '전기차 정책', href: '/admin/ev', min: 'MANAGER'},
     ],
   },
   {

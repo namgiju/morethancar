@@ -1,6 +1,8 @@
 # 전기차 정책·정보 허브 개발 작업 (STEP 0 분석 + STEP 1 DB 설계 + STEP 2~10 계획)
 
 > 작성: 2026-10-13(STEP 0) · 갱신: 2026-10-13(STEP 1) · 2차 보완: 2026-10-13(STEP 1, 사용자 검토 지적 사항 7개 반영 — §3.0) · 3차 갱신: 2026-10-13(STEP 2, 공개 조회 API) · 4차 갱신: 2026-10-13(STEP 2 버그 수정 + STEP 3~6 공개 화면 구현) · 기준 코드: `main`(작업 트리에 `frontend/app/icon.png`, `frontend/public/apple-touch-icon.png` 미추적 파일 존재, 이번 STEP에서도 보존 — 수정하지 않음) · 상태: **STEP 2 API 버그 4건 수정 + STEP 3~6(`/ev`,`/ev/buy`,`/ev/drive`,`/ev/changes`,`/ev/policy/[slug]`) 공개 화면 구현 완료, Node 22로 board-service 테스트 74개 전부 통과 확인, 합성 fixture로 브라우저 실동작 확인 완료. STEP 7(관리자 UI) 승인 대기**
+> 5차 갱신: 2026-10-13(STEP 7, 관리자 쓰기 API + `/admin/ev` 화면 — mock(가짜 DB) 테스트·`tsc`/`build`까지 확인, 실제 DB·브라우저 확인은 미실행).
+> 6차 갱신: 2026-10-13(STEP 7 배포 전 결함 점검·보완 — 검증 선언 로직·승격 동시성·동시 편집 보호 3건 수정 + 실제 코드 리뷰로 발견한 SQL 버그 1건(정책 공개·비공개 500 오류) 수정. **격리된 일회용 PostgreSQL 16 + Redis로 V1→V8 신규 적용과 기존 V7→V8 업그레이드를 모두 실행 검증**, board-service를 실제로 띄워 관리자 전체 흐름·권한·동시 승격·동시 편집을 실제 HTTP 요청으로 재현, 프런트엔드를 실제로 띄워 브라우저로 관리자 화면·메인 화면을 확인 — STEP 1부터 "정적 검토만, 실행 검증 미실행"이라고 반복해 남겨 두었던 것을 이번에 처음 실행했다. 아래 STEP 7 항목에 구현/mock검증/실DB검증을 구분해 갱신).
 > 범위: 전기차 정책·정보 허브(`/ev`, `/ev/buy`, `/ev/drive`, `/ev/changes`, `/ev/policy/{slug}`) + `/admin/ev` 관리 기능.
 > 참고: `docs/plans/MOTORSPORT-AND-SPOTS-PLAN.md`는 "전기차 정보 허브는 제외"라고 명시했던 문서다(2026-10-12 작성, 모터스포츠·스팟 범위만 다룸). 이 문서가 그 후속으로 전기차 범위를 다룬다.
 >
@@ -312,14 +314,17 @@ STEP 0 문서는 이 3가지를 "사용자 확인 필요"로 남겨 뒀다. 이�
 
 대시보드 전용 조합 엔드포인트(`/highlights`)는 **이번에 만들지 않았다** — 지시의 "필요한 경우만 추가" 기준에 따라, `/changes?filter=scheduled`가 이미 "D-day 표시 가능(= `effectiveDate` 있고 `status='SCHEDULED'`로 확정된 것만)" 계약을 만족하므로 STEP 3에서 메인 대시보드를 만들 때 이 엔드포인트들을 조합해 쓰는 것으로 충분하다고 판단했다. STEP 3에서 실제로 화면을 만들다가 전용 조합 엔드포인트가 필요하면 그때 추가한다.
 
-### 관리자 — 여전히 설계뿐, 이번 STEP 2에서 구현하지 않음 (`/api/board/admin/ev/*`, `requireCurrentStaff`, MANAGER 이상)
+### 관리자 — STEP 7에서 구현 완료(`/api/board/admin/ev/*`, `board-service/src/ev.js`의 `evAdminRouter`, `requireCurrentStaff`, MANAGER 이상). 아래 표는 설계와 거의 그대로 구현됐고, 실제 구현에서 달라진 점만 각주로 남긴다(세부는 STEP 7 항목 참고 — 실제 DB 실행 검증은 아직 없음, mock 테스트만).
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
 | GET | `/api/board/admin/ev/policies?q=&category=&deleted=&page=` | 정책 항목 목록(정책 단위, 각 행에 버전 개수·현재 버전 상태 요약 포함) |
-| GET | `/api/board/admin/ev/policies/:id/versions` | 해당 정책의 전체 버전 이력(모든 `revision_kind`, 모든 `publication` 포함) |
+| GET | `/api/board/admin/ev/policies/:id` | 정책 항목 하나(목록과 같은 모양 — 수정 다이얼로그가 이걸 안 쓰고 목록 응답을 그대로 재사용하지만, 별도 새로고침·딥링크용으로 둠) |
+| GET | `/api/board/admin/ev/policies/:id/versions` | 해당 정책의 전체 버전 이력(모든 `revision_kind`, 모든 `publication` 포함, 각 버전의 출처 배열 포함) |
 | POST | `/api/board/admin/ev/policies` | 정책 항목 생성(slug·category·scope) **+ 첫 버전(`revision_kind='INITIAL'`) 동시 생성.** 같은 트랜잭션. `version_no=1`, `is_current`는 아직 `false`(publish 전에는 현재 버전이 될 수 없음, DB CHECK) |
+| PUT | `/api/board/admin/ev/policies/:id` | 정책 기본 정보만 수정(분류·전국/지역·지역 설명·제목·featured). `slug`는 받지 않음(등록 후 불변). `expectedUpdatedAt`을 보내면 동시 편집 충돌을 409로 감지(지시 8, §3.4 — 새 락 컬럼 없이 기존 `updated_at`으로 비교) |
 | POST | `/api/board/admin/ev/policies/:id/versions` | 새 버전 등록(`revision_kind='CHANGE'` 또는 `'CORRECTION'`, `change_summary` 필수 — DB CHECK가 최종 방어). `supersedes_version_id`는 복합 FK(§3.3)로 같은 `policy_id`인지는 DB가 보장하지만, "올바른 버전"(보통 지금 대표 버전)을 고르는 것은 API 책임 |
+| PUT | `/api/board/admin/ev/versions/:id` | **설계 당시(§4 초안)에는 없던 엔드포인트 — STEP 7 지시("미공개 초안만 편집할 수 있게 하세요")에 따라 추가했다.** 한 번도 공개되지 않은 버전(`published_at IS NULL`)의 내용·상태·검증·종료일만 수정한다. `revisionKind`·`supersedesVersionId`는 구조적 식별자라 수정에서 받지 않는다(바꿀 수 없음). `expectedUpdatedAt`으로 동시 편집 충돌을 409로 감지 |
 | POST/PUT | `/api/board/admin/ev/policies/:id/publish` · `/hide` | **정책 전체 공개 게이트**(`policy_items.publication`) 전환(§3.6-1, 이번 보완에서 추가된 엔드포인트). 개별 버전을 건드리지 않고 정책 전체를 한 번에 가리거나 드러낸다 |
 | POST | `/api/board/admin/ev/versions/:id/sources` | 출처 추가. **해당 버전이 아직 한 번도 공개된 적 없을 때만**(`published_at IS NULL`) 허용 — 이미 공개됐던 버전에는 추가하지 않는다(지적 5번, §3.3). 기존 출처 행은 어떤 경우에도 수정하지 않는다 |
 | POST | `/api/board/admin/ev/versions/:id/publish` · `/hide` | **버전 단위** 공개·비공개(정책 전체 게이트와 별도 축, §3.6-1). publish 전 `policy_sources` 1개 이상 필수(§3.3) + `verification_status='VERIFIED'` 필수(DB CHECK). 대표 버전(`is_current=true`)을 `hide`하면 **같은 트랜잭션에서 `is_current=false`로도 내려야** DB CHECK를 통과한다(지적 5번 — 이 순서를 지키지 않으면 저장 자체가 거부된다) |
@@ -331,13 +336,13 @@ STEP 0 문서는 이 3가지를 "사용자 확인 필요"로 남겨 뒀다. 이�
 | GET | `/api/board/admin/ev/logs` | 감사 로그(`content_admin_logs WHERE entity_type IN ('POLICY','POLICY_VERSION')`) |
 | GET | `/api/board/admin/ev/stale` | 재확인 대기열(`last_verified_on`이 오래된 `PUBLISHED` 버전) |
 
-모든 변경은 `transaction()` + `content_admin_logs` 기록(스팟 패턴 그대로). `evAdminRouter`가 나중에 생기면 `board-service/src/app.js`에 다음 줄을 추가한다(**아직 추가하지 않았다** — 실제로 추가한 것은 `evRouter` 한 줄뿐):
+모든 변경은 `transaction()` + `content_admin_logs` 기록(스팟 패턴 그대로, STEP 7에서 구현 완료). `app.js`에 실제로 추가된 줄(STEP 7):
 
 ```js
-import { evAdminRouter, evRouter } from "./ev.js";   // 실제로는 아직 { evRouter }만 import함
+import { evAdminRouter, evRouter } from "./ev.js";
 // ...
-app.use("/api/board/admin/ev", evAdminRouter({ db, auth }));   // 미구현 — adminRouter보다 먼저 와야 함
-app.use("/api/board/ev", evRouter({ db }));                    // 구현 완료(STEP 2)
+app.use("/api/board/admin/ev", evAdminRouter({ db, auth }));   // adminRouter보다 먼저(모터스포츠·스팟과 같은 자리)
+app.use("/api/board/ev", evRouter({ db }));
 ```
 
 ### 4.1 공개 API 응답 계약 (STEP 2 실제 구현, SSR·`generateMetadata`·`sitemap.ts`가 재사용할 타입)
@@ -596,17 +601,82 @@ type ChangeEntry = PublicVersion & { slug: string; title: string; category: "BUY
 
 **테스트/검증 결과**: `tsc`/`build` 통과. 브라우저로 `/ev/changes` 전체(필터 전환 포함, "검토 중" 클릭 → URL이 `?filter=proposed`로 바뀌고 PROPOSED 항목만 남는 것)를 직접 확인.
 
-### ☐ STEP 7 — 관리자 정책 관리 기능 (`/admin/ev`)
+### ☑ STEP 7 — 관리자 정책 관리 기능 (`/admin/ev`) — 구현 2026-10-13, **배포 전 결함 점검·보완 2026-10-13(실제 PostgreSQL/Redis 격리 환경 + 브라우저로 실행 검증 완료)**
 
-**작업**: §5 전체(목록·등록·수정·공개/비공개·삭제/복원·출처 관리·감사 로그·대시보드 카드·사이드 내비).
+**작업**: §5 전체(목록·등록·수정·공개/비공개·삭제/복원·출처 관리·감사 로그·대시보드 카드·사이드 내비) + 관리자 쓰기 API(§4, 이전까지 설계뿐이던 `evAdminRouter`).
 
-**수정 파일**:
-- `frontend/lib/admin-ev.ts` (신규, 관리자 타입+API 클라이언트)
-- `frontend/app/admin/ev/page.tsx`, `frontend/components/admin/ev-admin.tsx`, `ev-policy-dialog.tsx`(정책 항목), `ev-version-dialog.tsx`(버전 등록·출처·승격·취소), `ev-logs.tsx` (신규)
-- `frontend/components/admin/admin-shell.tsx` (`NavKey`·`NAV`에 `ev` 추가)
-- `frontend/components/admin/admin-app.tsx` (`ContentSummary`에 카드 추가)
+**백엔드 — 실제 구현 파일**:
+- `board-service/src/ev.js` — 기존 공개 라우터(`evRouter`, STEP 2) 아래에 `evAdminRouter({db, auth})` 추가(파일을 새로 만들지 않고 이어씀 — 공개/관리자 라우터를 같은 파일에 두는 건 `motorsport.js`/`spots.js`의 기존 관행과 동일). §4 표의 엔드포인트 전부 + 설계에 없던 `PUT /versions/:id`(미공개 초안 수정, 지시 3번 "미공개 초안만 편집할 수 있게"에 따라 추가) 구현.
+- `board-service/src/app.js` — `evAdminRouter` import 1줄 + `app.use("/api/board/admin/ev", evAdminRouter({db, auth}))` 1줄을 `adminRouter`(ADMIN 전용)보다 먼저 등록(모터스포츠·스팟과 같은 자리 — §1.8).
+- `board-service/test/ev-admin.test.js` (신규) — spots.test.js/motorsport.test.js와 같은 "가짜 DB(SQL 문자열 매칭)" 패턴. **실제 PostgreSQL에 접속하지 않으므로 CHECK 제약·실제 트랜잭션 격리가 "진짜로" 동작하는지는 증명하지 않는다** — 증명하는 건: (1) 세션 역할과 현재 DB 역할·상태 재확인, (2) 핸들러가 상태 전환 규칙을 실제로 거부하는지, (3) 성공 시 `content_admin_logs` INSERT+COMMIT / 실패 시 ROLLBACK만 일어나는지, (4) 공개·삭제가 보내는 SQL 자체에 `publication`/`deleted_at`을 바꾸는 구문이 들어있는지(문자열 검사).
 
-**테스트/완료 기준**: MANAGER 계정으로 등록·수정(변경 요약 누락 시 저장 거부 확인)·공개/비공개 가능, USER 계정은 403(화면 접근 거부), 삭제·복원은 ADMIN만 가능(MANAGER로 시도 시 거부)을 수동으로 재현. 감사 로그에 모든 작업이 남는지 확인.
+#### 배포 전 결함 점검에서 발견·수정한 4건 (2026-10-13)
+
+사용자가 이번 라운드에서 지시한 "배포 전 결함 점검"으로 코드를 다시 읽으며 실제 결함 3건을 찾아 고쳤고, 그 수정을 실제 PostgreSQL로 검증하는 과정에서 **설계·리뷰만으로는 안 보이던 SQL 버그 1건을 추가로 발견**했다(mock DB 테스트는 SQL을 실행하지 않아 이 네 번째 결함을 전혀 잡지 못했다 — 왜 실DB 검증이 필요했는지의 직접적인 증거).
+
+1. **검증 선언이 암묵적으로 이뤄지던 결함(지시 1번)** — 이전 `versionContentInput`은 `status`가 `PROPOSED`가 아니면 `verifiedOn`이 없어도 오늘 날짜로 채우고 조용히 `VERIFIED`로 저장했고, `ev-version-fields.tsx`는 확정 상태를 고르면 검증 체크박스를 자동으로 켜고 비활성화했다 — **상태를 고른 것 자체가 "공식 출처로 확인했다"는 선언이 되어버렸다.** 고친 뒤: 서버는 요청 본문의 **명시적 불린 `confirmVerification`**(사용자가 실제로 체크한 값만, 상태·날짜로 추론하지 않음)이 `true`일 때만 `VERIFIED`로 저장하고, 아니면 확정 상태 저장 자체를 400으로 거부한다. **근거(출처)까지 같은 요청에서 확인**한다 — `confirmVerification:true`인데 출처가 하나도 없으면(새로 보낸 것도, 이미 저장된 것도) 409로 거부한다(버전 생성은 DB에 행이 없어 "이미 저장된 출처"가 있을 수 없으므로 반드시 같은 요청에 `sources` 배열을 포함해야 한다). UI 체크박스는 더 이상 자동으로 켜지거나 비활성화되지 않고, 확정 상태인데 체크가 안 돼 있으면 붉은 안내 문구로 왜 저장이 안 되는지 설명한다. **브라우저로 직접 확인함**: 상태를 "적용 중"으로 바꿔도 체크박스가 그대로 꺼져 있고 안내 문구가 뜨는 것을 스크린샷으로 확인.
+2. **대표 버전 승격(promote)의 동시성 결함(지시 2번)** — 이전 구현은 대상 버전부터 잠그고 "지금 대표인 행"을 그 다음에 조회했는데, 그 사이 정책 부모 행에 대한 락이 없었다. 대표가 아직 없는 정책에서 서로 다른 두 버전을 동시에 승격하면 둘 다 "지금 대표가 없다"는 커밋 전 상태를 보고 각자 자신을 대표로 쓰려 할 수 있었다 — 부분 유니크 인덱스가 최종적으로 막긴 하지만 "직렬화돼 둘 다 처리"가 아니라 "하나가 불필요하게 실패"하는 결과였다. **이전 주석이 "동적 조회라 교착이 없다"고 적었던 것은 실제로 재현하지 않고 단정한 것이었다 — 정정한다(교착은 맞게도 없었지만, 유니크 위반 경쟁은 있었다).** 고친 뒤: 버전 등록과 같은 순서로 **정책 부모 행을 먼저 `SELECT ... FOR UPDATE`로 잠근 뒤에만** 버전 행을 읽거나 쓴다 — 같은 정책에 대한 승격·버전 등록은 전부 정책 행의 락 하나로 직렬화된다.
+3. **`expectedUpdatedAt` 생략 시 충돌 검사가 조용히 건너뛰어지던 결함(지시 3번)** — 이전에는 이 필드가 요청에 아예 없으면(undefined) 동시 편집 검사를 생략했다. 고친 뒤: `PUT /policies/:id`·`PUT /versions/:id`는 이 키가 요청 본문에 **아예 없으면**(값이 `null`이어도 키 자체는 있어야 한다 — "한 번도 수정된 적 없음"의 명시) 400으로 거부한다 — 충돌 보호를 우회할 수 있는 경로 자체를 없앴다.
+4. **(실DB 검증 중 발견) 정책 공개·비공개 SQL의 파라미터 타입 불일치** — `UPDATE policy_items SET publication=$2,published_at=COALESCE(published_at,CASE WHEN $2='PUBLISHED' THEN NOW() END)...`에서 `$2`를 캐스트 없이 두 번(대입 1회 + `CASE WHEN` 비교 1회) 썼다. 실제 PostgreSQL은 이 조합에서 타입을 일관되게 추론하지 못해 `inconsistent types deduced for parameter $2` 오류로 500(관리자 화면에는 "서비스에 일시적으로 연결할 수 없습니다")이 났다 — **정책 공개·비공개가 코드 리뷰·mock 테스트를 모두 통과했음에도 실제로는 항상 실패했을 결함**이다. `spots.js`/`motorsport.js`의 같은 패턴은 이미 `$2::text`로 캐스트돼 있었는데 이 부분만 빠뜨렸다. 양쪽 다 `$2::text`로 캐스트해 고쳤고, mock 테스트에 캐스트가 둘 다 남아 있는지 문자열로 고정하는 회귀 테스트를 추가했다(SQL을 실행하지 않는 mock으로는 이 종류의 타입 오류 자체를 다시 잡을 수 없어, "캐스트 문자열이 사라지지 않았는지"만 방어선으로 둔다).
+
+수정 파일: `board-service/src/ev.js`(위 4건), `board-service/test/ev-admin.test.js`(결함 1·2·3·4 각각의 회귀 테스트 추가, 총 93개 중 신규), `frontend/components/admin/ev-version-fields.tsx`(체크박스 자동화 제거, `confirmVerification` 명시 전송), `frontend/components/admin/ev-policy-dialog.tsx`(출처 입력 섹션을 처음 추가 — 이전에는 정책 등록 다이얼로그에 출처 입력이 아예 없었다), `frontend/components/admin/ev-version-dialog.tsx`(출처를 버전 저장과 **같은 요청**(`sources` 배열)으로 보내도록 변경 — 이전에는 버전을 먼저 저장한 뒤 `POST .../sources`를 순서대로 호출해, confirmVerification을 요구하는 순간엔 아직 DB에 출처가 없는 경쟁 구간이 있었다), `frontend/lib/admin-ev.ts`(`VersionContentInput.confirmVerification` 필드 추가, `NewVersionInput`/`UpdateVersionInput`에 `sources?` 추가).
+
+**검증 상태 선언 방식(§3.2·지시 "확인일 갱신만으로 VERIFIED가 되지 않게", 이번 수정으로 최종 확정)**: `confirmVerification`은 상태·날짜 입력과 완전히 독립된, 운영자가 직접 켠 명시적 플래그다. `status`가 `PROPOSED`가 아닌데 `confirmVerification`이 `true`가 아니면 저장 자체를 400으로 거부한다(DB CHECK가 거부하는 조합을 더 친절한 메시지로 먼저 막음). `confirmVerification:true`는 반드시 근거(출처, 새로 보낸 것이든 이미 저장된 것이든)를 동반해야 한다. `/verify`(확인일만)와 `/verify-confirm`(검증 상태 전환, 출처 1개 이상 필수)은 여전히 분리된 별도 엔드포인트다.
+
+**출처 추가 후 재검증**: `PROPOSED` 버전만 DB CHECK상 `UNVERIFIED`로 되돌릴 수 있어(그 외 상태는 항상 `VERIFIED`여야 함), 단독 `/versions/:id/sources` 엔드포인트로 출처를 추가하면 `PROPOSED`인 경우에만 검증 상태를 자동으로 `UNVERIFIED`로 내린다. 그 외 상태의 미공개 초안에 이 엔드포인트로 출처를 추가하면 검증 상태는 그대로 유지되고, 운영자가 필요하면 `/verify-confirm`을 다시 호출해야 한다 — DB 제약상 가능한 범위까지만 자동화했고, 나머지는 문서에 한계로 남긴다. (등록·수정 시점에 `sources`로 같이 보내는 출처는 이 자동 되돌림과 무관하다 — 그 순간 검증을 새로 선언하는 것이다.)
+
+**동시 편집 충돌(지시 8, §3.4, 이번 수정으로 보강)**: 새 락 컬럼을 추가하지 않았다. `PUT /policies/:id`·`PUT /versions/:id`는 `expectedUpdatedAt` 키가 요청에 없으면 400, 있으면 서버가 잠근 행의 현재 `updated_at`과 **epoch 비교**(문자열 형식이 Postgres의 `+00:00`과 JS의 `Z`로 달라도 같은 순간이면 통과)해 다르면 409로 거부한다. 버전 번호 발급·대표 버전 승격은 **정책 부모 행을 먼저 잠근 뒤**(위 결함 2 수정) 대상 행을 같은 트랜잭션에서 잠그고 계산한다.
+
+**프런트엔드 — 실제 구현 파일**:
+- `frontend/lib/admin-ev.ts` (신규) — 관리자 타입 + API 클라이언트. 공개 타입(`lib/ev-types.ts`)과 라벨(`lib/ev-format.ts`)을 재사용(새로 안 만듦).
+- `frontend/components/admin/ev-admin.tsx` (신규) — `/admin/ev` 본체. 탭은 "정책/재확인 대기열/변경 이력" 3개(`?tab=`), 정책 행의 "버전 관리"를 누르면 탭 영역이 **그 정책의 버전 목록 화면으로 전환**된다(`?policy=`, 별도 다이얼로그가 아니라 전체 폭 화면 — 버전이 여러 개일 수 있어 다이얼로그에 넣기엔 좁아서, 이번 지시에는 없던 화면 전환 하나를 추가했다. 다단계 승인·복잡한 편집기는 아님, 목록 ↔ 상세 전환뿐).
+- `frontend/components/admin/ev-version-fields.tsx` (신규, **예상 파일 목록에는 없었음**) — 정책 등록(최초 버전)과 버전 등록·수정이 똑같이 쓰는 12개 입력 필드(요약·핵심내용·대상·혜택·방법·보충설명·상태·발표일·시행일·종료일·무기한 여부·검증)를 한 곳으로 모았다. 세 군데에 똑같은 폼을 복붙하지 않으려고 분리했다 — 새 API나 새 다이얼로그가 아니라 순수 폼 컴포넌트.
+- `frontend/components/admin/ev-policy-dialog.tsx` (신규) — 정책 항목 등록(+최초 버전 내용)·수정. slug는 등록 후에는 입력란 자체가 없다(불변).
+- `frontend/components/admin/ev-version-dialog.tsx` (신규) — 새 버전 등록(종류·대체할 이전 버전·변경 요약 선택 포함) / 미공개 초안 수정. 출처는 이미 등록된 것은 읽기 전용으로 보여주고, 추가할 출처만 입력폼에서 모아 저장 시 버전 저장 다음에 순서대로 `POST .../sources`를 호출한다(별도 배치 API를 만들지 않음 — 기존 코드베이스 관행대로 순차 호출).
+- `frontend/components/admin/ev-logs.tsx` (신규) — `spots-logs.tsx`와 같은 틀 + 대상 종류(정책/버전) 필터.
+- `frontend/components/admin/admin-shell.tsx` — `NavKey`에 `'ev'`, `NAV`의 "콘텐츠" 그룹에 전기차 정책 항목 추가.
+- `frontend/components/admin/admin-app.tsx` — `ContentSummary`의 `cardGrid`에 "전기차 정책" 카드 추가(기존 스팟 카드와 같은 모양 — 숫자 카운터 타일은 스팟 카드에도 없어서 맞추지 않음, 과설계 방지).
+- `frontend/app/admin/ev/page.tsx` (신규) — `metadata.robots: {index:false, follow:false}`로 색인 제외(지시 4번). 공개 `/ev` 메뉴의 SOON은 건드리지 않음(`lib/services.ts` 미수정, STEP 6 결정 유지).
+
+**구현 완료 체크(코드)**:
+- [x] §5 전체 + §4 관리자 API 전부 + 지시 1·2·3 결함 수정 + 실DB 검증 중 발견한 결함 4 수정.
+
+**mock 테스트/정적 검증(완료)**:
+- [x] `cd board-service && npm test` — **93개 전부 통과**(기존 74개 + `ev-admin.test.js` 19개). 권한·상태 전환·승격/취소 거부·감사로그/롤백·동시 편집(가짜 DB상의 SQL 순서)에 더해, 이번 라운드에서 결함 1(명시적 confirmVerification + 근거 필요)·결함 2(promote가 정책 부모 행을 먼저 잠그는지)·결함 3(expectedUpdatedAt 생략 시 400)·결함 4($2::text 캐스트가 SQL에 남아 있는지) 각각의 회귀 테스트를 추가했다.
+- [x] `cd frontend && npx tsc --noEmit` — 오류 0건.
+- [x] `cd frontend && npm run build` — 성공, `/admin/ev` 포함 전체 라우트 정상 빌드.
+
+**실제 PostgreSQL/Redis 격리 환경 검증(완료 — 2026-10-13, 이번 라운드에서 처음 실행)**
+
+운영 Neon·AWS에는 전혀 접속하지 않았다. 기존 dev 컨테이너(`revcc-member-test-pg` 등)·볼륨(`revcc-site_revcc_pg`)은 전혀 건드리지 않고, **완전히 새로운 이름의 1회용 컨테이너**(`revcc-ev-verify-pg`(postgres:16, 호스트 포트 55433), `revcc-ev-verify-redis`(redis:7-alpine, 포트 56379), 전용 네트워크 `revcc-ev-verify-net`)를 띄워 검증한 뒤 **검증이 끝나자마자 컨테이너·네트워크를 전부 삭제**했다(`docker rm -f` + `docker network rm` — 기존 컨테이너·볼륨은 검증 전후로 상태 변화 없음, `docker ps -a`로 확인).
+
+- [x] **빈 DB에 V1→V8 적용**: 새 DB(`revcc_fresh`)에 core(Spring, `mvn -o package` 후 `java -jar`)를 직접 실행해 Flyway가 V1부터 V8까지 순서대로 적용되는 것을 로그로 확인(`Successfully applied 8 migrations ... now at version v8`), `flyway_schema_history`에 8행 전부 `success=t`, `policy_items`/`policy_versions`/`policy_sources`/`content_admin_logs` 테이블 생성 확인, Hibernate `ddl-auto: validate` 통과(앱이 정상 기동 — 엔티티-스키마 불일치 없음).
+- [x] **기존 V7→V8 업그레이드**: 같은 Postgres에 두 번째 DB(`revcc`)를 만들어, **V8 마이그레이션 파일을 일시적으로 빼고** core를 실행해 V1~V7만 적용(`Successfully applied 7 migrations ... now at version v7`) → 실제 운영과 같은 모양의 데이터(ADMIN/MANAGER/USER/정지된 MANAGER 포함 회원 4명)를 직접 INSERT로 채움 → V8 파일을 되돌리고 **`mvn clean package`로 다시 빌드**(최초 시도에서 Maven이 target/classes의 V8 리소스를 자동으로 지우지 않아 "V7만 적용"이 거짓으로 통과한 것을 발견·재현해 바로잡음 — `clean` 없이 `package`만 하면 삭제된 리소스가 산출물에 남는다는 사실을 이번에 직접 확인) → core를 다시 실행해 **`Successfully applied 1 migration ... now at version v8`**(증분 적용) 확인, 기존 회원 4명 데이터가 그대로 남아 있음을 재확인, V8 새 테이블도 모두 생성됨을 확인.
+- [x] **V8 CHECK·FK·유니크 인덱스를 실제 SQL로 직접 재현**(STEP 1부터 "정적 근거뿐" 이라고 남겨 두었던 항목들): `content_admin_logs_action_check`에 `CANCEL`/`PROMOTE`가 실제로 반영됐는지 `pg_get_constraintdef`로 직접 조회해 확인(이름 추정이 맞았음을 실행으로 처음 확인), 복합 FK(`policy_id, supersedes_version_id`)가 **다른 정책의 버전을 가리키는 INSERT를 실제로 거부**하는지 확인(`ERROR: ... violates foreign key constraint ... policy_versions_policy_id_supersedes_version_id_fkey`), `CHECK(supersedes_version_id < id)`가 자기참조를 거부하는지, `CHECK(publication<>'PUBLISHED' OR verification_status='VERIFIED')`가 미검증 공개를 거부하는지, `CHECK(status='PROPOSED' OR verification_status='VERIFIED')`가 미검증 확정 상태를 거부하는지, 마지막으로 **부분 유니크 인덱스(`policy_versions_one_current`)가 같은 정책에 두 번째 대표 버전을 지정하려는 UPDATE를 실제로 거부**하는지까지 전부 직접 SQL로 재현해 확인했다.
+- [x] **관리자 등록→출처→검증→공개→승격 전체 흐름을 실제 HTTP로 재현**: board-service를 이 Postgres/Redis에 직접 연결해 띄우고(`PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE`, `REDIS_URL`), Redis에 `revcc:session:<token>` 키를 Spring과 같은 포맷(`{id,username,role,version}`)으로 직접 심어 ADMIN/MANAGER/USER/정지된 MANAGER 네 세션을 만든 뒤, **Node 스크립트로 실제 fetch 요청 21건을 순서대로 보내 확인**: 익명 401, USER 403, MANAGER 200, 정지 계정 401(아래 참고), 정책 등록(PROPOSED, 검증 불필요) 201, 확정 상태인데 confirmVerification 없음 400, confirmVerification:true인데 출처 없음 409, confirmVerification:true + 출처 포함 201(검증됨+출처 1개), 버전 공개 200, 대표 승격 200, 정책 전체 공개 200, 공개 API에 실제로 노출됨 확인, MANAGER 삭제 시도 403, ADMIN 삭제 204, 공개 API 404로 사라짐, 감사 로그에 CREATE/PUBLISH/PROMOTE/DELETE 전부 기록됨, ADMIN 복원 200 — **21건 전부 기대한 결과**. 이 과정에서 결함 4(공개·비공개 500 오류)를 실제로 맞닥뜨려 수정했다.
+  - 정지된 MANAGER 세션은 403이 아니라 **401**을 받았다 — `requireCurrentStaff`의 역할 검사까지 가기 전에, `app.js`의 공용 세션 재확인 미들웨어가 SUSPENDED 계정의 `req.user`를 이미 `null`로 만들기 때문이다(EV 전용 동작이 아니라 플랫폼 전체의 기존 동작). mock 테스트는 이 미들웨어의 쿼리를 모든 사용자에 대해 항상 ACTIVE로 반환하도록 단순화해 둬서 이 차이를 가리고 있었다 — mock 테스트도 실제 동작에 맞춰 바로잡았다(결과는 바뀌지만 "접근이 막힌다"는 보안 결론은 동일하다).
+- [x] **동시 승격 재현**: 같은 정책의 공개된 두 버전(B, C — 어느 쪽도 아직 대표가 아님)에 **`Promise.all`로 진짜 동시에** `POST .../promote`를 보냈다. 결과: **둘 다 200으로 성공**(교착도, 유니크 위반 409도 없음 — 결함 2 수정이 실제로 직렬화함을 확인), 최종적으로 둘 중 하나만 대표(`is_current`)로 남음(순서는 레이스라 결정되지 않지만 상태는 항상 일관됨).
+- [x] **동시 편집 재현**: 같은 정책에 **같은(오래된) `expectedUpdatedAt`을 들고 동시에** `PUT /policies/:id` 두 번(제목만 다르게)을 보냈다. 결과: **정확히 하나는 200, 다른 하나는 409** — 유실된 업데이트(lost update) 없이 충돌 보호가 실제 동시 요청에서도 보장됨을 확인.
+- [x] **브라우저로 직접 확인**(core는 마이그레이션 적용 후 종료, board-service·frontend(standalone 빌드)를 이 Postgres/Redis에 연결해 구동, Redis에 심어 둔 MANAGER 세션 쿠키로 로그인 상태 재현): `/admin/ev` 정책 목록 → "버전 관리" → 버전 테이블(상태·검증·공개 배지, 작업 버튼이 상태별로 다르게 보임) → "새 버전 등록" 다이얼로그에서 시행 상태를 "적용 중"으로 바꿔도 **검증 체크박스가 자동으로 켜지지 않고**, 빨간 안내 문구("...체크박스를 직접 켜고... 출처를 1개 이상 입력해야...")가 뜨는 것을 스크린샷으로 직접 확인(결함 1 수정의 실제 UI 동작 확인) → 메인 페이지(`/`)에서 변경된 제목("차 그 이상의 이야기")·설명 문구와 자연스러운 줄바꿈을 직접 확인.
+  - **반응형**: 1280px·768px은 요청대로 정확히 재현해 확인(가로 스크롤 없음, 관리자 테이블은 `.tableWrap` 내부 스크롤만 — 기존 스팟/모터스포츠 관리자 화면과 같은 기존 패턴). **360px/390px은 이 세션의 브라우저 자동화 도구가 허용하는 최소 창 너비가 500px로 보여(여러 번 재시도, 더 작은 값을 요청해도 500px로 고정됨) 정확히 그 값으로는 확인하지 못했다** — 대신 도달 가능한 가장 좁은 500px에서 관리자 화면·메인 화면 모두 가로 스크롤 없음(`document.documentElement.scrollWidth === clientWidth`로 직접 확인)과 제목·설명 줄바꿈이 깨지지 않는 것을 확인했다. CSS가 `clamp()`(폭에 비례해 줄어들다 하한에서 고정)와 `word-break: keep-all`을 쓰므로 500px 미만에서 상황이 더 나빠질 구조적 이유는 없지만, **360px/390px을 글자 그대로 확인했다고 말할 수는 없다** — 이 도구 제약을 그대로 보고한다.
+
+**정리**: 사용 후 모든 임시 자원을 제거했다 — Docker 컨테이너 2개(`revcc-ev-verify-pg`, `revcc-ev-verify-redis`) + 네트워크(`revcc-ev-verify-net`) 삭제, 로컬 core/board-service/frontend 프로세스 전부 종료, 브라우저 탭 전부 닫음. 기존 dev 컨테이너·볼륨·`.env`·운영 설정은 어느 것도 수정하지 않았다.
+
+#### 범위 밖(참고): 같은 라운드에서 함께 처리한 메인 화면 문구 변경
+
+사용자 지시 3번으로 `frontend/components/home/home-shell.tsx`(브랜드 제목·설명 문구)와 `main.module.css`(`.brandTitle` 글자 크기 약 10%·굵기 한 단계 축소, `.brandTitle`/`.brandLead`에 `word-break: keep-all` 추가로 한글 단어 중간 줄바꿈 방지)를 수정했다 — **이것은 전기차 정책 허브(STEP 1~10)와 무관한 별도 작업**이라 이 문서의 STEP 번호에 넣지 않고 여기 참고로만 남긴다. 기존 색상·버튼 문구/동작·통계·배치·내비게이션은 손대지 않았고, 다른 페이지 문구·폰트도 바꾸지 않았다. 검증: `tsc`/`build` 통과, 브라우저로 1280px·768px·(도구 제약상)500px에서 실제 렌더링 확인(위 "브라우저로 직접 확인" 항목에 포함).
+
+#### 배포 준비 판정 (사용자 지시 5번, 2026-10-13)
+
+**결론: 이 브랜치의 코드는 main 반영 후보로 올릴 수 있는 상태지만("코드 배포" 준비), "전기차 정책 허브 정식 오픈"은 별개이며 아직이다.** 아래는 그 둘을 구분한 근거다.
+
+- **마이그레이션 순서·적용 시점**: `docker-compose.prod.yml`의 core가 Neon에 연결해 재기동하는 시점에 그동안 쌓인 Flyway 마이그레이션(V1~V8, 운영 Neon은 아직 V8 미적용 — STEP 1부터 기록)이 한 번에 적용된다. 이번에 **격리된 로컬에서 "기존 V7 상태 + 데이터 → V8 증분 적용" 경로를 실행으로 확인**했으니, 운영에서도 같은 경로(core 재기동 한 번으로 V8만 추가 적용)가 동작할 근거는 생겼다 — 다만 이건 **로컬 재현이지 운영 Neon 자체를 확인한 것이 아니다.** 운영 반영 시점은 여전히 "core를 Neon에 연결해 재기동할 때"이고, 사용자의 "운영 반영 승인" 전까지는 하지 않는다(§13, STEP 10 완료 기준과 동일).
+- **백업·복구 절차**: 이번 라운드에서 새로 만들거나 확인하지 않았다. STEP 10(운영 배포 준비)의 몫으로 남아 있다 — Neon에 V8을 적용하기 전 스냅샷/백업 시점을 사용자와 먼저 정해야 한다.
+- **이전 앱과의 호환성**: V8은 새 테이블 3개(`policy_items`/`policy_versions`/`policy_sources`) 생성과 기존 `content_admin_logs` 하나에 대한 `ALTER TABLE ... DROP/ADD CONSTRAINT`(entity_type·action 허용값 확장)만 한다 — 기존 테이블의 컬럼·데이터를 바꾸지 않는다. 이번 실DB 검증에서 V7→V8 적용 전후로 기존 회원 데이터가 그대로 남아 있음을 직접 확인했다. **다만 커뮤니티·차고 등 기존 기능 자체의 API 회귀 테스트는 이번에 수행하지 않았다** — V8이 그 테이블들을 전혀 건드리지 않는다는 마이그레이션 파일의 구조적 사실에 근거한 "영향 없을 것"이라는 판단이지, 실행으로 재확인한 것은 아니다.
+- **core→board/frontend 준비 상태**: core(Flyway 소유), board-service(`evAdminRouter`), frontend(`/admin/ev`) 세 서비스 모두 이번 라운드에서 실제로 함께 띄워 전체 흐름을 확인했다(위 "실제 PostgreSQL/Redis 격리 환경 검증" 전체). 세 서비스 간 계약(라우팅·세션 포맷)은 기존 것을 그대로 썼고 바꾸지 않았다.
+- **기존 로그인·커뮤니티·차고 회귀**: 이번 라운드에서 **직접 재확인하지 않았다**(세션 생성은 Redis에 직접 키를 심는 방식으로 우회했고, Kakao 로그인·회원가입·커뮤니티 글쓰기·차고 등록 같은 기존 플로우는 건드리지도 실행하지도 않았다). board-service의 기존 테스트 스위트(74개, 이번에 93개로 늘었지만 기존 74개는 그대로 통과)가 그 기능들의 단위 수준 회귀는 계속 잡아 주지만, **실제 DB로 end-to-end 재확인한 것은 아니다** — 미실행으로 명시한다.
+- **CI 공백**: `.github/workflows/ci.yml`은 `mvn test`(backend)와 `npm test`(board-service)만 실행하고, **frontend의 `tsc`/`build`는 CI에 없다**(이전 STEP들의 기록과 동일, 이번에도 확인함 — 사람이 매번 로컬에서 돌려야 한다는 뜻이다). 이번 STEP 7 전체 구간에서 frontend 빌드가 깨진 적이 없었던 것은 사람이 그때그때 로컬 `npm run build`로 확인했기 때문이지, CI가 보장해서가 아니다.
+- **STEP 8(실제 정책 데이터)·STEP 9(SEO)는 여전히 미완료**다 — "코드가 main에 반영될 수 있는 상태"와 "전기차 정책 허브가 실제로 오픈된 상태"는 다르다. `lib/services.ts`의 SOON은 이번에도 해제하지 않았고, 가짜/임시 정책 데이터를 공개 API에 등록하지도 않았다(검증에 쓴 `drive-verify-subsidy`·`concurrency-verify`는 격리된 1회용 DB에만 있었고, 그 DB 자체를 삭제했다 — 운영 Neon에는 애초에 연결하지 않았으니 새어나갈 경로가 없다).
 
 ### ☐ STEP 8 — 실제 정책 데이터 검증 및 등록
 

@@ -53,13 +53,9 @@ export default function HomeShell({
         <div className={styles.firstScreen}>
           <section className={styles.brand} aria-labelledby="brand-title">
             <p className={styles.eyebrow}>MORE THAN A CAR</p>
-            <h1 id="brand-title" className={styles.brandTitle}>
-              차, 그 이상의
-              <br />
-              이야기.
-            </h1>
+            <h1 id="brand-title" className={styles.brandTitle}>차 그 이상의 이야기</h1>
             <p className={styles.brandLead}>
-              자동차와 모터스포츠를 좋아하는 사람들이 모여 정보와 경험을 나누는 곳, morethancar.
+              자동차와 모터스포츠를 좋아하는 사람들이 이야기를 나누는 곳
             </p>
             <div className={styles.ctaRow}>
               {session ? (

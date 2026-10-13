@@ -163,6 +163,11 @@ function ContentSummary({onAccessDenied}: {onAccessDenied: () => void}) {
           <span>스팟 등록·수정, 공개·비공개, 변경 이력</span>
           <em>열기 →</em>
         </a>
+        <a className={styles.navCard} href="/admin/ev">
+          <strong>전기차 정책</strong>
+          <span>정책·버전 등록, 공식 출처 검증, 공개·비공개, 대표 버전 승격, 변경 이력</span>
+          <em>열기 →</em>
+        </a>
       </div>
     </section>
   );
