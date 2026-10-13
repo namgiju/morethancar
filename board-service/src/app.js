@@ -5,6 +5,7 @@ import { marketRouter } from "./market.js";
 import { communityRouter } from "./community.js";
 import { motorsportAdminRouter, motorsportRouter } from "./motorsport.js";
 import { spotsAdminRouter, spotsRouter } from "./spots.js";
+import { evRouter } from "./ev.js";
 
 // Spring과 동일한 쿠키 이름·토큰 형식·Redis 키를 사용한다. TTL은 로그인부터 30분이다.
 export async function sessionUser(redis, cookie = "") {
@@ -72,6 +73,8 @@ export function createApp({ db, redis }) {
   app.use("/api/board/admin", adminRouter({ db, auth }));
   app.use("/api/board/motorsport", motorsportRouter({ db }));
   app.use("/api/board/spots", spotsRouter({ db }));
+  // 전기차 정책·정보 허브 공개 조회(STEP 2). 관리자 쓰기 라우터는 아직 없다(후속 단계).
+  app.use("/api/board/ev", evRouter({ db }));
   app.use("/api/board", communityRouter({ db, auth }));
   app.use("/api/parts/listings", marketRouter({ db, auth }));
   app.get("/api/parts/compatibility", (req, res) => {
