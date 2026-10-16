@@ -321,9 +321,22 @@
 }
 
 .reply {
+  position: relative;
   margin-left: 24px;
-  border-left: 2px solid var(--line-strong);
-  padding-left: 16px;
+  padding-left: 20px;
+}
+
+.reply::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 20px;
+  height: 22px;
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-bottom-left-radius: 8px;
+  pointer-events: none;
 }
 
 .deleted p {
@@ -593,7 +606,11 @@
   }
   .reply {
     margin-left: 12px;
-    padding-left: 12px;
+    padding-left: 16px;
+  }
+  .reply::before {
+    width: 16px;
+    height: 20px;
   }
 }
 
