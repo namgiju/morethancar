@@ -17,6 +17,6 @@ export const SERVICES: Service[] = [
   {key: 'community', label: '커뮤니티', description: '오너들의 정비·드라이브·부품 이야기', href: '/community'},
   {key: 'garage', label: '내 차고', description: '내 차를 등록하고 기록을 남겨보세요', href: '/home'},
   {key: 'motorsport', label: '모터스포츠', description: '서킷 주행일과 레이스 일정', href: '/motorsport'},
-  {key: 'ev', label: '전기차', description: '보조금·충전·정책 정보'},
+  {key: 'ev', label: '전기차', description: '보조금·충전·정책 정보', href: '/ev'},
   {key: 'spots', label: '스팟', description: '가까운 와인딩 코스와 심레이싱 시설 찾기', href: '/spots'},
 ];

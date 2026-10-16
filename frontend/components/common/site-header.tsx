@@ -27,8 +27,6 @@ function activeService(pathname: string): ServiceKey | null {
   if (pathname === '/home') return 'garage';
   if (pathname === '/motorsport' || pathname.startsWith('/motorsport/')) return 'motorsport';
   if (pathname === '/spots' || pathname.startsWith('/spots/')) return 'spots';
-  // ev는 lib/services.ts에 아직 href가 없어 SOON으로 표시되므로 지금은 시각적 효과가 없지만,
-  // href가 붙을 때 추가 수정 없이 바로 활성 표시가 되도록 매칭만 먼저 둔다.
   if (pathname === '/ev' || pathname.startsWith('/ev/')) return 'ev';
   return null;
 }
