@@ -1,10 +1,22 @@
 import type {Metadata} from 'next';
 import {fetchEvChanges} from '../../../lib/ev-server-api';
 import {CHANGE_FILTER_LABELS} from '../../../lib/ev-format';
+import {toJsonLd} from '../../../lib/json-ld';
 import TabLinks from '../../../components/ev/tab-links';
 import VersionDetail from '../../../components/ev/version-detail';
 import type {EvChangeFilter} from '../../../lib/ev-types';
 import styles from '../../../components/ev/ev.module.css';
+
+const BASE_URL = 'https://morethancar.kr';
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {'@type': 'ListItem', position: 1, name: 'morethancar', item: `${BASE_URL}/`},
+    {'@type': 'ListItem', position: 2, name: '전기차 정책·혜택', item: `${BASE_URL}/ev`},
+    {'@type': 'ListItem', position: 3, name: '정책 변경', item: `${BASE_URL}/ev/changes`},
+  ],
+};
 
 const FILTERS: {key: string; label: string; filter?: EvChangeFilter}[] = [
   {key: 'all', label: '전체'},
@@ -39,6 +51,7 @@ export default async function EvChangesPage({searchParams}: {searchParams: Promi
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{__html: toJsonLd(breadcrumbJsonLd)}} />
       <div className={styles.pageHead}>
         <h1>정책 변경</h1>
         <p>전기차 정책이 이전에 무엇이었고 지금 무엇으로 바뀌었는지, 확정 여부와 함께 확인하세요.</p>

@@ -3,6 +3,7 @@
 > 작성: 2026-10-13(STEP 0) · 갱신: 2026-10-13(STEP 1) · 2차 보완: 2026-10-13(STEP 1, 사용자 검토 지적 사항 7개 반영 — §3.0) · 3차 갱신: 2026-10-13(STEP 2, 공개 조회 API) · 4차 갱신: 2026-10-13(STEP 2 버그 수정 + STEP 3~6 공개 화면 구현) · 기준 코드: `main`(작업 트리에 `frontend/app/icon.png`, `frontend/public/apple-touch-icon.png` 미추적 파일 존재, 이번 STEP에서도 보존 — 수정하지 않음) · 상태: **STEP 2 API 버그 4건 수정 + STEP 3~6(`/ev`,`/ev/buy`,`/ev/drive`,`/ev/changes`,`/ev/policy/[slug]`) 공개 화면 구현 완료, Node 22로 board-service 테스트 74개 전부 통과 확인, 합성 fixture로 브라우저 실동작 확인 완료. STEP 7(관리자 UI) 승인 대기**
 > 5차 갱신: 2026-10-13(STEP 7, 관리자 쓰기 API + `/admin/ev` 화면 — mock(가짜 DB) 테스트·`tsc`/`build`까지 확인, 실제 DB·브라우저 확인은 미실행).
 > 6차 갱신: 2026-10-13(STEP 7 배포 전 결함 점검·보완 — 검증 선언 로직·승격 동시성·동시 편집 보호 3건 수정 + 실제 코드 리뷰로 발견한 SQL 버그 1건(정책 공개·비공개 500 오류) 수정. **격리된 일회용 PostgreSQL 16 + Redis로 V1→V8 신규 적용과 기존 V7→V8 업그레이드를 모두 실행 검증**, board-service를 실제로 띄워 관리자 전체 흐름·권한·동시 승격·동시 편집을 실제 HTTP 요청으로 재현, 프런트엔드를 실제로 띄워 브라우저로 관리자 화면·메인 화면을 확인 — STEP 1부터 "정적 검토만, 실행 검증 미실행"이라고 반복해 남겨 두었던 것을 이번에 처음 실행했다. 아래 STEP 7 항목에 구현/mock검증/실DB검증을 구분해 갱신).
+> 7차 갱신: 2026-10-16(STEP 9, SEO/반응형 — `app/sitemap.ts`·`app/robots.ts` 신설, 5개 EV 공개 페이지에 JSON-LD(BreadcrumbList + 상세 페이지는 GovernmentService) 추가, 320/375/430px 3너비 가로 스크롤 0 확인. STEP 8(실제 정책 데이터)은 이번에도 손대지 않음 — 아래 STEP 9 항목 참고).
 > 범위: 전기차 정책·정보 허브(`/ev`, `/ev/buy`, `/ev/drive`, `/ev/changes`, `/ev/policy/{slug}`) + `/admin/ev` 관리 기능.
 > 참고: `docs/plans/MOTORSPORT-AND-SPOTS-PLAN.md`는 "전기차 정보 허브는 제외"라고 명시했던 문서다(2026-10-12 작성, 모터스포츠·스팟 범위만 다룸). 이 문서가 그 후속으로 전기차 범위를 다룬다.
 >
@@ -684,15 +685,27 @@ type ChangeEntry = PublicVersion & { slug: string; title: string; category: "BUY
 
 **완료 기준**: §8 완료 기준 그대로(구매·지원 5건↑, 운행·혜택 5건↑, 출처 1개 이상, 공식 출처 URL 직접 열어 확인).
 
-### ☐ STEP 9 — SEO, 반응형, 통합 테스트
+### ☑ STEP 9 — SEO, 반응형, 통합 테스트 (완료, 2026-10-16)
 
-**작업**: `app/sitemap.ts`, `app/robots.ts` 신설, 구조화 데이터(JSON-LD) 추가, 반응형(모바일 폭 3종) 가로 스크롤 0 확인, 전체 플로우 통합 확인.
+**작업**: §9 원안 그대로(`app/sitemap.ts`, `app/robots.ts` 신설, 구조화 데이터(JSON-LD) 추가, 반응형 가로 스크롤 0 확인). 다만 이번 라운드는 사용자가 범위를 "STEP 9로 제한"했고 검증 너비를 360px가 아니라 **320/375/430px**로 직접 지정했다 — 원안의 360px 대신 이 세 값을 기준으로 확인했다.
 
-**수정 파일**:
-- `frontend/app/sitemap.ts`, `frontend/app/robots.ts` (신규)
-- `frontend/components/ev/policy-detail.tsx` (JSON-LD `<script>` 추가)
+**수정 파일** (원안과 다른 점 포함):
+- `frontend/app/sitemap.ts`, `frontend/app/robots.ts` (신규) — 원안과 동일.
+- `frontend/lib/json-ld.ts` (신규, 원안에 없던 파일) — JSON.stringify 결과의 `<`를 `<`로 바꿔 `</script>` 조기 종료를 막는 작은 공용 헬퍼. 5개 페이지가 똑같은 이스케이프 로직을 반복하지 않게 하려고 추가했다.
+- **원안의 `frontend/components/ev/policy-detail.tsx`는 존재하지 않는 파일이다** — STEP 3~6에서 실제로 만든 구조는 `app/ev/policy/[slug]/page.tsx` + `components/ev/version-detail.tsx`다. JSON-LD는 실제 구조에 맞춰 `app/ev/policy/[slug]/page.tsx`에 넣었다.
+- `frontend/app/ev/page.tsx`, `app/ev/buy/page.tsx`, `app/ev/drive/page.tsx`, `app/ev/changes/page.tsx` — 각 페이지 성격에 맞는 `BreadcrumbList` JSON-LD 추가(원안에 없던 범위 확장 — "페이지 성격에 맞는 구조화 데이터"라는 이번 지시를 상세 페이지 하나만이 아니라 목록형 4개 페이지에도 적용했다. Breadcrumb은 내비게이션 사실만 서술하므로 실제 정책 데이터를 새로 지어내지 않는다).
+- `frontend/app/ev/policy/[slug]/page.tsx` — `GovernmentService` + `BreadcrumbList` JSON-LD 추가. `name`/`description`/`serviceType`은 이미 API가 돌려주는 실제 값만 쓰고, `areaServed`/`provider.name`도 DB에 실제 입력된 `scope`/`regionNote`만 반영했다(전국 정책이 아닌데 "대한민국 정부"로 단정하지 않음, 특정 지자체명을 추측해 넣지 않고 "지방자치단체"라는 일반 명칭만 씀) — 지시 9번("존재하지 않는 정책 정보를 생성하지 않는다")을 메타데이터에도 적용했다.
+- 기존 metadata(title/description/canonical)는 이미 STEP 3~6에서 5개 페이지 모두 구현되어 있었다(`generateMetadata`, canonical은 전부 `https://morethancar.kr` 기준) — 이번에 새로 만들 필요가 없어 손대지 않았다(지시 7·10 준수).
 
-**테스트/완료 기준**: `/sitemap.xml`에 PUBLISHED 정책 slug만 포함(DRAFT/HIDDEN 제외) 확인. Google 리치 결과 테스트 등으로 구조화 데이터 유효성 확인(수동). `npx tsc --noEmit && npm run build` 통과. 모바일(360px)·태블릿·데스크톱 3너비에서 전기차 5개 화면 모두 가로 스크롤 없음.
+**검증 방법과 결과**:
+- `npx tsc --noEmit`: 오류 0건.
+- `npm run build`(Turbopack): 성공. 라우트 표에 `/sitemap.xml`(ƒ, 동적)·`/robots.txt`(○, 정적)가 정상적으로 잡힘.
+- **ESLint는 이 저장소에 설정이 없다**(`.eslintrc`/`eslint.config.*` 없음, `package.json`에 lint 스크립트도 의존성도 없음, CI도 `mvn test`/`npm test`만 돈다 — §1.10·이전 STEP들의 기록과 동일). 새로 설치하면 무관한 범위(저장소 전체 lint 룰 도입)로 번지므로 설치하지 않았고, 이 STEP에서는 해당 사항 없음으로 남긴다.
+- `next start`(로컬 3900번 포트) + `REVCC_API_ORIGIN=https://morethancar.kr`로 **실제 운영 공개 API**를 직접 호출해 확인(운영 DB에 쓰기 없음, 읽기 전용 GET만): `/sitemap.xml`에 정적 5개 URL만 나옴(운영에 PUBLISHED 정책이 아직 0건이라 정책 URL 없음 — 이는 콘텐츠가 없다는 사실을 정확히 반영한 것이지 버그가 아니다), `/robots.txt`가 `Disallow: /admin/` + `Sitemap:` 줄을 포함해 정확히 출력됨, `/ev`·`/ev/buy`·`/ev/drive`·`/ev/changes` 200, `/ev/policy/존재하지않는slug` 404, 5개 페이지 HTML에 JSON-LD `<script>`가 전부 정확히 박혀 있음을 `curl`로 직접 확인.
+- JSON-LD 이스케이프 로직은 `</script><script>` 공격 문자열을 넣은 가짜 fixture로 별도 검증(Node 스크립트, 결과를 다시 `JSON.parse`해 유효성도 확인) — 운영 데이터를 건드리지 않고 로직만 검증.
+- **가로 스크롤 320/375/430px**: Playwright(`playwright-core`, 시스템에 이미 설치된 Chrome을 `channel:'chrome'`으로 그대로 구동 — 브라우저 바이너리를 새로 받지 않음, 저장소 `package.json`에도 추가하지 않음, 검증 후 스크래치패드 삭제)로 `document.documentElement.scrollWidth`와 `clientWidth`를 세 너비 모두에서 비교 + `body *` 전체 순회로 뷰포트보다 넓은 요소가 있는지 개별 확인. `/ev`·`/ev/buy`·`/ev/drive`·`/ev/changes`(+ 대조군으로 EV가 아닌 `/motorsport`) 전부 `scrollWidth === clientWidth`, overflow 요소 0개 — 가로 스크롤 없음을 코드 수준 수치로 확인했다(macOS 헤드리스 Chrome 스크린샷만으로 먼저 봤을 때는 헤더 내비가 잘려 보여 overflow를 의심했으나, 이는 `--window-size` 스크린샷 방식 자체의 렌더링 아티팩트였다 — Playwright의 정확한 viewport 측정으로 재확인해 바로잡았다). `/ev/policy/[slug]`는 운영에 공개된 정책이 아직 없어 404 상태(에러·not-found 틀)만 확인했고, 실제 정책 본문이 들어간 상세 페이지의 320px 레이아웃은 STEP 8에서 데이터가 생긴 뒤 별도로 재확인이 필요하다(미확인으로 남김).
+
+**완료 기준 대비**: `/sitemap.xml`은 PUBLISHED 정책만 포함하는 쿼리(`fetchEvPolicies`, board-service의 `publicGate`가 이미 DRAFT/HIDDEN을 걸러냄)를 쓰므로 조건을 만족하되, 운영에 PUBLISHED 정책이 없어 "실제로 걸러지는 모습"은 STEP 8 이후 재확인이 필요하다. 구조화 데이터의 Google 리치 결과 테스트는 외부 서비스에 운영 URL을 제출하는 행위라 이번 세션에서는 수행하지 않았다(사용자가 원하면 STEP 10 전후로 별도 확인 가능).
 
 ### ☐ STEP 10 — 운영 배포 준비 및 최종 검증
 

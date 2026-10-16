@@ -1,10 +1,21 @@
 import type {Metadata} from 'next';
 import {fetchEvChanges, fetchEvPolicies} from '../../lib/ev-server-api';
 import {STATUS_FILTER_OPTIONS, dDay, dDayLabel} from '../../lib/ev-format';
+import {toJsonLd} from '../../lib/json-ld';
 import PolicyCard from '../../components/ev/policy-card';
 import TabLinks from '../../components/ev/tab-links';
 import StatusBadge from '../../components/ev/status-badge';
 import styles from '../../components/ev/ev.module.css';
+
+const BASE_URL = 'https://morethancar.kr';
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {'@type': 'ListItem', position: 1, name: 'morethancar', item: `${BASE_URL}/`},
+    {'@type': 'ListItem', position: 2, name: '전기차 정책·혜택', item: `${BASE_URL}/ev`},
+  ],
+};
 
 const TOP_TABS = [
   {key: 'all', label: '전체', href: '/ev'},
@@ -42,6 +53,7 @@ export default async function EvMainPage({searchParams}: {searchParams: Promise<
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{__html: toJsonLd(breadcrumbJsonLd)}} />
       <div className={styles.pageHead}>
         <h1>전기차 정책·혜택</h1>
         <p>구매부터 운행까지, 달라지는 전기차 제도를 한눈에 확인하세요.</p>
