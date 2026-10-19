@@ -8,10 +8,17 @@
 
 ## 1. 현재 브랜치와 프로젝트 상태
 
-- 브랜치: `docker-assignment` (항상 이 브랜치에서만 작업, 다른 브랜치로 전환하지 말 것)
-- **실제 개발 기준 경로(2026-10-02부터): `~/Projects/revcc-site`.** `~/Desktop/revcc-site`는 이전 위치의 백업본이며 더 이상 작업 기준으로 쓰지 않는다(이 머신은 `~/Desktop` 하위 파일에 처음 접근할 때마다 비정상적으로 느려져 `next dev`/`npm ci`/`mv` 같은 작업이 사실상 멈추는 문제가 있었다 — Projects로 옮긴 뒤 정상 속도 확인됨). 코드·설정·스크립트에 `~/Desktop/revcc-site`든 `~/Projects/revcc-site`든 절대경로를 하드코딩하지 않는다(항상 상대경로 또는 환경변수 사용).
-- 이 파일 작성 시점 기준 `git status`: P0 변경사항 + `REVCC_AUDIT.md` + 이 파일이 커밋 대상으로 대기 중이었고, 이번 세션에서 **P0 변경사항 + REVCC_AUDIT.md + REVCC_NEXT_TASKS.md를 함께 커밋·push했다** (아래 "완료된 작업"의 commit hash 참고).
+- **브랜치(2026-10-19 사용자 결정)**: 통합 기준은 `main`이다. 코드 변경은 최신 `main`에서 기능별 브랜치를 만들어 진행하고 `main`으로 합친다. push·PR·병합 시점은 사용자 지시를 따른다.
+  - 이전 규칙(기록): "`docker-assignment` 브랜치에서만 작업, 다른 브랜치로 전환하지 말 것" — 2026-10-19에 위 기준으로 대체했다.
+  - **브랜치 규칙 현황 확인(2026-10-19, 위 결정 전 기록)**: 위 규칙을 바꾸기로 한 결정 기록은 이 파일·`MORETHANCAR_EV_TASKS.md`·커밋 메시지 어디에도 없다. 실제 이력은 규칙과 다르다 — `origin/docker-assignment`의 마지막 커밋은 `f76aa09`(2026-10-07)이고 `d0347ae`로 main에 머지된 뒤 갱신되지 않았다. 2026-10-11 `406f2db`부터는 main에 직접 커밋·push했고(2026-10-19 기준 `docker-assignment..main` 46커밋), EV 허브는 `codex/ev-policy-hub` → PR #2(`57d0327`)로 main에 들어갔다. 운영 EC2도 main을 `git pull`한다(EV 문서 STEP 10). CI(`.github/workflows/ci.yml`)는 `docker-assignment`·`main` 두 브랜치의 push/PR에서 모두 돈다. 어느 브랜치를 기준으로 할지는 사용자가 정한다 — 같은 날 사용자가 `main` 통합 + 기능 브랜치로 정했고, §5 2·10번과 §7 명령을 그 기준으로 고쳤다. `.github/workflows/ci.yml`의 `docker-assignment` 트리거는 남아 있지만 동작에는 영향이 없다(정리는 별도 판단).
+- **개발 기준 경로: 저장소 루트(이 파일이 있는 디렉터리).** 2026-10-19부터 새 MacBook에 새로 클론한 저장소(`$HOME/morethancar`)를 기준으로 쓴다. 이전 Mac의 `~/Projects/revcc-site`(2026-10-02~)와 그 전의 `~/Desktop/revcc-site`(Desktop 하위 접근이 비정상적으로 느려 옮겼음)는 더 이상 기준이 아니다 — 이 문서에서 그 경로가 나오면 당시 기록으로 읽는다. 코드·설정·스크립트에 절대경로를 하드코딩하지 않는다(항상 저장소 기준 상대경로 또는 환경변수 사용).
+- 이 파일 작성 시점 기준 `git status`: P0 변경사항 + `REVCC_AUDIT.md` + 이 파일이 커밋 대상으로 대기 중이었고, 이번 세션에서 **P0 변경사항 + REVCC_AUDIT.md + REVCC_NEXT_TASKS.md를 함께 커밋·push했다** (아래 "완료된 작업"의 commit hash 참고). 이 파일 이름은 2026-10-12 `3e6ddc7`에서 `MORETHANCAR_NEXT_TASKS.md`로 바뀌었다.
 - 프로젝트 구조: `backend`(Spring Boot, `core`), `board-service`(Node/Express, `board`), `nginx`(proxy), `docker-compose*.yml` 3종(기본·`dev`·`prod`, 2026-10-11 `override`·`garage` 삭제) — Next.js 전환과 무관하게 그대로 유지한다. 전환을 이유로 이미 있는 API를 다시 만들지 않는다. 화면 작업 전에는 항상 기존 API와 기존 호출 코드(`frontend/lib/*`, `board-service/src/*`, `backend/src/main/java/com/revcc/app/*`)부터 조사한다.
+- **새 MacBook 개발 환경(2026-10-19 준비)**:
+  - Docker Desktop(엔진 29.8.2, CLI는 `~/.docker/bin/docker` → 앱 내부 바이너리). 저장소 루트에서 `docker compose up -d --build --wait` → `http://localhost:8090` 6개 서비스 healthy 확인. 로컬 DB 볼륨은 compose 프로젝트 이름(=폴더 이름)을 따라 `morethancar_revcc_pg`로 새로 만들어졌다(§5 "발견된 추가 이슈"의 2026-10-19 항목 참고).
+  - 직접 개발 도구(버전은 Dockerfile·CI와 같음): Homebrew(`/opt/homebrew`), Node 22.23.3(Homebrew `node@22`, keg-only라 `~/.zprofile`에서 PATH 추가), JDK Temurin 23.0.2+7(Homebrew에 JDK 23이 없어 Adoptium 배포본을 `~/Library/Java/JavaVirtualMachines/temurin-23.jdk`에 설치, `JAVA_HOME=$(/usr/libexec/java_home -v 23)`), Maven 3.9.9(Homebrew는 3.10만 있어 Apache 배포본을 `~/.local/opt/apache-maven-3.9.9`에 설치, `~/.local/bin/mvn`).
+  - 비밀 파일 위치(값은 문서에 남기지 않음): 운영 SSH 키 `~/.ssh/morethancar-prod-key.pem`(파일 400, `~/.ssh` 700). 이전 Mac에서 가져온 env 원본 `~/.config/morethancar/imported.env`(파일 600, 디렉터리 700 — 운영 DB 접속 정보가 들어 있어 로컬 `.env`로 옮기지 않음). 저장소 `.env`(600, git 무시)는 로컬 compose 전용이다 — 원본에서 카카오 로그인(`KAKAO_CLIENT_ID`/`KAKAO_CLIENT_SECRET`)·카카오 지도(`KAKAO_MAP_KEY`)·SMTP(`SMTP_HOST`/`SMTP_USERNAME`/`SMTP_PASSWORD`/`SMTP_FROM`)만 옮겼고, `DB_*`·`CLOUDFLARE_TUNNEL_TOKEN` 같은 운영 전용 값은 없다.
+  - 아직 안 한 것: 이 Mac에서 `mvn test`·`npm ci`·`npm test` 실행, 카카오 개발자 콘솔에 로컬 Redirect URI(`http://localhost:8090/api/auth/kakao/callback`)·Web 도메인(`http://localhost:8090`) 등록 여부 확인.
 - 프론트엔드: `frontend`(Next.js) 하나다. 레거시 정적 HTML/CSS/JS(`assignment-frontend`)는 모든 화면을 Next.js로 옮긴 뒤 2026-10-11에 삭제했다(git 이력에서 참고 가능). **새 UI/페이지는 특별한 이유가 없으면 `frontend`(Next.js)에 구현한다.** 전환은 기존 기능을 깨지 않는 방식으로 화면 단위로 하나씩 진행한다.
 - 인증 구조: 커스텀 쿠키+Redis 세션(Spring Security 미사용). `SharedSessionService`가 세션을 만들고 `revcc:session:<token>` 키로 Redis에 저장, Node가 같은 키를 직접 읽음. Next.js 전환에서도 이 인증/세션/API 계약을 임의로 바꾸지 않는다.
 
@@ -104,8 +111,8 @@
 
 ```
 [x] NOW-1: UI/UX 개선 및 Next.js 전환 — 메인대문/커뮤니티/내차고/인증/장터/관리자 포팅 전부 완료(2026-10-06). 로고 교체(morethancarLogo.png) + 공용 헤더 레이아웃(로고 확대·좌측 고정, 검색 확대·중앙, nav·로그인 우측 고정) + `/` 페이지 누락된 SiteFooter 추가까지 이어서 완료.
-[ ] NOW-2: 실제 운영 배포 준비 (production secret/env, Compose 실행 조건, 오래된 인스턴스 정리)
-[ ] NOW-3: 실제 배포 (Cloudflare Named Tunnel + 현재 production compose)
+[x] NOW-2: 실제 운영 배포 준비 (production secret/env, Compose 실행 조건, 오래된 인스턴스 정리) — 근거(문서 기록): 2026-10-13 EC2에서 prod 오버레이로 기동 성공(필수 env가 없으면 기동 거부), 배포 전 Neon Flyway V7 확인 + pg_dump 백업·복원 검증. 기록 없는 NOW-2-3의 2번(카카오 콘솔 운영 설정)은 아래 NOW-2-3에 남김
+[x] NOW-3: 실제 배포 (Cloudflare Named Tunnel + 현재 production compose) — 근거(문서 기록): 2026-10-13 `57d0327`, 2026-10-16 `98eb6ec` EC2 배포, cloudflared 포함 6개 서비스 healthy, morethancar.kr 실접속 200. 배포 후 확인 일부와 이후 커밋 반영 여부는 아래 NOW-3에 남김
 [ ] NOW-4: 최소 운영 안정성 (Kakao HttpClient timeout, 최소 health monitoring/알림)
 [ ] LATER-1: 카카오 회원 탈퇴 최소 구현 (배포 이후 제품 완성도 작업, 구 STEP 10-impl-D 축소)
 [ ] LATER-2: 비밀번호 재설정 응답 통일 (작은 보안 정리, 구 STEP 11 축소)
@@ -129,7 +136,7 @@
     - `/auth`를 `/parts`보다 먼저 하는 이유: 장터도 로그인 상태와 사용자 권한을 쓰므로, 공통 인증 화면을 먼저 Next로 옮기는 편이 자연스럽다.
     - 각 포팅(3~5)은 커뮤니티·내 차고와 같은 방식으로 진행한다: 착수 시 legacy 기능을 파일·API 단위로 조사 → 공통 타입/API 계층(`-0`) → 화면 단위 STEP → 마지막 STEP에서 legacy와 기능 동등성 검증.
   - **진행 상황(2026-10-02)**: 메인 대문(`frontend/app/page.tsx` + `frontend/components/home/*` + `frontend/lib/*`)을 Next.js로 구현하고 실제 API 연동까지 검증 완료. 더미 데이터 없음 — 확인된 실제 API: `GET /api/board/posts`(오늘의 인기글 + 실시간 인기 TOP10, 둘 다 같은 엔드포인트를 기간/limit만 다르게 호출), `GET /api/board/garage`(오늘의 차고), `GET /api/parts/listings`(장터 새 매물), `GET /api/board/me`(세션). 레이아웃은 제공받은 레퍼런스 이미지(`references/badges/대문ver3.png`)를 따라 1440px 데스크톱 기준으로 다시 맞췄다: 넓은 container(1600px), Header(로고/검색 확대, nav 한 줄 고정), Hero(차량이 오른쪽을 차지하도록 crop, 높이 축소), 메인 그리드는 왼쪽 "오늘의 인기글"(2열 이미지 카드) + 오른쪽 "실시간 인기" TOP10, "오늘의 차고"·"장터 새 매물"은 첫 화면을 차지하지 않도록 본문 아래 별도 2열 섹션으로 이동. CTA 텍스트가 안 보이던 색상 specificity 버그, header nav 줄바꿈, container 정렬 불일치도 함께 수정.
-    실행 방법: 저장소 루트(`~/Projects/revcc-site`, Desktop 경로 아님)에서 `docker compose up`(기존 Docker/nginx/백엔드, `localhost:8090`) + `frontend/`에서 `npm run dev`(Next.js, `localhost:3000`)를 같이 띄운다 — `next.config.ts`의 rewrite가 `/api/*`를 8090으로 넘겨준다.
+    실행 방법: 저장소 루트에서 `docker compose up`(기존 Docker/nginx/백엔드, `localhost:8090`) + `frontend/`에서 `npm run dev`(Next.js, `localhost:3000`)를 같이 띄운다 — `next.config.ts`의 rewrite가 `/api/*`를 8090으로 넘겨준다.
     확인 상태: 1440px은 실제 브라우저 스크린샷으로 확인(Chrome 확장 연결). 1024/768은 CSS 계산과 컴파일된 미디어쿼리 값으로만 확인했고 스크린샷 미확인(이 세션의 `resize_window` 도구가 실제 뷰포트를 바꾸지 못하는 결함이 있었음 — `window.innerWidth`가 요청값과 무관하게 고정됨, 재확인 필요). "오늘의 인기글"이 `period=today`에서 빈 상태로 보이는 건 버그가 아니라 DB에 오늘(KST) 작성된 글이 없어서다(정상 동작).
     나머지 화면(`/home`, `/community`, `/parts` 등)은 아직 `assignment-frontend` 그대로이며, 다음 STEP에서 화면 단위로 이어서 옮긴다.
   - **커뮤니티 Next.js 이전**: 착수 전 `assignment-frontend`의 커뮤니티 기능(목록/상세/작성자 정보/댓글·대댓글/신고/글쓰기·수정/이미지/작성자→차고 이동 등)을 파일·API 단위로 조사하고, STEP을 `2-0`(공통 타입/API 계층) → `2-1`(목록) → `2-2`(상세) → `2-3`(좋아요·북마크·댓글·신고) → `2-4`(글쓰기·수정) → `2-5`(작성자 프로필·차고 연결, 내 활동, 알림) → `2-6`(기존 커뮤니티와 기능 동등성 검증)으로 나눴다. 조사 결과 "기간 필터"는 커뮤니티 목록 기능이 아니라 홈 전용(`period=today|week`, 이미 위에서 이전 완료)이라 커뮤니티 STEP 범위에서 뺐다. `frontend/`는 아직 어떤 docker-compose에도 서비스로 등록돼 있지 않다(로컬 `npm run dev` 전용) — 커뮤니티 코드를 옮겨도 실제 운영 라우팅 연결은 NOW-3와 별도로 판단한다.
@@ -309,11 +316,11 @@
     - **[x] 배포 준비 점검 (2026-10-12, 운영 Neon은 읽기 전용 세션으로만 접속 — `default_transaction_read_only=on`으로 세션 자체를 쓰기 불가 상태로 강제)**:
       - **V7 충돌 가능성**: 없음. Neon의 `flyway_schema_history`는 V6까지만 적용됨(V7 미적용 확인), `drive_spots` 테이블·`board_posts.spot_id` 컬럼·`content_admin_logs`의 SPOT entity_type 전부 아직 없음 — V7은 전부 신규 추가뿐이라 기존 데이터와 충돌하지 않는다. 운영 테이블 규모도 작다(`board_posts` 21행, `users` 33행, `motorsport_events`·`content_admin_logs` 0행) — 적용 시간은 밀리초 단위로 예상.
       - **`users_role_check`**: V6에서 `NOT VALID`로 들어간 뒤 지금까지 `VALIDATE CONSTRAINT`를 안 함. 운영 `role` 값은 `ADMIN` 1·`USER` 32뿐이고 예상 밖 값 없음 — 전부 체크를 이미 만족하므로 `VALIDATE CONSTRAINT users_role_check`는 안전하게 실행 가능(여전히 **사람이 운영 반영 시점에 직접 실행** — 이번 세션은 읽기 전용이라 실행하지 않음).
-      - **백업**: 저장소에 운영 DB 백업·복구 절차 문서가 없었다(확인됨 — `docs/`에 없음, `revcc_backup.dump`는 2026-09-28 로컬 수동 덤프로 이번 작업 이전 것). `pg_dump`는 읽기 전용이라 이번 세션에서 바로 떠서 `/Users/namgiju/Projects/revcc-site-backups/neon-pre-v7-20261012-144753.dump`(커스텀 포맷, 9.1MB, 219 TOC 항목, `pg_restore --list`로 유효성 확인함, **저장소 밖**이라 git에 안 잡힘)로 남겼다. 복구 명령: `pg_restore --clean --if-exists -d "<연결 문자열>" neon-pre-v7-*.dump`(운영 쓰기 작업이라 실행 안 함). Neon 자체 PITR(브랜치/시점 복구) 설정 여부는 웹 콘솔 접근 권한이 없어 확인 못 함 — 사람이 Neon 콘솔에서 보존 기간을 확인해야 한다.
+      - **백업**: 저장소에 운영 DB 백업·복구 절차 문서가 없었다(확인됨 — `docs/`에 없음, `revcc_backup.dump`는 2026-09-28 로컬 수동 덤프로 이번 작업 이전 것). `pg_dump`는 읽기 전용이라 이번 세션에서 바로 떠서 이전 Mac의 `~/Projects/revcc-site-backups/neon-pre-v7-20261012-144753.dump`(새 MacBook으로 옮겼는지는 확인 안 됨, 커스텀 포맷, 9.1MB, 219 TOC 항목, `pg_restore --list`로 유효성 확인함, **저장소 밖**이라 git에 안 잡힘)로 남겼다. 복구 명령: `pg_restore --clean --if-exists -d "<연결 문자열>" neon-pre-v7-*.dump`(운영 쓰기 작업이라 실행 안 함). Neon 자체 PITR(브랜치/시점 복구) 설정 여부는 웹 콘솔 접근 권한이 없어 확인 못 함 — 사람이 Neon 콘솔에서 보존 기간을 확인해야 한다.
       - **환경변수**: `KAKAO_MAP_KEY`가 `docker-compose.yml`·`docker-compose.prod.yml` 양쪽 frontend 서비스에 `${KAKAO_MAP_KEY:-}`로 연결됨(런타임 읽기라 이미지 재빌드 불필요, `REVCC_API_ORIGIN`과 같은 방식) 확인. **단, EC2 서버의 운영 `.env`에는 아직 이 키가 없을 것**(로컬 `.env`에만 방금 추가함) — 운영 반영 시 사람이 추가해야 한다. 아래 NOW-2-3 체크리스트에도 추가해둠.
       - **CSP**: nginx(`nginx/default.conf`)의 폴백 CSP는 upstream이 CSP를 안 보낸 응답(API·정적 파일)에만 붙고, `/spots` 등 Next 페이지는 항상 `proxy.ts`가 보내는 nonce CSP를 쓰므로 운영에서도 로컬과 동일하게 동작할 것으로 판단(아키텍처상 확인, 실제 운영 도메인 접속 테스트는 아님). `img-src`/`connect-src`의 `*.kakaocdn.net`은 스킴을 지정하지 않아 로컬 http·운영 https 둘 다 매치한다 — 다만 카카오 SDK가 운영(https) 환경에서 타일을 http로 요청하면 브라우저가 혼합 콘텐츠로 자체 차단할 수 있는데, 이건 로컬(http 페이지)에서는 재현되지 않는 문제라 **실제 운영 도메인(https)에 배포한 뒤 Network 탭으로 재확인 필요**.
     - 남은 것: ① (선택) 게시글 ↔ 스팟 연결 UI(컬럼만 있고 미구현), ② 운영 반영 전: Neon 읽기 전용으로 role 값 재확인 후 사람이 `VALIDATE CONSTRAINT users_role_check` 실행, ③ 운영 `.env`에 `KAKAO_MAP_KEY` 추가, ④ Neon PITR 보존 기간을 콘솔에서 확인, ⑤ 실제 운영 https 도메인에서 카카오 지도 타일 로딩 재확인, ⑥ EC2 자동 시작 차단(NOW-2-3 재검토 참고) — 이번 세션에서 AWS는 전혀 건드리지 않음.
-  - **[ ] NOW-2-3 배포 직전 사람이 할 일** (코드 작업 없음, 순서대로):
+  - **[ ] NOW-2-3 배포 직전 사람이 할 일** (코드 작업 없음, 순서대로) — 2번 근거가 없어 미완료로 둔다. 2026-10-19 문서 기록 대조: 1·4는 10-13 prod 오버레이 기동 성공(필수 env 누락이나 Compose < 2.24면 기동 자체가 안 됨), 3은 cloudflared healthy + morethancar.kr 200, 5는 `972bdfd`(2026-10-12)부터 로컬 compose가 Neon을 참조하지 않아 이 MacBook은 해당 없음(이전 Windows 스택 정지 여부는 기록 없음), 6은 10-13 Flyway V7 직접 조회로 대체. **2(카카오 콘솔 운영 Redirect URI·사이트 도메인)는 기록 없음**, 7은 선택이라 미실행:
     1. 운영 `.env` 작성(`.env.example` 기준). 필수(`:?`): `DB_HOST`/`DB_NAME`/`DB_USER`/`DB_PASSWORD`, `REDIS_PASSWORD`(영문·숫자, `openssl rand -hex 32`), `WITHDRAWAL_HMAC_SECRET`(32자 이상, 없으면 core 기동 거부), `CLOUDFLARE_TUNNEL_TOKEN`, `KAKAO_REDIRECT_URI=https://morethancar.kr/api/auth/kakao/callback`, `PASSWORD_RESET_URL=https://morethancar.kr/password-reset`. 기동은 되지만 기능에 필요: `PASSWORD_RESET_SECRET`(32자 이상, 없으면 재설정 503), `SMTP_*`(없으면 재설정 메일 미발송 — LATER-3상 오류도 안 보임), `KAKAO_CLIENT_ID`/`KAKAO_CLIENT_SECRET`, `KAKAO_MAP_KEY`(2026-10-12 추가 — 없으면 `/spots` 지도가 "지도를 불러올 수 없어요" 안내만 뜨고 목록은 정상 동작, 카카오 개발자 콘솔에서 로그인용과 별도로 발급한 JavaScript 키, 사이트 도메인에 `https://morethancar.kr` 등록 필요). `SESSION_COOKIE_SECURE`는 prod 프로파일이 true로 고정하므로 넣지 않아도 된다.
     2. 카카오 개발자 콘솔 Redirect URI에 `https://morethancar.kr/api/auth/kakao/callback` 등록, 사이트 도메인에 `https://morethancar.kr` 추가.
     3. Cloudflare: `morethancar.kr` 존 추가 → Named Tunnel Public Hostname `morethancar.kr` → `http://proxy:80`(`docs/DOCKER-SUBMISSION.md` 절차).
@@ -327,6 +334,7 @@
       - 실제 미완료: Mac 로컬 스택 정지 확인, Neon 읽기 전용 재확인(V5·실패 없음·`account_status` 분포, 마지막 확인 10-04), 재가동 전 Neon 백업 브랜치(권장, 승인 필요), NOW-3 반영 자체와 배포 후 확인.
       - **가장 큰 위험**: `e68e81f`(9/30) 이전 코드는 core가 `ddl-auto: update`, board가 기동마다 `schema.sql`을 실행한다. EC2가 그 이전 커밋이고 컨테이너가 자동 시작되면, 인스턴스를 켜는 순간 옛 core/board가 Flyway V5 상태의 Neon 스키마를 건드리고 옛 삭제·사진 공개 규칙으로 동작한다(STEP 10-impl-B 혼합 배포 주의). 그래서 재가동 직후 가장 먼저 `docker ps`로 확인하고, 옛 스택이 떠 있으면 바로 `stop`한다(`down -v` 금지). 단 이것만으로는 부팅부터 `stop`까지의 몇 초~몇 분 사이를 막지 못한다 → 아래 차단 방법 중 하나를 **재가동 전에** 적용한다.
       - **상태(2026-10-12)**: EC2 재가동 보류. 인스턴스는 중지 상태로 두고 운영·Neon은 건드리지 않는다. 아래 방법은 조사만 했고 아무것도 실행하지 않았다.
+      - **이후(문서 기록)**: 2026-10-13 EC2를 다시 가동해 배포했다(`MORETHANCAR_EV_TASKS.md` "배포 완료 (2026-10-13)"). 위 보류 상태는 해소됐다. 아래 자동 시작 차단 방법 중 무엇을 썼는지는 기록 없음.
       - **재가동 전 자동 시작 차단 방법(조사, 미실행)**:
         1. (권장) **EC2 보안 그룹 아웃바운드에서 Neon(TCP 5432) 차단**: 인스턴스가 중지된 상태에서 콘솔로 바꿀 수 있고 부팅이 필요 없으며 되돌리기 쉽다. 아웃바운드 "모든 트래픽" 규칙을 지우고 443·80(git·docker 이미지·카카오), 587(SMTP)만 남긴다. 옛 컨테이너가 자동으로 떠도 Neon에 연결하지 못하므로 스키마를 건드릴 수 없다. 코드 업데이트·`config` 검사가 끝난 뒤 5432를 다시 열고 `up`한다. 주의: EC2가 로컬 postgres를 썼다면 이 방법과 무관하다(그 경우 데이터가 EC2 볼륨에 있음). VPC DNS(169.254.169.253)는 보안 그룹 규칙의 영향을 받지 않는다.
         2. **Neon 앱 역할 비밀번호 재설정**: 옛 `.env`의 비밀번호가 무효가 되어 옛 컨테이너는 인증에서 실패한다. 확실하지만 운영 DB 자격 증명 변경이라 별도 승인이 필요하고, 새 비밀번호를 운영 `.env`에 사람이 넣어야 한다.
@@ -336,6 +344,9 @@
 - **NOW-3 실제 배포**
   - Cloudflare Named Tunnel + `docker-compose.yml` + `docker-compose.prod.yml` 기준으로 배포한다.
   - 배포 후 확인은 두 가지만 한다. ① proxy 로그의 첫 칸이 실제 사용자 IP인지, cloudflared가 172.16.238.2를 쓰는지. ② 로그인·게시글·이미지 등 핵심 proxy 동작. 배포를 또 하나의 대형 테스트 프로젝트로 만들지 않는다.
+  - **배포 기록(문서 기준)**: 2026-10-13 `57d0327`(EV V8, PR #2), 2026-10-16 `98eb6ec`(EV SOON 해제). 절차와 결과는 `MORETHANCAR_EV_TASKS.md`의 STEP 10과 "배포 완료 (2026-10-13)". 접속 `ssh -i ~/.ssh/morethancar-prod-key.pem ubuntu@54.180.254.40`, 서버 경로 `~/rev.cc`, 명령 `git pull --ff-only` → `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait`.
+  - **[ ] 배포 후 확인 중 기록 없는 것**: ①은 직접 확인 기록이 없다(10-13 HSTS 헤더 정상 기록이 간접 근거 — HSTS는 172.16.238.2에서 온 https 요청에만 붙는다). ②는 10-13에 커뮤니티 API·페이지·`/garage`·로그인 페이지 200까지만 기록됐고 실제 로그인·글쓰기·이미지 업로드는 기록 없음.
+  - **운영 상태 — 문서 기록과 실제 서버 확인을 구분한다(2026-10-19)**: 문서 기록상 EC2의 마지막 배포 커밋은 `98eb6ec`이다. 2026-10-19 세션은 운영 서버에 접속하지 않았으므로 **실제 서버 상태는 확인하지 않았다.** 그 뒤 main 커밋은 `6d251f9`(문서만, 운영 무관)와 커뮤니티 댓글 연결선 스타일 3건 `839e333`·`730af84`·`69c0e3c`(`frontend/components/community/post-detail.module.css`만)이다. **댓글 스타일 3건의 운영 반영 여부: 미확인.**
 - **NOW-4 최소 운영 안정성**
   - **[x] NOW-4-1 Kakao HttpClient timeout (2026-10-07, d98b2f1)**: `KakaoOAuthService`의 `HttpClient`에 연결 timeout 3초, 토큰·프로필 요청마다 요청 timeout 5초를 넣었다(최악 약 16초 후 실패). timeout 예외는 `AuthController` 카카오 콜백의 기존 `catch (Exception)` 실패 경로로 그대로 처리된다. 검증: Maven 컨테이너에서 컴파일 + `KakaoOAuthServiceTest` 통과(카카오 URL이 하드코딩이라 실제 timeout 발생은 재현하지 않음 — JDK 표준 동작). NOW-2/NOW-3보다 먼저 했지만 독립 작업이라 순서 영향 없음.
   - 서비스 다운을 알 수 있는 최소 health monitoring·알림(예: 외부 uptime 체크 하나)을 둔다. 장애 대응에 실제로 필요한 최소 수준만 한다.
@@ -1003,7 +1014,7 @@
 모든 STEP에 공통으로 적용된다.
 
 1. 작업 시작 전 `git status`로 현재 상태 확인 — 이전 세션이 남긴 미커밋 변경이 있으면 먼저 사용자에게 확인하거나 별도로 처리, 임의로 버리지 않는다.
-2. `docker-assignment` 브랜치에서만 작업한다. 다른 브랜치로 전환하거나 새 브랜치를 만들지 않는다.
+2. 최신 `main`에서 기능별 브랜치를 만들어 작업한다(2026-10-19부터, §1 "브랜치" 참고). `main`에 직접 커밋하지 않는다. (이전 규칙: `docker-assignment` 브랜치에서만 작업)
 3. 기존에 정상 동작하는 기능을 임의로 리팩터링하지 않는다. 해당 STEP의 구현 요구사항에 명시된 범위만 수정한다.
 4. 작업 중 STEP 범위 밖의 문제를 발견해도 임의로 고치지 않는다 — 이 파일의 "발견된 추가 이슈" 섹션(아래, 없으면 새로 만들어 추가)에 기록만 한다.
 5. `.env`, API key, token, password 등 민감정보를 절대 커밋하지 않는다. `git add` 전 `git status`/`git diff`로 반드시 확인한다.
@@ -1011,8 +1022,8 @@
 7. 테스트가 실패하면 원인을 해결하기 전에는 commit도 push도 하지 않는다. 원인이 이번 변경 때문인지, 기존부터 있던 문제인지 먼저 구분한다.
 8. commit 전 `git diff`로 변경사항을 최종 검토한다.
 9. 문제가 없으면 **해당 STEP에서 변경한 파일만** commit한다(다른 STEP이나 무관한 파일을 같이 묶지 않는다).
-10. `origin/docker-assignment`로 push한다.
-11. 이 파일(`REVCC_NEXT_TASKS.md`)의 "다음 작업 순서" 표에서 완료한 STEP을 `[x]`로 갱신하고, 아래 "작업 이력" 섹션에 결과와 commit hash를 기록한 뒤, 이 갱신 자체도 같은 commit(또는 바로 다음의 문서 전용 commit)에 포함해 push한다.
+10. 기능 브랜치를 `origin`에 push하고 `main`으로 합친다(PR 또는 병합). push·병합은 사용자 지시가 있을 때만 한다. (이전 규칙: `origin/docker-assignment`로 push)
+11. 이 파일(`MORETHANCAR_NEXT_TASKS.md`)의 "다음 작업 순서" 표에서 완료한 STEP을 `[x]`로 갱신하고, 아래 "작업 이력" 섹션에 결과와 commit hash를 기록한 뒤, 이 갱신 자체도 같은 commit(또는 바로 다음의 문서 전용 commit)에 포함해 push한다.
 12. `REVCC_AUDIT.md`는 절대 수정하지 않는다(감사 원본 보존).
 
 ### 작업 및 검증 경량화 원칙 (2026-10-01, STEP 10-impl-C 이후 모든 작업에 적용)
@@ -1064,6 +1075,8 @@ STEP 10-impl-C에서 수행한 검증(PG16·PG18 각각 전체 Maven, Flyway 반
 
 _(작업 중 발견하면 여기에 "STEP 번호 — 파일:설명" 형식으로 추가할 것.)_
 
+- ~~2026-10-19 새 MacBook 환경 정리 — **로컬 DB 볼륨 이름이 폴더 이름에 묶여 있다(수정하지 않음, 기록만)**: `docker-compose.yml`의 `revcc_pg`에는 `name:`이 없어 실제 볼륨 이름이 `<compose 프로젝트 이름>_revcc_pg`가 되고, 프로젝트 이름은 폴더 이름에서 온다. 이전 Mac(`revcc-site` 폴더)에서는 `revcc-site_revcc_pg`였지만 이 MacBook(`morethancar` 폴더)에서는 `morethancar_revcc_pg`가 새로 만들어졌다. 그런데 `scripts/assignment-run.sh`는 `revcc-site_revcc_pg`를 하드코딩해 직접 만들고, `docker-compose.yml` 131행 주석·`ASSIGNMENT.md` 130행·`docs/DOCKER-SUBMISSION.md` 143행(`docker volume inspect revcc-site_revcc_pg`)도 그 이름을 전제로 한다. 영향: 이 Mac에서는 compose 실행과 `assignment-run.sh` 실행이 서로 다른 볼륨을 써서 로컬 데이터가 갈라지고, 문서의 볼륨 확인 명령은 실패한다. 운영은 해당 없음(prod 오버레이가 postgres와 `revcc_pg`를 `!reset`으로 제거, DB는 Neon). 고치려면 볼륨에 `name:`을 고정하거나 문서·스크립트를 프로젝트 이름 기준으로 바꾸는 것 중 하나를 사용자가 정한다.~~
+  → **해결(2026-10-19, 브랜치 `chore/local-db-volume-and-branch-rules`)**: 사용자 결정으로 현재 볼륨 `morethancar_revcc_pg`와 데이터를 유지하고(삭제·이름 변경·초기화 없음), `scripts/assignment-run.sh`가 `docker compose config --no-interpolate`로 Compose가 이 폴더에서 쓰는 볼륨 이름을 직접 골라 쓰게 바꿨다(새로 만들 때는 Compose 라벨을 붙이고, `--print-volume`은 이름만 출력). `docker-compose.yml` 주석·`ASSIGNMENT.md`·`docs/DOCKER-SUBMISSION.md`도 맞췄다. 검증: 저장소에서 `--print-volume` = `morethancar_revcc_pg` = Compose 값, `COMPOSE_PROJECT_NAME=volcheck`에서도 둘이 일치, 볼륨 목록 변화 없음. 전용 테스트 볼륨(복사한 `mtc-volcheck` 폴더 → `mtc-volcheck_revcc_pg`)으로 스크립트 전체를 실행해 6개 서비스 기동·`:8091` 200을 확인하고, 그 볼륨을 Compose가 경고 없이 이어 쓰는 것까지 본 뒤 테스트 자원만 지웠다. 원래 스택은 `down`(볼륨 유지) 후 다시 `up`했고 `morethancar_revcc_pg`의 행 수·Flyway 이력이 전후 동일하다. 폴더 이름이 `revcc-site`인 다른 PC에서는 계속 `revcc-site_revcc_pg`를 고른다.
 - STEP 1 — `frontend/components/garage/garage-session.tsx`: Next.js "My Garage" 프로토타입 가입 폼에는 8자 최소 길이 클라이언트 검증이 없다(서버가 400으로 거부하지만 안내 문구가 없음). 기본 compose 미포함 프로토타입이라 수정하지 않음.
 - STEP 1 — 테스트 환경: Windows 개발 PC에는 Java/Maven/Node가 설치되어 있지 않아 `maven:3.9.9-eclipse-temurin-23`, `node:22-alpine` 컨테이너로 테스트를 실행했다(Dockerfile과 같은 버전). STEP 3 CI에서도 같은 버전을 쓰면 된다.
 - STEP 2 — `board-service/src/schema.sql`: `moderation_logs.action_type` CHECK 제약에 `LISTING_DELETE`를 추가했다(기존 DB는 board-service 기동 시 1회 교체, 임시 PostgreSQL에서 기존 로그 보존·재적용 무변화·잘못된 값 거부 확인). 공유 Neon DB에는 board-service가 새 코드로 처음 재기동될 때 적용된다. 이전 코드와도 호환된다(허용 값만 늘어남).
@@ -1170,5 +1183,5 @@ _(작업 중 발견하면 여기에 "STEP 번호 — 파일:설명" 형식으로
 새 터미널/새 Claude Code 세션에서 아래 한 문장만 입력하면 된다:
 
 ```
-REVCC_NEXT_TASKS.md를 읽고 "지금 할 것"의 처음 미완료 작업 하나만 진행해. 공통 작업 규칙과 "작업 및 검증 경량화 원칙"을 따르고, 관련 테스트 통과 후 commit 및 origin/docker-assignment push까지 진행해.
+MORETHANCAR_NEXT_TASKS.md를 읽고 "지금 할 것"의 처음 미완료 작업 하나만 진행해. 공통 작업 규칙과 "작업 및 검증 경량화 원칙"을 따르고, 최신 main에서 기능 브랜치를 만들어 작업하고, 관련 테스트 통과 후 그 브랜치에 commit까지 진행해. push·main 병합은 내가 확인한 뒤 진행해.
 ```

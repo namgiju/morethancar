@@ -127,8 +127,10 @@ Mockito 테스트는 샌드박스의 JVM attach 제한을 피하도록 subclass 
 ## 영속화 확인 및 종료
 
 기존 Compose 서비스명 `postgres`와 `revcc_pg` 볼륨 키를 유지했다.
-이 작업 폴더에서는 `revcc-site_revcc_pg`를 재사용한다. 프로젝트 이름(`-p`)을 변경하면
-다른 볼륨을 사용하므로 기존 데이터가 필요한 경우 동일 프로젝트 이름을 유지한다.
+실제 볼륨 이름은 `<Compose 프로젝트 이름>_revcc_pg`이고, 프로젝트 이름은 폴더 이름(또는 `COMPOSE_PROJECT_NAME`)에서 온다.
+제출 당시 폴더(`revcc-site`)에서는 `revcc-site_revcc_pg`였고, 지금 `morethancar` 폴더에서는 `morethancar_revcc_pg`다.
+프로젝트 이름(`-p`)이나 폴더 이름을 바꾸면 다른 볼륨을 사용하므로 기존 데이터가 필요한 경우 동일 프로젝트 이름을 유지한다.
+`scripts/assignment-run.sh`도 Compose에 직접 물어 같은 볼륨을 쓴다(`sh scripts/assignment-run.sh --print-volume`으로 확인).
 
 ```sh
 docker compose exec postgres psql -U revcc -d revcc -c 'SELECT id, username FROM users;'

@@ -128,7 +128,9 @@ services:
       timeout: 3s
       retries: 10
 volumes:
-  # 기존 revcc-site_revcc_pg를 재사용한다. down -v는 데이터를 삭제하므로 금지.
+  # 실제 이름은 <Compose 프로젝트 이름>_revcc_pg다(프로젝트 이름은 폴더 이름 또는 COMPOSE_PROJECT_NAME).
+  # 예: morethancar 폴더 → morethancar_revcc_pg. scripts/assignment-run.sh도 같은 볼륨을 고른다.
+  # down -v는 데이터를 삭제하므로 금지.
   revcc_pg:
 
 # 기본 네트워크를 명시적인 사용자 정의 bridge로 만들어 inspect 시연이 가능하다.
