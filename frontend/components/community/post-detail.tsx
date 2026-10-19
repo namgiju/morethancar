@@ -28,6 +28,7 @@ import CommunityDialog, {type DialogSpec} from './community-dialog';
 import SiteFooter from '../footer/site-footer';
 import theme from '../common/theme.module.css';
 import styles from './community.module.css';
+import {showLoginRequiredToast} from '../common/toast';
 import detailStyles from './post-detail.module.css';
 
 // Posts already counted in this page load (assignment-frontend/js/app.js's
@@ -140,9 +141,9 @@ export default function PostDetail({postId}: {postId: number}) {
 
   const requireLogin = useCallback(() => {
     if (session) return true;
-    notify('로그인 후 이용할 수 있어요. 상단의 로그인 / 가입을 눌러주세요.');
+    showLoginRequiredToast();
     return false;
-  }, [session, notify]);
+  }, [session]);
 
   // --- Mutations. Each one goes to the existing board-service endpoint and
   // then re-reads what it changed from the server, like the legacy page's

@@ -16,6 +16,7 @@ import VehicleManageDialog from './vehicle-manage-dialog';
 import VehicleRegistrationDialog from './vehicle-registration-dialog';
 import WithdrawDialog from './withdraw-dialog';
 import theme from '../common/theme.module.css';
+import {showLoginRequiredToast} from '../common/toast';
 import styles from './my-garage.module.css';
 
 type GarageState =
@@ -68,9 +69,9 @@ export default function MyGarage() {
 
   const requireLogin = useCallback(() => {
     if (session) return true;
-    notify('로그인 후 이용할 수 있어요. 상단의 로그인 / 가입을 눌러주세요.');
+    showLoginRequiredToast();
     return false;
-  }, [session, notify]);
+  }, [session]);
 
   return (
     <div className={`${theme.theme} ${styles.shell}`}>

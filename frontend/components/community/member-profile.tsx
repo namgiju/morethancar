@@ -8,6 +8,7 @@ import CommunityPage, {useNotice} from './community-page';
 import Guestbook from './guestbook';
 import PostRow from './post-row';
 import {useCommunitySession} from './use-community-session';
+import {showLoginRequiredToast} from '../common/toast';
 import styles from './post-detail.module.css';
 
 type State =
@@ -46,9 +47,9 @@ export default function MemberProfile({memberId}: {memberId: number}) {
 
   const requireLogin = useCallback(() => {
     if (session) return true;
-    notify('로그인 후 이용할 수 있어요. 상단의 로그인 / 가입을 눌러주세요.');
+    showLoginRequiredToast();
     return false;
-  }, [session, notify]);
+  }, [session]);
 
   return (
     <CommunityPage auth={auth} notice={notice}>
