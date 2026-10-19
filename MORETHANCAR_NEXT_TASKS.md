@@ -8,8 +8,9 @@
 
 ## 1. 현재 브랜치와 프로젝트 상태
 
-- 브랜치: `docker-assignment` (항상 이 브랜치에서만 작업, 다른 브랜치로 전환하지 말 것)
-  - **브랜치 규칙 현황 확인(2026-10-19, 규칙 자체는 변경하지 않음)**: 위 규칙을 바꾸기로 한 결정 기록은 이 파일·`MORETHANCAR_EV_TASKS.md`·커밋 메시지 어디에도 없다. 실제 이력은 규칙과 다르다 — `origin/docker-assignment`의 마지막 커밋은 `f76aa09`(2026-10-07)이고 `d0347ae`로 main에 머지된 뒤 갱신되지 않았다. 2026-10-11 `406f2db`부터는 main에 직접 커밋·push했고(2026-10-19 기준 `docker-assignment..main` 46커밋), EV 허브는 `codex/ev-policy-hub` → PR #2(`57d0327`)로 main에 들어갔다. 운영 EC2도 main을 `git pull`한다(EV 문서 STEP 10). CI(`.github/workflows/ci.yml`)는 `docker-assignment`·`main` 두 브랜치의 push/PR에서 모두 돈다. 어느 브랜치를 기준으로 할지는 사용자가 정한다 — 정해지기 전까지 §5 2·10번과 §7 명령의 브랜치 문구는 그대로 둔다.
+- **브랜치(2026-10-19 사용자 결정)**: 통합 기준은 `main`이다. 코드 변경은 최신 `main`에서 기능별 브랜치를 만들어 진행하고 `main`으로 합친다. push·PR·병합 시점은 사용자 지시를 따른다.
+  - 이전 규칙(기록): "`docker-assignment` 브랜치에서만 작업, 다른 브랜치로 전환하지 말 것" — 2026-10-19에 위 기준으로 대체했다.
+  - **브랜치 규칙 현황 확인(2026-10-19, 위 결정 전 기록)**: 위 규칙을 바꾸기로 한 결정 기록은 이 파일·`MORETHANCAR_EV_TASKS.md`·커밋 메시지 어디에도 없다. 실제 이력은 규칙과 다르다 — `origin/docker-assignment`의 마지막 커밋은 `f76aa09`(2026-10-07)이고 `d0347ae`로 main에 머지된 뒤 갱신되지 않았다. 2026-10-11 `406f2db`부터는 main에 직접 커밋·push했고(2026-10-19 기준 `docker-assignment..main` 46커밋), EV 허브는 `codex/ev-policy-hub` → PR #2(`57d0327`)로 main에 들어갔다. 운영 EC2도 main을 `git pull`한다(EV 문서 STEP 10). CI(`.github/workflows/ci.yml`)는 `docker-assignment`·`main` 두 브랜치의 push/PR에서 모두 돈다. 어느 브랜치를 기준으로 할지는 사용자가 정한다 — 같은 날 사용자가 `main` 통합 + 기능 브랜치로 정했고, §5 2·10번과 §7 명령을 그 기준으로 고쳤다. `.github/workflows/ci.yml`의 `docker-assignment` 트리거는 남아 있지만 동작에는 영향이 없다(정리는 별도 판단).
 - **개발 기준 경로: 저장소 루트(이 파일이 있는 디렉터리).** 2026-10-19부터 새 MacBook에 새로 클론한 저장소(`$HOME/morethancar`)를 기준으로 쓴다. 이전 Mac의 `~/Projects/revcc-site`(2026-10-02~)와 그 전의 `~/Desktop/revcc-site`(Desktop 하위 접근이 비정상적으로 느려 옮겼음)는 더 이상 기준이 아니다 — 이 문서에서 그 경로가 나오면 당시 기록으로 읽는다. 코드·설정·스크립트에 절대경로를 하드코딩하지 않는다(항상 저장소 기준 상대경로 또는 환경변수 사용).
 - 이 파일 작성 시점 기준 `git status`: P0 변경사항 + `REVCC_AUDIT.md` + 이 파일이 커밋 대상으로 대기 중이었고, 이번 세션에서 **P0 변경사항 + REVCC_AUDIT.md + REVCC_NEXT_TASKS.md를 함께 커밋·push했다** (아래 "완료된 작업"의 commit hash 참고). 이 파일 이름은 2026-10-12 `3e6ddc7`에서 `MORETHANCAR_NEXT_TASKS.md`로 바뀌었다.
 - 프로젝트 구조: `backend`(Spring Boot, `core`), `board-service`(Node/Express, `board`), `nginx`(proxy), `docker-compose*.yml` 3종(기본·`dev`·`prod`, 2026-10-11 `override`·`garage` 삭제) — Next.js 전환과 무관하게 그대로 유지한다. 전환을 이유로 이미 있는 API를 다시 만들지 않는다. 화면 작업 전에는 항상 기존 API와 기존 호출 코드(`frontend/lib/*`, `board-service/src/*`, `backend/src/main/java/com/revcc/app/*`)부터 조사한다.
@@ -1013,7 +1014,7 @@
 모든 STEP에 공통으로 적용된다.
 
 1. 작업 시작 전 `git status`로 현재 상태 확인 — 이전 세션이 남긴 미커밋 변경이 있으면 먼저 사용자에게 확인하거나 별도로 처리, 임의로 버리지 않는다.
-2. `docker-assignment` 브랜치에서만 작업한다. 다른 브랜치로 전환하거나 새 브랜치를 만들지 않는다. (실제 이력과의 차이는 §1 "브랜치 규칙 현황 확인" 참고 — 규칙은 변경하지 않음)
+2. 최신 `main`에서 기능별 브랜치를 만들어 작업한다(2026-10-19부터, §1 "브랜치" 참고). `main`에 직접 커밋하지 않는다. (이전 규칙: `docker-assignment` 브랜치에서만 작업)
 3. 기존에 정상 동작하는 기능을 임의로 리팩터링하지 않는다. 해당 STEP의 구현 요구사항에 명시된 범위만 수정한다.
 4. 작업 중 STEP 범위 밖의 문제를 발견해도 임의로 고치지 않는다 — 이 파일의 "발견된 추가 이슈" 섹션(아래, 없으면 새로 만들어 추가)에 기록만 한다.
 5. `.env`, API key, token, password 등 민감정보를 절대 커밋하지 않는다. `git add` 전 `git status`/`git diff`로 반드시 확인한다.
@@ -1021,7 +1022,7 @@
 7. 테스트가 실패하면 원인을 해결하기 전에는 commit도 push도 하지 않는다. 원인이 이번 변경 때문인지, 기존부터 있던 문제인지 먼저 구분한다.
 8. commit 전 `git diff`로 변경사항을 최종 검토한다.
 9. 문제가 없으면 **해당 STEP에서 변경한 파일만** commit한다(다른 STEP이나 무관한 파일을 같이 묶지 않는다).
-10. `origin/docker-assignment`로 push한다.
+10. 기능 브랜치를 `origin`에 push하고 `main`으로 합친다(PR 또는 병합). push·병합은 사용자 지시가 있을 때만 한다. (이전 규칙: `origin/docker-assignment`로 push)
 11. 이 파일(`MORETHANCAR_NEXT_TASKS.md`)의 "다음 작업 순서" 표에서 완료한 STEP을 `[x]`로 갱신하고, 아래 "작업 이력" 섹션에 결과와 commit hash를 기록한 뒤, 이 갱신 자체도 같은 commit(또는 바로 다음의 문서 전용 commit)에 포함해 push한다.
 12. `REVCC_AUDIT.md`는 절대 수정하지 않는다(감사 원본 보존).
 
@@ -1074,7 +1075,8 @@ STEP 10-impl-C에서 수행한 검증(PG16·PG18 각각 전체 Maven, Flyway 반
 
 _(작업 중 발견하면 여기에 "STEP 번호 — 파일:설명" 형식으로 추가할 것.)_
 
-- 2026-10-19 새 MacBook 환경 정리 — **로컬 DB 볼륨 이름이 폴더 이름에 묶여 있다(수정하지 않음, 기록만)**: `docker-compose.yml`의 `revcc_pg`에는 `name:`이 없어 실제 볼륨 이름이 `<compose 프로젝트 이름>_revcc_pg`가 되고, 프로젝트 이름은 폴더 이름에서 온다. 이전 Mac(`revcc-site` 폴더)에서는 `revcc-site_revcc_pg`였지만 이 MacBook(`morethancar` 폴더)에서는 `morethancar_revcc_pg`가 새로 만들어졌다. 그런데 `scripts/assignment-run.sh`는 `revcc-site_revcc_pg`를 하드코딩해 직접 만들고, `docker-compose.yml` 131행 주석·`ASSIGNMENT.md` 130행·`docs/DOCKER-SUBMISSION.md` 143행(`docker volume inspect revcc-site_revcc_pg`)도 그 이름을 전제로 한다. 영향: 이 Mac에서는 compose 실행과 `assignment-run.sh` 실행이 서로 다른 볼륨을 써서 로컬 데이터가 갈라지고, 문서의 볼륨 확인 명령은 실패한다. 운영은 해당 없음(prod 오버레이가 postgres와 `revcc_pg`를 `!reset`으로 제거, DB는 Neon). 고치려면 볼륨에 `name:`을 고정하거나 문서·스크립트를 프로젝트 이름 기준으로 바꾸는 것 중 하나를 사용자가 정한다.
+- ~~2026-10-19 새 MacBook 환경 정리 — **로컬 DB 볼륨 이름이 폴더 이름에 묶여 있다(수정하지 않음, 기록만)**: `docker-compose.yml`의 `revcc_pg`에는 `name:`이 없어 실제 볼륨 이름이 `<compose 프로젝트 이름>_revcc_pg`가 되고, 프로젝트 이름은 폴더 이름에서 온다. 이전 Mac(`revcc-site` 폴더)에서는 `revcc-site_revcc_pg`였지만 이 MacBook(`morethancar` 폴더)에서는 `morethancar_revcc_pg`가 새로 만들어졌다. 그런데 `scripts/assignment-run.sh`는 `revcc-site_revcc_pg`를 하드코딩해 직접 만들고, `docker-compose.yml` 131행 주석·`ASSIGNMENT.md` 130행·`docs/DOCKER-SUBMISSION.md` 143행(`docker volume inspect revcc-site_revcc_pg`)도 그 이름을 전제로 한다. 영향: 이 Mac에서는 compose 실행과 `assignment-run.sh` 실행이 서로 다른 볼륨을 써서 로컬 데이터가 갈라지고, 문서의 볼륨 확인 명령은 실패한다. 운영은 해당 없음(prod 오버레이가 postgres와 `revcc_pg`를 `!reset`으로 제거, DB는 Neon). 고치려면 볼륨에 `name:`을 고정하거나 문서·스크립트를 프로젝트 이름 기준으로 바꾸는 것 중 하나를 사용자가 정한다.~~
+  → **해결(2026-10-19, 브랜치 `chore/local-db-volume-and-branch-rules`)**: 사용자 결정으로 현재 볼륨 `morethancar_revcc_pg`와 데이터를 유지하고(삭제·이름 변경·초기화 없음), `scripts/assignment-run.sh`가 `docker compose config --no-interpolate`로 Compose가 이 폴더에서 쓰는 볼륨 이름을 직접 골라 쓰게 바꿨다(새로 만들 때는 Compose 라벨을 붙이고, `--print-volume`은 이름만 출력). `docker-compose.yml` 주석·`ASSIGNMENT.md`·`docs/DOCKER-SUBMISSION.md`도 맞췄다. 검증: 저장소에서 `--print-volume` = `morethancar_revcc_pg` = Compose 값, `COMPOSE_PROJECT_NAME=volcheck`에서도 둘이 일치, 볼륨 목록 변화 없음. 전용 테스트 볼륨(복사한 `mtc-volcheck` 폴더 → `mtc-volcheck_revcc_pg`)으로 스크립트 전체를 실행해 6개 서비스 기동·`:8091` 200을 확인하고, 그 볼륨을 Compose가 경고 없이 이어 쓰는 것까지 본 뒤 테스트 자원만 지웠다. 원래 스택은 `down`(볼륨 유지) 후 다시 `up`했고 `morethancar_revcc_pg`의 행 수·Flyway 이력이 전후 동일하다. 폴더 이름이 `revcc-site`인 다른 PC에서는 계속 `revcc-site_revcc_pg`를 고른다.
 - STEP 1 — `frontend/components/garage/garage-session.tsx`: Next.js "My Garage" 프로토타입 가입 폼에는 8자 최소 길이 클라이언트 검증이 없다(서버가 400으로 거부하지만 안내 문구가 없음). 기본 compose 미포함 프로토타입이라 수정하지 않음.
 - STEP 1 — 테스트 환경: Windows 개발 PC에는 Java/Maven/Node가 설치되어 있지 않아 `maven:3.9.9-eclipse-temurin-23`, `node:22-alpine` 컨테이너로 테스트를 실행했다(Dockerfile과 같은 버전). STEP 3 CI에서도 같은 버전을 쓰면 된다.
 - STEP 2 — `board-service/src/schema.sql`: `moderation_logs.action_type` CHECK 제약에 `LISTING_DELETE`를 추가했다(기존 DB는 board-service 기동 시 1회 교체, 임시 PostgreSQL에서 기존 로그 보존·재적용 무변화·잘못된 값 거부 확인). 공유 Neon DB에는 board-service가 새 코드로 처음 재기동될 때 적용된다. 이전 코드와도 호환된다(허용 값만 늘어남).
@@ -1181,5 +1183,5 @@ _(작업 중 발견하면 여기에 "STEP 번호 — 파일:설명" 형식으로
 새 터미널/새 Claude Code 세션에서 아래 한 문장만 입력하면 된다:
 
 ```
-MORETHANCAR_NEXT_TASKS.md를 읽고 "지금 할 것"의 처음 미완료 작업 하나만 진행해. 공통 작업 규칙과 "작업 및 검증 경량화 원칙"을 따르고, 관련 테스트 통과 후 commit 및 origin/docker-assignment push까지 진행해.
+MORETHANCAR_NEXT_TASKS.md를 읽고 "지금 할 것"의 처음 미완료 작업 하나만 진행해. 공통 작업 규칙과 "작업 및 검증 경량화 원칙"을 따르고, 최신 main에서 기능 브랜치를 만들어 작업하고, 관련 테스트 통과 후 그 브랜치에 commit까지 진행해. push·main 병합은 내가 확인한 뒤 진행해.
 ```

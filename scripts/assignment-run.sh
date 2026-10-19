@@ -1,8 +1,27 @@
 #!/bin/sh
 # Compose 없이 개별 docker run으로 동일한 6개 서비스를 시연한다.
 # 먼저 docker compose down으로 기존 컨테이너만 내린다. -v는 사용하지 않는다.
+# sh scripts/assignment-run.sh --print-volume 은 사용할 DB 볼륨 이름만 출력하고 아무것도 만들지 않는다.
 set -eu
 cd "$(dirname "$0")/.."
+
+# DB 볼륨은 docker compose가 이 폴더에서 쓰는 것과 같은 볼륨이어야 한다. 이름은
+# <Compose 프로젝트 이름>_revcc_pg이고 프로젝트 이름은 폴더 이름(또는 COMPOSE_PROJECT_NAME)에서
+# 오므로 고정하지 않고 Compose에게 직접 묻는다. --no-interpolate라 .env 값은 출력되지 않는다.
+compose_config=$(docker compose config --no-interpolate)
+PG_PROJECT=$(printf '%s\n' "$compose_config" | awk '/^name:/ { print $2; exit }')
+PG_VOLUME=$(printf '%s\n' "$compose_config" | awk '
+    /^volumes:/ { in_volumes = 1; next }
+    in_volumes && /^  revcc_pg:/ { in_pg = 1; next }
+    in_pg && /^    name:/ { print $2; exit }')
+if [ -z "$PG_PROJECT" ] || [ -z "$PG_VOLUME" ]; then
+    echo "Could not resolve the revcc_pg volume from docker compose config." >&2
+    exit 1
+fi
+if [ "${1:-}" = "--print-volume" ]; then
+    echo "$PG_VOLUME"
+    exit 0
+fi
 
 # 기존 컨테이너를 자동 삭제하지 않고 충돌을 먼저 검사한다.
 for service in proxy frontend core board redis postgres; do
@@ -12,13 +31,16 @@ for service in proxy frontend core board redis postgres; do
     fi
 done
 docker network inspect revcc-network >/dev/null 2>&1 || docker network create --driver bridge revcc-network
-docker volume inspect revcc-site_revcc_pg >/dev/null 2>&1 || docker volume create revcc-site_revcc_pg
+# 새로 만들 때는 Compose 라벨을 붙여 이후 docker compose up이 같은 볼륨을 경고 없이 이어 쓰게 한다.
+docker volume inspect "$PG_VOLUME" >/dev/null 2>&1 || docker volume create \
+    --label "com.docker.compose.project=$PG_PROJECT" --label com.docker.compose.volume=revcc_pg "$PG_VOLUME"
+echo "PostgreSQL volume: $PG_VOLUME"
 
 # --network-alias는 프로그램 설정에 쓰인 postgres/redis/core 등의 DNS 이름을 제공한다.
-# 영구 데이터는 이전 Compose와 정확히 동일한 named volume에 저장한다.
+# 영구 데이터는 Compose와 정확히 동일한 named volume에 저장한다.
 docker run -d --name revcc-postgres --network revcc-network --network-alias postgres \
     -e POSTGRES_DB=revcc -e POSTGRES_USER=revcc -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-revcc}" \
-    -v revcc-site_revcc_pg:/var/lib/postgresql/data postgres:16
+    -v "$PG_VOLUME":/var/lib/postgresql/data postgres:16
 # Redis는 docker-compose.yml과 같은 방식으로 인증을 요구한다(비밀번호는 명령줄 인자 대신 설정 파일로 전달).
 REDIS_PASSWORD="${REDIS_PASSWORD:-revcc-local-redis}"
 export REDIS_PASSWORD

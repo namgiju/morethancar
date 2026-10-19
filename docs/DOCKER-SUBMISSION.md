@@ -38,6 +38,8 @@ python3 scripts/assignment-smoke.py
 
 [scripts/assignment-run.sh](../scripts/assignment-run.sh)에 **6개 docker run 명령 전체**와
 네트워크 생성·볼륨 생성·서비스 준비 대기 명령이 들어 있다.
+PostgreSQL 볼륨은 이름을 고정하지 않고 `docker compose config`로 Compose가 이 폴더에서 쓰는 볼륨(`<프로젝트 이름>_revcc_pg`)을 골라
+Compose 실행과 같은 데이터를 이어 쓴다. `sh scripts/assignment-run.sh --print-volume`은 그 이름만 출력하고 아무것도 만들지 않는다.
 `--network revcc-network`, `--network-alias`, `-e`, `-v`, `-p` 사용 이유를 주석으로 설명했다.
 수동 실행 컨테이너는 Compose 관리 대상이 아니므로 Compose로 돌아올 때:
 
@@ -140,7 +142,7 @@ docker exec revcc-core java -version
 docker exec revcc-board node --version
 docker exec revcc-redis redis-cli ping
 docker exec revcc-postgres psql -U revcc -d revcc -c '\dt'
-docker volume inspect revcc-site_revcc_pg
+docker volume inspect "$(sh scripts/assignment-run.sh --print-volume)"
 docker image inspect revcc-core:assignment --format '{{.Os}}/{{.Architecture}}'
 ```
 
