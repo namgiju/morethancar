@@ -11,6 +11,7 @@ import CommunityHeader from '../community/community-header';
 import SiteFooter from '../footer/site-footer';
 import ListingCard from './listing-card';
 import PartsSidebar from './parts-sidebar';
+import {showLoginRequiredToast} from '../common/toast';
 import styles from './parts.module.css';
 
 const PAGE_LIMIT = 12;
@@ -190,7 +191,7 @@ export default function PartsList() {
   const [favoriteBusy, setFavoriteBusy] = useState<Set<number>>(new Set());
   async function toggleFavorite(item: Listing) {
     if (!session) {
-      notify('로그인 후 이용할 수 있어요. 상단의 로그인 / 가입을 눌러주세요.');
+      showLoginRequiredToast();
       return;
     }
     if (favoriteBusy.has(item.id)) return;

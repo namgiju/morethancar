@@ -1,0 +1,70 @@
+/* Site-wide toast (components/common/toast.tsx). Colors follow theme.module.css
+   (ink #0e100f, lime #c8f53a, radius 4px); the root layout sits outside any
+   .theme element, so the values are written out here.
+
+   Fixed to the bottom center of the viewport, so it shows wherever the page is
+   scrolled and never pushes the layout. --toast-bottom-offset is the height of
+   a fixed mobile bottom menu, if a page ever adds one (none exists today). */
+.region {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + var(--toast-bottom-offset, 0px) + env(safe-area-inset-bottom, 0px));
+  z-index: 1000;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 18px;
+  border-radius: 4px;
+  background: #0e100f;
+  color: #ffffff;
+  box-shadow: 0 8px 24px rgba(14, 16, 15, 0.18);
+  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Noto Sans KR', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  animation: toast-in 180ms ease-out;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.toast::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #c8f53a;
+}
+
+.toast[data-leaving] {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (max-width: 760px) {
+  .region {
+    bottom: calc(16px + var(--toast-bottom-offset, 0px) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+    transition: none;
+  }
+}

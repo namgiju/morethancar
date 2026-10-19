@@ -11,6 +11,7 @@ import CommunityHeader from '../community/community-header';
 import CommunityDialog, {type DialogSpec} from '../community/community-dialog';
 import SiteFooter from '../footer/site-footer';
 import PartsSidebar from './parts-sidebar';
+import {showLoginRequiredToast} from '../common/toast';
 import styles from './parts.module.css';
 
 // Listings already view-counted in this page load (market.js's `seen` Set).
@@ -85,9 +86,9 @@ export default function ListingDetail({listingId}: {listingId: number}) {
 
   const requireLogin = useCallback(() => {
     if (session) return true;
-    notify('로그인 후 이용할 수 있어요. 상단의 로그인 / 가입을 눌러주세요.');
+    showLoginRequiredToast();
     return false;
-  }, [session, notify]);
+  }, [session]);
 
   const refreshTicket = useRef(0);
   const refresh = useCallback(async () => {
