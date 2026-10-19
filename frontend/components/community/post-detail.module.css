@@ -320,35 +320,28 @@
   color: var(--muted);
 }
 
+/* A reply is marked by a short ㄴ before its meta row instead of a line from
+   the divider above. The marker starts at the comment's top padding, so it
+   never touches the parent's border-bottom; its foot ends at the meta row's
+   middle (16px padding + 18px line-height / 2), and the author name starts
+   10px after it. Meta, date and body all sit on the same left edge
+   (padding-left), so wrapped lines line up too. */
 .reply {
   position: relative;
   margin-left: 24px;
-  padding-left: 20px;
+  padding-left: 22px;
 }
 
 .reply::before {
   content: '';
   position: absolute;
-  top: 0;
+  top: 18px;
   left: 0;
-  width: 20px;
-  height: 25px;
-  background:
-    linear-gradient(var(--line), var(--line)) left top / 1px 100% no-repeat,
-    linear-gradient(var(--line), var(--line)) left 25px / 16px 1px no-repeat;
-  pointer-events: none;
-}
-
-.reply::after {
-  content: '';
-  position: absolute;
-  left: 12px;
-  top: 22px;
-  width: 6px;
-  height: 6px;
-  border-top: 1px solid var(--line);
-  border-right: 1px solid var(--line);
-  transform: rotate(45deg);
+  width: 12px;
+  height: 8px;
+  border-left: 1.5px solid var(--line-strong, #c9ccc4);
+  border-bottom: 1.5px solid var(--line-strong, #c9ccc4);
+  border-bottom-left-radius: 2px;
   pointer-events: none;
 }
 
@@ -619,17 +612,7 @@
     font-size: 15px;
   }
   .reply {
-    margin-left: 12px;
-    padding-left: 16px;
-  }
-  .reply::before {
-    width: 16px;
-    background:
-      linear-gradient(var(--line), var(--line)) left top / 1px 100% no-repeat,
-      linear-gradient(var(--line), var(--line)) left 25px / 12px 1px no-repeat;
-  }
-  .reply::after {
-    left: 9px;
+    margin-left: 8px;
   }
 }
 
