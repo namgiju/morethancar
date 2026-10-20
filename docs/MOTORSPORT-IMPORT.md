@@ -5,7 +5,7 @@
 
 - 코드: `board-service/src/motorsport-import/` (출처 어댑터 `sources/*.js`, 반영 규칙 `sync.js`, 실행 `run.js`, CLI `cli.js`)
 - 스키마: Flyway `V9__motorsport_import.sql` (기존 테이블에 nullable 컬럼 + 실행 기록 `motorsport_import_runs`)
-- 스케줄: `scripts/motorsport-import-cron.sh` (운영 EC2 cron), 실패 메일: `scripts/send-alert-mail.py`
+- 스케줄: `scripts/motorsport-import-cron.sh` (운영 EC2 cron)
 
 ## 지원 범위 (2026-10-20)
 
@@ -61,7 +61,6 @@ cd board-service && node src/motorsport-import/cli.js --source all --no-db
 |---|---|
 | `MOTORSPORT_IMPORT_USER_ID` | 수집 전용 계정 `schedule-bot`의 users.id |
 | `MOTORSPORT_IMPORT_SOURCES` | 활성화한 출처(쉼표 구분). 비어 있으면 수집하지 않음 |
-| `MOTORSPORT_ALERT_EMAIL` | 수집 실패 알림을 받을 주소. 발송은 기존 `SMTP_*` 설정 재사용 |
 
 ### 수집 전용 계정
 
@@ -77,7 +76,7 @@ VALUES('schedule-bot','$2a$10$!login-disabled-schedule-bot','MANAGER','ACTIVE',0
   대상이 아니고 BCrypt 검증은 항상 실패한다.
 - 이메일·카카오 ID가 없어 비밀번호 재설정·카카오 로그인으로도 인증되지 않는다(카카오는 kakao_id로만 계정을 찾는다).
 
-## 스케줄과 알림
+## 스케줄과 실패 확인
 
 ```cron
 # crontab -e (ubuntu, 서버 시간대 UTC)
@@ -86,7 +85,7 @@ VALUES('schedule-bot','$2a$10$!login-disabled-schedule-bot','MANAGER','ACTIVE',0
 
 - 매일 18:30 UTC = 03:30 KST. 스크립트가 PATH와 저장소 경로를 직접 정한다.
 - 로그 `~/logs/motorsport-import.log`: 1MB를 넘으면 마지막 512KB만 남긴다.
-- 실패 시 `MOTORSPORT_ALERT_EMAIL`로 메일(제목 `[morethancar] 모터스포츠 일정 수집 실패`). 관리자 재확인 대기열에도 출처별 "수집 실패/지연/정상"이 표시된다.
+- 실패는 메일로 알리지 않는다(2026-10-20 결정). 로그와 관리자 재확인 대기열의 출처별 "수집 실패/지연(이틀 넘게 성공 없음)/정상"으로 확인한다.
 - 스케줄은 활성화한 출처의 첫 등록과 재실행 무중복을 확인한 뒤 켠다.
 
 ## 되돌리기
@@ -101,10 +100,9 @@ V9는 기존 행을 바꾸지 않는다. 수집으로 들어온 일정만 지우
   `.env.backup.20261020-023642`. 롤백 이미지: `revcc-core|revcc-board|revcc-frontend:pre-20261020-v9-rollback`
   (core·board는 원본 이미지 기록이 없어 실행 중이던 컨테이너를 `docker commit`).
 - 수집 계정: `schedule-bot`(users.id 4, MANAGER, 이메일·카카오 없음). 운영 로그인 시도 401, core 재시작 후에도 비밀번호 칸 그대로.
-- `.env`: `MOTORSPORT_IMPORT_USER_ID=4`, `MOTORSPORT_IMPORT_SOURCES=`(비어 있음), `MOTORSPORT_ALERT_EMAIL` 설정. 수집기 실행 시 "활성화된 출처 없음"으로 종료.
+- `.env`: `MOTORSPORT_IMPORT_USER_ID=4`, `MOTORSPORT_IMPORT_SOURCES=`(비어 있음). 수집기 실행 시 "활성화된 출처 없음"으로 종료.
 - **출처 활성화·첫 등록·cron 등록은 하지 않았다** — 이용 조건이 금지(F1·NASCAR) 또는 불명확(르망·슈퍼레이스·인제)이라 사용자 결정 대기.
 - 운영 EC2 접속 확인: WRC 캘린더 200(접속만 확인), 인제 서킷 사이트 80·443·8443 타임아웃.
-- **실패 알림 메일 미확인**: EC2 보안 그룹(`launch-wizard-1`) 아웃바운드가 443만 허용해 smtp.gmail.com 587·465에 연결되지 않는다
-  (80·8443도 막힘). 같은 이유로 core의 비밀번호 재설정 메일도 운영에서 발송되지 않을 것으로 보인다. 보안 그룹에 아웃바운드
-  TCP 587을 허용한 뒤 `scripts/send-alert-mail.py`로 시험 발송해 확인한다.
-
+- 실패 알림 메일은 쓰지 않기로 했다(2026-10-20). 관리자 상태 표시와 로그만 쓴다.
+- EC2 보안 그룹 `launch-wizard-1`(sg-09c3eed40efefe97d) 아웃바운드가 443만 허용해 smtp.gmail.com:587에 연결되지 않는다.
+  core의 비밀번호 재설정 메일도 같은 이유로 발송되지 않는다(별도 복구 작업). 운영 SMTP 설정은 587 + STARTTLS(필수) + 인증으로 정상.

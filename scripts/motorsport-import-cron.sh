@@ -7,7 +7,7 @@
 # - 저장소 경로는 이 스크립트 위치에서 구한다. cron의 PATH는 좁으므로 직접 지정한다.
 # - 활성화한 출처만 실행한다(.env의 MOTORSPORT_IMPORT_SOURCES, 비어 있으면 아무것도 하지 않음).
 # - 로그: ~/logs/motorsport-import.log. 1MB를 넘으면 마지막 512KB만 남긴다(무한히 늘지 않게).
-# - 실패(종료 코드 ≠ 0)하면 기존 SMTP 설정으로 MOTORSPORT_ALERT_EMAIL에 알림 메일을 보낸다(scripts/send-alert-mail.py).
+# - 실패(종료 코드 ≠ 0)는 이 로그와 관리자 재확인 대기열의 출처별 상태(수집 실패/지연)로 확인한다. 메일 알림은 쓰지 않는다.
 # - 같은 스크립트가 겹쳐 실행되면 뒤의 실행은 바로 끝낸다(flock). 출처별 DB 잠금도 따로 있다.
 set -uo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -32,12 +32,6 @@ status=$?
   echo "=== $started exit=$status"
   echo "$output"
 } >>"$LOG"
-
-if [ "$status" -ne 0 ]; then
-  printf '모터스포츠 일정 자동 수집이 실패했습니다(종료 코드 %s, 시작 %s).\n관리자 화면: https://morethancar.kr/admin/motorsport?tab=stale\n서버 로그: %s\n\n%s\n' \
-    "$status" "$started" "$LOG" "$output" |
-    python3 -I "$ROOT/scripts/send-alert-mail.py" "[morethancar] 모터스포츠 일정 수집 실패" >>"$LOG" 2>&1
-fi
 
 size=$(wc -c <"$LOG")
 if [ "$size" -gt "$MAX_BYTES" ]; then
