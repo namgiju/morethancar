@@ -114,6 +114,7 @@
 [x] NOW-2: 실제 운영 배포 준비 (production secret/env, Compose 실행 조건, 오래된 인스턴스 정리) — 근거(문서 기록): 2026-10-13 EC2에서 prod 오버레이로 기동 성공(필수 env가 없으면 기동 거부), 배포 전 Neon Flyway V7 확인 + pg_dump 백업·복원 검증. 기록 없는 NOW-2-3의 2번(카카오 콘솔 운영 설정)은 아래 NOW-2-3에 남김
 [x] NOW-3: 실제 배포 (Cloudflare Named Tunnel + 현재 production compose) — 근거(문서 기록): 2026-10-13 `57d0327`, 2026-10-16 `98eb6ec` EC2 배포, cloudflared 포함 6개 서비스 healthy, morethancar.kr 실접속 200. 배포 후 확인 일부와 이후 커밋 반영 여부는 아래 NOW-3에 남김
 [ ] NOW-4: 최소 운영 안정성 (Kakao HttpClient timeout, 최소 health monitoring/알림)
+[~] MOTORSPORT-IMPORT: 모터스포츠 공식 일정 자동 수집(2026-10-20) — 코드·V9·수집 계정·실패 메일·cron 스크립트 준비. 출처 이용 조건이 금지(F1·NASCAR) 또는 불명확(르망·슈퍼레이스·인제)이라 운영 출처 활성화·첫 등록·스케줄은 사용자 결정 대기. WRC 미지원. 상세 docs/MOTORSPORT-IMPORT.md
 [ ] LATER-1: 카카오 회원 탈퇴 최소 구현 (배포 이후 제품 완성도 작업, 구 STEP 10-impl-D 축소)
 [ ] LATER-2: 비밀번호 재설정 응답 통일 (작은 보안 정리, 구 STEP 11 축소)
 [ ] LATER-5: 운영 성능 메모 — SSR 내부 API 호출이 nginx rate limit을 frontend IP 하나로 공유, `/_next/static` no-store (2026-10-06, 실제 429·속도 문제가 보이면 착수)

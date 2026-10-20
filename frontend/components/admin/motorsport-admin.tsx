@@ -15,10 +15,14 @@ import {
   PUBLICATION_LABELS,
   restoreEvent,
   setPublication,
+  SOURCE_FIELD_LABELS,
+  SOURCE_LABELS,
   STATUS_LABELS,
   verifyEvent,
   type AdminEvent,
   type EventStatus,
+  type ImportRun,
+  type SourceField,
   type MotorsportSeries,
   type MotorsportVenue,
   type Publication,
@@ -261,11 +265,16 @@ function EventList({isAdmin, reloadKey, actions, onError}: {isAdmin: boolean; re
 
 function StaleList({isAdmin, reloadKey, actions, onError}: {isAdmin: boolean; reloadKey: number; actions: Actions; onError: (e: unknown) => void}) {
   const [events, setEvents] = useState<AdminEvent[] | null>(null);
+  const [runs, setRuns] = useState<ImportRun[]>([]);
   useEffect(() => {
     let cancelled = false;
     setEvents(null);
     fetchStaleEvents()
-      .then((r) => !cancelled && setEvents(r.events))
+      .then((r) => {
+        if (cancelled) return;
+        setEvents(r.events);
+        setRuns(r.importRuns ?? []);
+      })
       .catch((e) => !cancelled && onError(e));
     return () => {
       cancelled = true;
@@ -274,10 +283,48 @@ function StaleList({isAdmin, reloadKey, actions, onError}: {isAdmin: boolean; re
   return (
     <section className={styles.panel} aria-labelledby="stale-title">
       <h2 id="stale-title">재확인 대기열</h2>
-      <p className={styles.count}>앞으로 60일 안의 일정 중 마지막 확인일이 {STALE_DAYS}일보다 오래된 일정입니다(비공개·취소·삭제 제외). 공식 출처를 다시 확인한 뒤 &ldquo;확인일 갱신&rdquo;을 눌러주세요.</p>
+      <p className={styles.count}>앞으로 60일 안의 일정 중 마지막 확인일이 {STALE_DAYS}일보다 오래된 일정(비공개·취소·삭제 제외)과, 자동 수집한 출처의 변경이 운영자가 고친 값과 달라 반영되지 않은 일정입니다. 공식 출처를 확인한 뒤 필요하면 &ldquo;수정&rdquo;으로 고치고 &ldquo;확인일 갱신&rdquo;을 눌러주세요.</p>
+      {runs.length > 0 && <ImportRuns runs={runs} />}
       <EventTable events={events} loading={events === null} isAdmin={isAdmin} actions={actions} empty="재확인할 일정이 없어요." />
     </section>
   );
+}
+
+// 출처별 마지막 자동 수집 결과. 실패했거나 마지막 성공이 이틀보다 오래되면 경고로 표시한다(하루 한 번 실행).
+function ImportRuns({runs}: {runs: ImportRun[]}) {
+  const staleBefore = Date.now() - 2 * 86_400_000;
+  return (
+    <ul className={styles.count}>
+      {runs.map((run) => {
+        const late = !run.lastSuccessAt || Date.parse(run.lastSuccessAt) < staleBefore;
+        const s = run.summary ?? {};
+        return (
+          <li key={run.source}>
+            <span className={`${styles.chip} ${run.ok === false || late ? styles.chipBlocked : styles.chipOk}`}>
+              {run.ok === false ? '수집 실패' : late ? '수집 지연' : '수집 정상'}
+            </span>{' '}
+            {SOURCE_LABELS[run.source] ?? run.source} · 마지막 실행 {formatInZone(run.startedAt, 'Asia/Seoul')}
+            {run.lastSuccessAt ? ` · 마지막 성공 ${formatInZone(run.lastSuccessAt, 'Asia/Seoul')}` : ' · 성공 기록 없음'}
+            {run.ok !== false && ` · 수집 ${s.collected ?? 0} / 신규 ${s.inserted ?? 0} / 갱신 ${s.updated ?? 0} / 충돌 ${s.conflict ?? 0} / 출처에서 사라짐 ${s.missing ?? 0}`}
+            {run.error && ` · ${run.error}`}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+// 출처 변경 중 반영하지 못한 필드와 출처의 새 값.
+function sourceChanges(event: AdminEvent): string[] {
+  if (!event.sourceReview || !event.sourceLatest) return [];
+  const before = event.sourceSnapshot ?? {};
+  return (Object.keys(event.sourceLatest) as SourceField[])
+    .filter((field) => (event.sourceLatest?.[field] ?? null) !== (before[field] ?? null))
+    .map((field) => {
+      const value = event.sourceLatest?.[field] ?? null;
+      const shown = field === 'startsAt' && typeof value === 'string' ? `${formatInZone(value, 'Asia/Seoul')} KST` : String(value ?? '없음');
+      return `${SOURCE_FIELD_LABELS[field]} → ${shown}`;
+    });
 }
 
 function EventTable({events, loading, isAdmin, actions, empty}: {events: AdminEvent[] | null; loading: boolean; isAdmin: boolean; actions: Actions; empty: string}) {
@@ -347,7 +394,11 @@ function EventTable({events, loading, isAdmin, actions, empty}: {events: AdminEv
                     <a className={styles.textLink} href={event.sourceUrl} target="_blank" rel="noopener noreferrer">{event.sourceName}</a>
                     <span className={styles.rowSub}>
                       {event.verifiedOn} 확인{age > STALE_DAYS ? ` · ${age}일 지남` : ''}
+                      {event.sourceCheckedAt ? ` · 자동 수집 ${formatInZone(event.sourceCheckedAt, 'Asia/Seoul')}` : ''}
                     </span>
+                    {sourceChanges(event).map((change) => (
+                      <span key={change} className={`${styles.rowSub} ${styles.chipPending}`}>출처 변경 미반영: {change}</span>
+                    ))}
                   </td>
                   <td>
                     <div className={styles.rowActions}>

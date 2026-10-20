@@ -48,6 +48,11 @@ try {
   } finally {
     client.release();
   }
+  // V6 이후 마이그레이션도 적용한다(운영 API가 V9 자동 수집 컬럼을 읽는다).
+  await mkdir("/tmp/v7-plus", { recursive: true });
+  for (const name of await readdir("./db-migration"))
+    if (/^V([7-9]|\d{2,})__/.test(name)) await copyFile(`./db-migration/${name}`, `/tmp/v7-plus/${name}`);
+  await applyFlywayMigrations(db, "/tmp/v7-plus");
   // 옛 role 값은 NOT VALID라 그대로 남고, 새로 쓰는 값만 검사한다.
   assert.equal((await db.query("SELECT role FROM users WHERE id=$1", [LEGACY])).rows[0].role, "LEGACY_ROLE");
   await assert.rejects(db.query("UPDATE users SET role='OWNER' WHERE id=$1", [MEMBER]), /users_role_check/);

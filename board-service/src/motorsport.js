@@ -118,7 +118,7 @@ export function range(query, today = kstToday()) {
 // DATE는 문자열로 꺼낸다(node-pg가 DATE를 서버 로컬 시간대 Date로 바꿔 하루 밀리는 것을 막는다).
 const eventSelect = `SELECT e.id,e.kind,e.title,to_char(e.starts_on,'YYYY-MM-DD') AS "startsOn",to_char(e.ends_on,'YYYY-MM-DD') AS "endsOn",
  to_char(e.starts_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "startsAt",e.status,e.source_url AS "sourceUrl",e.source_name AS "sourceName",
- to_char(e.verified_on,'YYYY-MM-DD') AS "verifiedOn",e.note,
+ to_char(e.verified_on,'YYYY-MM-DD') AS "verifiedOn",e.note,e.booking_url AS "bookingUrl",
  CASE WHEN s.id IS NULL THEN NULL ELSE json_build_object('id',s.id,'code',s.code,'name',s.name,'scope',s.scope) END AS series,
  json_build_object('id',v.id,'name',v.name,'country',v.country,'region',v.region,'timezone',v.timezone,
    'latitude',v.latitude,'longitude',v.longitude) AS venue,
@@ -127,8 +127,11 @@ const eventFrom = `FROM motorsport_events e JOIN motorsport_venues v ON v.id=e.v
  LEFT JOIN motorsport_series s ON s.id=e.series_id`;
 const eventOrder = "ORDER BY e.starts_on,e.starts_at NULLS LAST,e.id";
 // 운영 API 응답에만 붙는 관리 정보(공개 상태, 작성·수정·확인·삭제한 운영자 id와 시각).
+// 자동 수집 일정(V9): 출처 식별자, 마지막 성공 확인 시각, 운영자 수정과 충돌해 반영하지 못한 출처 변경(sourceReview).
 const adminColumns = `,e.publication,e.published_at AS "publishedAt",e.created_by AS "createdBy",e.updated_by AS "updatedBy",e.verified_by AS "verifiedBy",
- e.created_at AS "createdAt",e.updated_at AS "updatedAt",e.deleted_at AS "deletedAt",e.deleted_by AS "deletedBy"`;
+ e.created_at AS "createdAt",e.updated_at AS "updatedAt",e.deleted_at AS "deletedAt",e.deleted_by AS "deletedBy",
+ e.source_key AS "sourceKey",e.source_checked_at AS "sourceCheckedAt",e.source_snapshot AS "sourceSnapshot",e.source_latest AS "sourceLatest",
+ (e.source_latest IS DISTINCT FROM e.source_snapshot) AS "sourceReview"`;
 
 const seriesSelect = `SELECT id,code,name,scope,official_url AS "officialUrl",active FROM motorsport_series`;
 const venueSelect = `SELECT id,name,country,region,timezone,official_url AS "officialUrl",latitude::float8 AS latitude,
@@ -362,7 +365,8 @@ export function motorsportAdminRouter({ db, auth }) {
     });
   }
 
-  // 공식 출처를 다시 확인했을 때: 확인일만 갱신한다(기본 오늘 KST).
+  // 공식 출처를 다시 확인했을 때: 확인일만 갱신한다(기본 오늘 KST). 자동 수집 일정이면 출처 변경 충돌도 확인한 것으로
+  // 보고 snapshot을 latest로 맞춘다 — 운영자가 둔 값은 그대로이고, 같은 출처 변경으로 다시 대기열에 뜨지 않는다.
   router.post("/events/:id/verify", async (req, res) => {
     const verifiedOn = req.body?.verifiedOn === undefined ? kstToday() : isoDate(req.body.verifiedOn, "확인일");
     if (verifiedOn > kstToday()) fail(400, "확인일은 오늘(KST) 이후일 수 없습니다.");
@@ -370,7 +374,8 @@ export function motorsportAdminRouter({ db, auth }) {
       const before = await lockEvent(client, req.params.id);
       if (before.deleted_at) fail(409, "삭제된 일정은 확인일을 바꿀 수 없습니다.");
       await client.query(
-        "UPDATE motorsport_events SET verified_on=$2,verified_by=$3,updated_by=$3,updated_at=NOW() WHERE id=$1",
+        `UPDATE motorsport_events SET verified_on=$2,verified_by=$3,updated_by=$3,updated_at=NOW(),
+           source_snapshot=COALESCE(source_latest,source_snapshot) WHERE id=$1`,
         [req.params.id, verifiedOn, req.staff.id],
       );
       await log(client, "MOTORSPORT_EVENT", req.params.id, "VERIFY", before, await eventRow(client, req.params.id), req.staff);
@@ -408,7 +413,9 @@ export function motorsportAdminRouter({ db, auth }) {
     res.json(event);
   });
 
-  // 재확인 대기열: 앞으로 within일 안에 끝나지 않은 일정 중 확인일이 olderThan일보다 오래된 것(삭제·비공개·취소 제외).
+  // 재확인 대기열: 앞으로 within일 안에 끝나지 않은 일정 중 확인일이 olderThan일보다 오래된 것(삭제·비공개·취소 제외)과,
+  // 기간과 관계없이 출처 변경이 운영자 수정과 충돌해 반영되지 않은 자동 수집 일정(sourceReview).
+  // importRuns: 출처별 마지막 실행 결과와 마지막 성공 시각(수집 실패를 관리자 화면에서 알아차리도록).
   router.get("/stale", async (req, res) => {
     const within = req.query.within === undefined ? 60 : positive(req.query.within);
     const olderThan = req.query.olderThan === undefined ? 14 : positive(req.query.olderThan);
@@ -416,12 +423,18 @@ export function motorsportAdminRouter({ db, auth }) {
     const today = kstToday();
     const { rows } = await db.query(
       `${eventSelect}${adminColumns} ${eventFrom}
-       WHERE e.deleted_at IS NULL AND e.publication<>'HIDDEN' AND e.status<>'CANCELLED'
-       AND e.ends_on >= $1::date AND e.starts_on <= $2::date AND e.verified_on < $3::date
+       WHERE e.deleted_at IS NULL AND e.ends_on >= $1::date
+       AND ((e.publication<>'HIDDEN' AND e.status<>'CANCELLED' AND e.starts_on <= $2::date AND e.verified_on < $3::date)
+         OR e.source_latest IS DISTINCT FROM e.source_snapshot)
        ORDER BY e.starts_on,e.id LIMIT 200`,
       [today, addDays(today, within), addDays(today, -olderThan)],
     );
-    res.json({ today, within, olderThan, events: rows.map(staffIds) });
+    const importRuns = (await db.query(
+      `SELECT DISTINCT ON (source) source,started_at AS "startedAt",finished_at AS "finishedAt",ok,summary,error,
+         (SELECT max(finished_at) FROM motorsport_import_runs s WHERE s.source=r.source AND s.ok) AS "lastSuccessAt"
+       FROM motorsport_import_runs r ORDER BY source,id DESC`,
+    )).rows;
+    res.json({ today, within, olderThan, events: rows.map(staffIds), importRuns });
   });
 
   // --- 시리즈 / 장소: 삭제 대신 active=false(이미 쓰인 일정이 있을 수 있다). MANAGER 이상 ---
