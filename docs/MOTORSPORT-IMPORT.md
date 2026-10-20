@@ -93,3 +93,18 @@ VALUES('schedule-bot','$2a$10$!login-disabled-schedule-bot','MANAGER','ACTIVE',0
 
 V9는 기존 행을 바꾸지 않는다. 수집으로 들어온 일정만 지우려면 `source_key IS NOT NULL`인 DRAFT 일정을 대상으로 한다
 (연결된 후기 글은 `motorsport_event_id`가 NULL이 된다). 스키마까지 되돌리려면 배포 전 pg_dump 백업으로 복원한다.
+
+## 운영 배포 기록 (2026-10-20)
+
+- 배포: `dcf475d`(PR #8). core·board·frontend만 갱신, proxy·redis·cloudflared 재시작 없음. Flyway V9 적용 확인(02:38 UTC).
+- 배포 전 백업: `~/rev.cc/backups/neon-pre-v9-20261020-023011.dump`(pg_dump 18 — Neon 서버가 PostgreSQL 18이라 16으로는 실패, TABLE DATA 28개 확인),
+  `.env.backup.20261020-023642`. 롤백 이미지: `revcc-core|revcc-board|revcc-frontend:pre-20261020-v9-rollback`
+  (core·board는 원본 이미지 기록이 없어 실행 중이던 컨테이너를 `docker commit`).
+- 수집 계정: `schedule-bot`(users.id 4, MANAGER, 이메일·카카오 없음). 운영 로그인 시도 401, core 재시작 후에도 비밀번호 칸 그대로.
+- `.env`: `MOTORSPORT_IMPORT_USER_ID=4`, `MOTORSPORT_IMPORT_SOURCES=`(비어 있음), `MOTORSPORT_ALERT_EMAIL` 설정. 수집기 실행 시 "활성화된 출처 없음"으로 종료.
+- **출처 활성화·첫 등록·cron 등록은 하지 않았다** — 이용 조건이 금지(F1·NASCAR) 또는 불명확(르망·슈퍼레이스·인제)이라 사용자 결정 대기.
+- 운영 EC2 접속 확인: WRC 캘린더 200(접속만 확인), 인제 서킷 사이트 80·443·8443 타임아웃.
+- **실패 알림 메일 미확인**: EC2 보안 그룹(`launch-wizard-1`) 아웃바운드가 443만 허용해 smtp.gmail.com 587·465에 연결되지 않는다
+  (80·8443도 막힘). 같은 이유로 core의 비밀번호 재설정 메일도 운영에서 발송되지 않을 것으로 보인다. 보안 그룹에 아웃바운드
+  TCP 587을 허용한 뒤 `scripts/send-alert-mail.py`로 시험 발송해 확인한다.
+
