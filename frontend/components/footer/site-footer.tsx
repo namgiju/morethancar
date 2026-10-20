@@ -35,25 +35,13 @@ export default function SiteFooter() {
             <h2>morethancar</h2>
             <dl>
               <div>
-                <dt>대표</dt>
+                <dt>운영자</dt>
                 <dd>남기주</dd>
-              </div>
-              <div>
-                <dt>사업자등록번호</dt>
-                <dd>000-00-00000</dd>
-              </div>
-              <div>
-                <dt>소재지</dt>
-                <dd>
-                  경기도 성남시 수정구 성남대로 1342
-                  <br />
-                  가천대학교 AI공학관
-                </dd>
               </div>
               <div>
                 <dt>이메일</dt>
                 <dd>
-                  <a href="mailto:wjswkemd@gachon.ac.kr">wjswkemd@gachon.ac.kr</a>
+                  <a href="mailto:wjswkemd@gmail.com">wjswkemd@gmail.com</a>
                 </dd>
               </div>
             </dl>
@@ -64,9 +52,6 @@ export default function SiteFooter() {
             <p className={styles.copyright}>
               <span>© 2026 morethancar</span>
               <span>Built for car people.</span>
-            </p>
-            <p className={styles.disclaimer}>
-              현재 개발 중인 프로젝트이며, 표시된 사업자 정보는 UI 테스트를 위한 임시 정보입니다.
             </p>
           </div>
           <button type="button" className={styles.toTop} onClick={scrollToTop}>
