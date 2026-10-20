@@ -123,6 +123,10 @@ services:
       PGUSER: ${DB_USER:?DB_USER를 설정해야 배포할 수 있습니다.}
       PGPASSWORD: ${DB_PASSWORD:?DB_PASSWORD를 설정해야 배포할 수 있습니다.}
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD 환경변수를 설정해야 배포할 수 있습니다.}
+      # 모터스포츠 공식 일정 수집(src/motorsport-import, scripts/motorsport-import-cron.sh).
+      # 수집 전용 계정 id와 활성화한 출처(쉼표 구분). 출처가 비어 있으면 수집기는 아무것도 하지 않는다.
+      MOTORSPORT_IMPORT_USER_ID: ${MOTORSPORT_IMPORT_USER_ID:-}
+      MOTORSPORT_IMPORT_SOURCES: ${MOTORSPORT_IMPORT_SOURCES:-}
 volumes:
   revcc_pg: !reset null
 networks:

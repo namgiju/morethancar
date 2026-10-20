@@ -82,6 +82,44 @@ export type AdminEvent = {
   updatedAt: string | null;
   deletedAt: string | null;
   deletedBy: number | null;
+  bookingUrl: string | null;
+  // 자동 수집 일정(board-service src/motorsport-import). 운영자가 등록한 일정은 모두 null/false.
+  sourceKey: string | null;
+  sourceCheckedAt: string | null;
+  sourceSnapshot: SourceValues | null;
+  sourceLatest: SourceValues | null;
+  sourceReview: boolean;
+};
+
+// 수집기가 비교하는 출처 값. snapshot(마지막으로 반영·확인한 값)과 latest(마지막 수집 값)가 다르면 운영자 수정과
+// 충돌해 반영하지 못한 출처 변경이 있다는 뜻이다.
+export type SourceValues = Partial<Record<SourceField, string | number | null>>;
+export type SourceField = 'title' | 'startsOn' | 'endsOn' | 'startsAt' | 'venueId' | 'status' | 'sourceUrl' | 'bookingUrl';
+export const SOURCE_FIELD_LABELS: Record<SourceField, string> = {
+  title: '제목',
+  startsOn: '시작일',
+  endsOn: '종료일',
+  startsAt: '시작 시각',
+  venueId: '장소',
+  status: '상태',
+  sourceUrl: '출처 주소',
+  bookingUrl: '예약 링크',
+};
+export const SOURCE_LABELS: Record<string, string> = {
+  f1: 'F1',
+  nascar: 'NASCAR Cup',
+  lemans: '르망 24시',
+  superrace: '슈퍼레이스',
+  inje: '인제 스피디움',
+};
+export type ImportRun = {
+  source: string;
+  startedAt: string;
+  finishedAt: string | null;
+  ok: boolean | null;
+  summary: {collected?: number; inserted?: number; updated?: number; conflict?: number; missing?: number; errors?: number} | null;
+  error: string | null;
+  lastSuccessAt: string | null;
 };
 
 export type EventInput = {
@@ -164,7 +202,7 @@ export const verifyEvent = (id: number) => apiFetch<AdminEvent>(`${MS}/events/${
 export const deleteEvent = (id: number, reason?: string) => apiFetch<void>(`${MS}/events/${id}`, send('DELETE', reason ? {reason} : {}));
 export const restoreEvent = (id: number, reason?: string) =>
   apiFetch<AdminEvent>(`${MS}/events/${id}/restore`, send('POST', reason ? {reason} : {}));
-export const fetchStaleEvents = () => apiFetch<{today: string; events: AdminEvent[]}>(`${MS}/stale`);
+export const fetchStaleEvents = () => apiFetch<{today: string; events: AdminEvent[]; importRuns: ImportRun[]}>(`${MS}/stale`);
 
 export const fetchSeries = () => apiFetch<MotorsportSeries[]>(`${MS}/series`);
 export const saveSeries = (input: SeriesInput, id?: number) =>

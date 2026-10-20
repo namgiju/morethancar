@@ -99,7 +99,7 @@ function EventDetailBody({event}: {event: PublicEvent}) {
 
       {event.note && (
         <div className={styles.detailNote}>
-          <h2>경기 설명</h2>
+          <h2>{event.kind === 'TRACK_DAY' ? '주행 안내' : '경기 설명'}</h2>
           <p>{event.note}</p>
         </div>
       )}
@@ -107,6 +107,12 @@ function EventDetailBody({event}: {event: PublicEvent}) {
       {event.sourceUrl && (
         <a className={styles.detailLink} href={event.sourceUrl} target="_blank" rel="noopener noreferrer">
           공식 홈페이지 · {event.sourceName} ↗
+        </a>
+      )}
+
+      {event.bookingUrl && (
+        <a className={styles.detailLink} href={event.bookingUrl} target="_blank" rel="noopener noreferrer">
+          예약 안내 · 예약 가능 여부는 예약 페이지에서 확인 ↗
         </a>
       )}
 

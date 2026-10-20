@@ -46,6 +46,8 @@ export type PublicEvent = {
   sourceName: string;
   verifiedOn: string;
   note: string | null;
+  // 예약 안내 페이지(스포츠주행 등). 예약 가능 여부·잔여석은 저장하지 않는다.
+  bookingUrl: string | null;
   series: EventSeries | null;
   venue: EventVenue;
   linkedPostCount: number;
