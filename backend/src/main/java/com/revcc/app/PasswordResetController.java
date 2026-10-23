@@ -24,5 +24,7 @@ public class PasswordResetController {
         resets.reset(body.token(),body.password(),body.confirm());
         return Map.of("message", "비밀번호가 변경되었습니다. 다시 로그인해주세요.");
     }
-    static Map<String,String> message() { return Map.of("code", "CODE_SENT", "message", "인증번호를 발송했습니다."); }
+    // 계정 일치 여부와 관계없이 같은 응답이다(PasswordResetService.request 참고).
+    static Map<String,String> message() { return Map.of("code", "CODE_SENT", "message", MESSAGE); }
+    static final String MESSAGE = "입력한 정보가 일치하면 인증번호가 발송됩니다. 메일이 오지 않으면 입력 정보와 스팸함을 확인해 주세요. 카카오 가입 회원은 카카오 로그인을 이용해 주세요.";
 }

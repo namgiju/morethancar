@@ -5,6 +5,11 @@ import {completePasswordReset, requestPasswordReset, verifyPasswordReset} from '
 import AuthShell from './auth-shell';
 import styles from './auth.module.css';
 
+// The server answers every well-formed request the same way, so this never
+// says whether the account matched (PasswordResetController.MESSAGE).
+const REQUEST_SENT_MESSAGE =
+  '입력한 정보가 일치하면 인증번호가 발송됩니다. 메일이 오지 않으면 입력 정보와 스팸함을 확인해 주세요. 카카오 가입 회원은 카카오 로그인을 이용해 주세요.';
+
 type Message = {text: string; kind: 'error' | 'success'} | null;
 type Stage = 'email' | 'code' | 'password';
 
@@ -91,7 +96,7 @@ export default function PasswordResetForm() {
       if (result.code !== 'CODE_SENT') return fail('발송 상태를 확인하지 못했습니다. 다시 시도해주세요.');
       setEmail(trimmedEmail);
       setStage('code');
-      setMessage({text: result.message, kind: 'success'});
+      setMessage({text: REQUEST_SENT_MESSAGE, kind: 'success'});
     });
   }
 

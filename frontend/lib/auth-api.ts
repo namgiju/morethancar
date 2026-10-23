@@ -35,13 +35,11 @@ export function signup(username: string, password: string, email: string): Promi
   });
 }
 
-// password-reset.js's post(): unlike authFetch/ApiError, the final error
-// message depends on the step — only the "request" step's known failure
-// codes (USERNAME_NOT_FOUND/IDENTITY_MISMATCH/SOCIAL_ACCOUNT/MAIL_UNAVAILABLE)
-// surface the server's own message; everything else (verify/complete, or any
-// other request-step failure) gets one of three fixed messages by status.
+// Every step's failure becomes one of three fixed messages by status. The
+// request step no longer has account-specific failure codes: a well-formed
+// request always answers CODE_SENT, whatever the account (see
+// PasswordResetService.request), so only 400 (format), 429 and 503 reach here.
 type PasswordResetStep = 'request' | 'verify' | 'complete';
-const PASSWORD_RESET_REQUEST_CODES = ['USERNAME_NOT_FOUND', 'IDENTITY_MISMATCH', 'SOCIAL_ACCOUNT', 'MAIL_UNAVAILABLE'];
 
 async function passwordResetFetch<T>(step: PasswordResetStep, body: unknown): Promise<T> {
   const res = await fetch('/api/auth/password-reset/' + step, {
@@ -51,7 +49,6 @@ async function passwordResetFetch<T>(step: PasswordResetStep, body: unknown): Pr
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok && step === 'request' && PASSWORD_RESET_REQUEST_CODES.includes(data?.code)) throw new Error(data.message);
   if (!res.ok)
     throw new Error(
       res.status === 429

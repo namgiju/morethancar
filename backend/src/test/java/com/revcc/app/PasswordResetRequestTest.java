@@ -6,6 +6,8 @@ import org.springframework.data.redis.core.*;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.test.web.servlet.*;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -26,43 +28,62 @@ class PasswordResetRequestTest {
         mvc=MockMvcBuilders.standaloneSetup(new PasswordResetController(service)).setControllerAdvice(new MemberExceptionHandler()).build();
     }
     @Test void matchingUsernameAndNormalizedEmailSendCode() throws Exception {
-        request("owner","OWNER@example.test",200,"CODE_SENT","인증번호를 발송했습니다.");
+        sent("owner","OWNER@example.test");
         verify(mail).send(eq("owner@example.test"),matches("[0-9]{6}"));
         verify(values).set(startsWith("password-reset:"),anyString(),eq(java.time.Duration.ofMinutes(5)));
     }
-    @Test void mismatchesAndUnknownAccountsAreExplicitAndNeverSend() throws Exception {
-        request("missing","owner@example.test",400,"USERNAME_NOT_FOUND","등록되지 않은 아이디입니다.");
-        request("owner","another@example.test",400,"IDENTITY_MISMATCH","아이디와 이메일 정보가 일치하지 않습니다.");
-        request("owner","missing@example.test",400,"IDENTITY_MISMATCH","아이디와 이메일 정보가 일치하지 않습니다.");
-        request("missing","missing@example.test",400,"USERNAME_NOT_FOUND","등록되지 않은 아이디입니다.");
+    @Test void mismatchesAndUnknownAccountsGetTheSameResponseAndNeverSend() throws Exception {
+        sent("missing","owner@example.test");
+        sent("owner","another@example.test");
+        sent("owner","missing@example.test");
+        sent("missing","missing@example.test");
         verifyNoInteractions(mail);
+        // 쿨다운도 일치하는 계정에만 건다(오타 뒤 바로잡은 요청이 막히지 않는다).
+        verify(values,never()).setIfAbsent(anyString(),anyString(),any(java.time.Duration.class));
         verify(values,never()).set(anyString(),anyString(),any(java.time.Duration.class));
         verify(users,never()).findByEmail(anyString());
     }
     @Test void socialOnlyAccountDoesNotSend() throws Exception {
         User user=new User("social","hash",77L);user.registerEmail("owner@example.test");
         when(users.findByUsername("social")).thenReturn(Optional.of(user));
-        request("social","owner@example.test",400,"SOCIAL_ACCOUNT","카카오 계정은 카카오 로그인을 이용해주세요.");verifyNoInteractions(mail);
+        sent("social","owner@example.test");verifyNoInteractions(mail);
+        verify(values,never()).set(anyString(),anyString(),any(java.time.Duration.class));
     }
     @Test void requestRequiresUsernameAndValidEmail() throws Exception {
         for(String body:List.of("{\"email\":\"owner@example.test\"}","{\"username\":\"  \",\"email\":\"owner@example.test\"}","{\"username\":\"owner\",\"email\":\"invalid\"}"))
             mvc.perform(post("/api/auth/password-reset/request").contentType("application/json").content(body)).andExpect(status().isBadRequest());
         verifyNoInteractions(users,mail);
     }
-    @Test void requestRateLimitRemainsSeparateAndStopsDbAndMail() throws Exception {
+    @Test void requestRateLimitAppliesBeforeAccountLookupForEveryAccount() throws Exception {
+        // IP·이메일 제한은 계정 조회 전에 걸리므로 일치·불일치·없는 계정 모두 같은 429다.
         when(redis.execute(any(RedisScript.class),anyList(),any(Object[].class))).thenReturn(21L);
-        request("owner","owner@example.test",429,"RATE_LIMITED","요청이 많습니다. 잠시 후 다시 시도해주세요.");
+        for (String username : List.of("owner","missing"))
+            request(username,"owner@example.test",429,"RATE_LIMITED","요청이 많습니다. 잠시 후 다시 시도해주세요.");
         verifyNoInteractions(users,mail);
     }
-    @Test void cooldownDoesNotPretendAnotherCodeWasSent() throws Exception {
+    @Test void cooldownKeepsTheSameResponseWithoutSendingAnotherCode() throws Exception {
         when(values.setIfAbsent(anyString(),anyString(),any(java.time.Duration.class))).thenReturn(false);
-        request("owner","owner@example.test",429,"RATE_LIMITED","요청이 많습니다. 잠시 후 다시 시도해주세요.");
+        sent("owner","owner@example.test");
         verifyNoInteractions(mail);
         verify(values,never()).set(anyString(),anyString(),any(java.time.Duration.class));
     }
-    @Test void dispatchFailureDoesNotReportCodeSent() throws Exception {
+    @Test void dispatchFailureKeepsTheSameResponseAndDropsTheCode() throws Exception {
+        // 발송 대기열이 가득 차도 응답으로 계정 일치를 드러내지 않는다. 발급한 코드는 지운다(로그는 서비스가 남긴다).
         doThrow(new org.springframework.core.task.TaskRejectedException("test queue full")).when(mail).send(anyString(),anyString());
-        request("owner","owner@example.test",503,"MAIL_UNAVAILABLE","메일 발송 요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.");
+        sent("owner","owner@example.test");
+        verify(redis).delete(startsWith("password-reset:"));
+    }
+    @Test void adminRequestStillReportsCooldownAndQueueFailure() {
+        // 관리자 경로는 대상 계정을 이미 확인했으므로 결과를 숨기지 않는다.
+        var service=new PasswordResetService(redis,users,mail,"test-secret-with-at-least-32-characters");
+        User target=users.findByUsername("owner").orElseThrow();
+        service.requestForMember(target,"admin:1");
+        verify(mail).send(eq("owner@example.test"),matches("[0-9]{6}"));
+        when(values.setIfAbsent(anyString(),anyString(),any(java.time.Duration.class))).thenReturn(false);
+        assertEquals(429,assertThrows(ResponseStatusException.class,()->service.requestForMember(target,"admin:1")).getStatusCode().value());
+        when(values.setIfAbsent(anyString(),anyString(),any(java.time.Duration.class))).thenReturn(true);
+        doThrow(new org.springframework.core.task.TaskRejectedException("test queue full")).when(mail).send(anyString(),anyString());
+        assertEquals(503,assertThrows(ResponseStatusException.class,()->service.requestForMember(target,"admin:1")).getStatusCode().value());
         verify(redis).delete(startsWith("password-reset:"));
     }
     @Test void completeRejectsShortPasswordWithoutConsumingToken() throws Exception {
@@ -79,6 +100,9 @@ class PasswordResetRequestTest {
         limited.perform(post("/api/auth/password-reset/request").contentType("application/json").content(huge))
             .andExpect(status().isPayloadTooLarge());
         verifyNoInteractions(users,mail);
+    }
+    void sent(String username,String email) throws Exception {
+        request(username,email,200,"CODE_SENT",PasswordResetController.MESSAGE);
     }
     void request(String username,String email,int expectedStatus,String code,String message) throws Exception {
         mvc.perform(post("/api/auth/password-reset/request").contentType("application/json").content("{\"username\":\""+username+"\",\"email\":\""+email+"\"}"))

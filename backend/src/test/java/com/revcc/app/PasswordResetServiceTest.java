@@ -53,9 +53,9 @@ class PasswordResetServiceTest {
         user.markWithdrawn(java.time.Instant.now());
         assertThrows(ResponseStatusException.class,()->service.reset(token,"new-password","new-password"));
         assertEquals(before,user.getPassword());
-        // 요청은 없는 아이디와 같은 응답이다(쿨다운 60초를 피하려고 새 이메일로 요청한다).
-        var failure=assertThrows(PasswordResetService.RequestFailure.class,()->service.request("tester","other-"+email,"other-"+email));
-        assertEquals("USERNAME_NOT_FOUND",failure.code());
+        // 요청은 없는 아이디와 똑같이 조용히 끝나고(컨트롤러는 같은 CODE_SENT) 메일을 보내지 않는다.
+        assertDoesNotThrow(()->service.request("tester",email,"other-"+email));
+        verify(mail,times(1)).send(eq(email),anyString());
     }
     @Test void failuresLimitedToFiveEvenWithCorrectSixthAttempt() {
         service.request("tester",email,email);
@@ -65,10 +65,14 @@ class PasswordResetServiceTest {
     }
     @Test void requestsAreThrottledAndUnknownAccountsNeverSendMail() {
         service.request("tester",email,email);
-        for(int i=1;i<5;i++) assertEquals(429,assertThrows(ResponseStatusException.class,()->service.request("tester",email,email)).getStatusCode().value());
+        // 60초 쿨다운 안의 재요청은 같은 응답으로 조용히 끝나고 메일을 다시 보내지 않는다.
+        for(int i=1;i<5;i++) assertDoesNotThrow(()->service.request("tester",email,email));
         verify(mail,times(1)).send(eq(email),anyString());
+        // 이메일당 5회/시간 제한은 계정과 관계없이 6번째 요청부터 429다.
         assertEquals(429,assertThrows(ResponseStatusException.class,()->service.request("tester",email,email)).getStatusCode().value());
-        assertEquals(400,assertThrows(ResponseStatusException.class,()->service.request("missing", "missing-"+email,"other-"+email)).getStatusCode().value());
+        assertEquals(429,assertThrows(ResponseStatusException.class,()->service.request("missing",email,"other-"+email)).getStatusCode().value());
+        // 없는 아이디는 같은 응답으로 끝나고 메일을 보내지 않는다.
+        assertDoesNotThrow(()->service.request("missing","missing-"+email,"other-"+email));
         verifyNoMoreInteractions(mail);
     }
     @Test void concurrentVerificationIssuesOnlyOneToken() throws Exception {
