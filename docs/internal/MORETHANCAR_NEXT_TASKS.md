@@ -117,7 +117,7 @@
 [x] NOW-3: 실제 배포 (Cloudflare Named Tunnel + 현재 production compose) — 근거(문서 기록): 2026-10-13 `57d0327`, 2026-10-16 `98eb6ec` EC2 배포, cloudflared 포함 6개 서비스 healthy, morethancar.kr 실접속 200. 배포 후 확인 일부와 이후 커밋 반영 여부는 아래 NOW-3에 남김
 [x] NOW-4: 최소 운영 안정성 (Kakao HttpClient timeout, 최소 health monitoring/알림) — NOW-4-1·NOW-4-2 완료(2026-10-23, 운영 `790654a` + UptimeRobot 감시·이메일 알림 수신 확인)
 [~] MOTORSPORT-IMPORT: 모터스포츠 공식 일정 자동 수집(2026-10-20) — `dcf475d` 운영 배포(V9, 수집 계정 id 4, 출처 비활성). 출처 이용 조건 금지(F1·NASCAR)/불명확(르망·슈퍼레이스·인제)이라 활성화·첫 등록·cron은 사용자 결정 대기. 인제는 운영 EC2에서 접속 불가. WRC 미지원(EC2에서는 200). 실패 메일 알림은 쓰지 않음(관리자 상태·로그만). 2026-10-20에는 EC2에서 smtp.gmail.com:587에 연결되지 않았으나 2026-10-23 재확인에서 EC2·core 컨테이너 모두 587 연결 성공, 같은 날 운영 일반 계정으로 재설정 메일 수신까지 확인(보안 그룹 규칙 자체는 미확인, LATER-2 참고). 상세 docs/MOTORSPORT-IMPORT.md
-[ ] LATER-1: 카카오 회원 탈퇴 최소 구현 (배포 이후 제품 완성도 작업, 구 STEP 10-impl-D 축소)
+[ ] LATER-1: 카카오 회원 탈퇴 최소 구현 (배포 이후 제품 완성도 작업, 구 STEP 10-impl-D 축소) — 2026-10-23 결정·실패 처리 설계 완료, 구현 전(아래 "다음 시작 지점")
 [x] LATER-2: 비밀번호 재설정 응답 통일 (작은 보안 정리, 구 STEP 11 축소) — 2026-10-23 PR #15 운영 배포(`76e8985`), 운영 일반 계정으로 메일 수신·재설정 성공 확인
 [ ] LATER-5: 운영 성능 메모 — SSR 내부 API 호출이 nginx rate limit을 frontend IP 하나로 공유, `/_next/static` no-store (2026-10-06, 실제 429·속도 문제가 보이면 착수)
 [ ] LATER-4: 차량 기록/타임라인 — 자동 연결·사진 기록·기록 보존부터, timeline read API·UI·회고 모션은 마지막 (2026-10-06 계획, 아래 "차량 기록/타임라인" 참고)
@@ -367,6 +367,32 @@
   - 지금은 카카오 계정의 탈퇴 요청을 400 `KAKAO_REAUTH_REQUIRED`로 안전하게 거부하는 상태를 유지한다.
   - 공개 서비스에서는 카카오 회원도 탈퇴할 수 있어야 하므로 제품 완성도 작업으로 남긴다.
   - 구현할 때 기존 STEP 10-impl-D 계획을 기계적으로 따르지 않는다. 카카오 재인증 + unlink + 탈퇴에 필요한 최소 구현만 다시 설계한다(참고: 추가 이슈의 "STEP 10-impl-C → D 전에 알아야 할 것").
+  - **현재 구현 확인(2026-10-23, 코드 변경 없음)**: 카카오 계정 탈퇴는 `WithdrawalService.withdraw`가 회원 행 잠금 직후 400 `KAKAO_REAUTH_REQUIRED`로 거부(데이터 변경 없음), 프론트 `withdraw-dialog.tsx`는 "준비 중" 안내만. unlink 호출 코드는 저장소에 없고 `KakaoOAuthService.exchange`는 access token을 저장하지 않는다(Admin 키도 없음). 이미 있는 것: 탈퇴 트랜잭션·재가입 제한(카카오 id HMAC)·콜백의 탈퇴 카카오 id 409·1회용 state·카카오 HTTP timeout(연결 3초·요청 5초).
+  - **쿠키 확인(2026-10-23)**:
+    - 운영 응답에서 확인: state 쿠키 `REVCC_OAUTH_STATE` 생성(`/api/auth/kakao/login`)·삭제(잘못된 state 콜백 400) 모두 `Path=/api/auth/kakao; Secure; HttpOnly; SameSite=Lax`, Domain 없음, Max-Age 300/0 — 생성·삭제 Path/Domain 일치. 세션 쿠키 `REVCC_SESSION` 삭제(로그아웃) `Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`, Domain 없음. 인가 URL에 `prompt` 없음.
+    - 로컬에서만 확인(운영 계정 없이 볼 수 없음): 로그인 시 `REVCC_SESSION` 생성 `Path=/; Max-Age=1800; HttpOnly; SameSite=Lax`(로컬은 Secure 없음, 운영은 `application-prod.yml`에서 secure 고정), 로그아웃 시 Redis 키 삭제·옛 쿠키로 `/me` 401.
+    - 코드 확인: 세션 Redis TTL은 로그인부터 30분 고정(`/me` 호출로 연장되지 않음, 로컬 TTL 1800→1797 확인). 카카오 콜백은 GET 최상위 이동이라 SameSite=Lax 세션 쿠키(Path=/)가 함께 전송되는 구조(실계정 왕복으로는 미확인). 일반 로그인은 이전 세션을 revoke하지만 카카오 콜백은 하지 않는다. `kakaoCallback`에 메서드 전체 `@Transactional`이 붙어 카카오 HTTP 동안 DB 커넥션을 쥘 수 있다. state는 Redis 값 `"1"`뿐이라 용도·회원 구분이 없다(`verify()`가 getAndDelete 값을 돌려주게 바꾸면 구분 가능).
+  - **결정(2026-10-23, 사용자)**:
+    1. unlink 실패 시 사이트 탈퇴도 중단하고 재시도 안내(구 D-1 기본안).
+    2. 쿠키 속성은 현재 그대로 유지.
+    3. 탈퇴용 state에 용도·회원·시작 세션을 연결하고 5분·1회용 유지.
+    4. 콜백에서 세션 유효성, state 연결 정보, 카카오 id 일치를 모두 확인한 뒤 처리.
+    5. 세션 만료 시 아무 계정도 변경하지 말고 다시 로그인하도록 안내.
+    6. 카카오 로그인도 새 세션 발급 시 이전 세션을 무효화(일반 로그인과 동일).
+  - **실패 처리 설계(2026-10-23 보고, 사용자 승인 전)**:
+    - 순서: 0) `GET /api/auth/kakao/withdraw`(로그인 필수·카카오 계정만) → state Redis 값 `withdraw:<회원id>:<세션버전>:<세션 토큰 해시>`(5분·1회용), 인가 URL에 `prompt=login` → 1) 콜백에서 state getAndDelete·용도 확인(로그인용 state로는 탈퇴 분기 불가) → 2) 세션 쿠키 유효·회원 id·세션 버전·토큰 해시 일치(실패 시 카카오 호출 전 중단, `/login?next=/home` 안내) → 3) 읽기 전용 사전 검사(비밀값 설정·미탈퇴·운영자 아님·예약중 매물 0, 실패 시 unlink 전 중단) → 4) 토큰 교환·사용자 조회, 카카오 id == 회원 kakao_id → 5) unlink(Bearer 사용자 토큰, 실패 시 중단·재시도 안내) → 6) 짧은 탈퇴 트랜잭션(회원 행 FOR UPDATE 후 전 조건 재검사, 기존 탈퇴 처리) → 7) 커밋 후 세션 revoke·쿠키 삭제·`/?withdrawn=1`.
+    - DB 잠금: 카카오 HTTP(교환·조회·unlink, 최악 약 24초) 동안 트랜잭션·잠금·커넥션을 쥐지 않는다. 컨트롤러 `@Transactional`을 빼고 DB 작업만 서비스 트랜잭션 메서드로 옮긴다(카카오 로그인의 회원 찾기/생성, `withdrawKakao`). 로그인 흐름의 커넥션 점유도 같이 해소된다.
+    - unlink 성공 후 DB 실패(3~5단계 사이 상태 변경, 세션 버전 변경, DB 503, unlink 응답 timeout인데 실제 처리됨): 사이트 계정은 그대로(롤백), 카카오 앱 연결만 끊김 — 데이터 손상·접속 불가 없음(다음 카카오 로그인 시 동의 후 재연결). 사용자에게 "카카오 연결은 해제됐지만 탈퇴는 완료되지 않았습니다. (사유) 해결 후 다시 시도" 안내. 재시도는 같은 전체 흐름(재인증 = 재동의·재연결 → 다시 unlink → 탈퇴)이라 저장 상태·Admin 키·토큰 저장 불필요. 운영 가시성: WARN 로그 `Kakao unlinked but withdrawal not completed: user=<id> reason=<code>`(토큰·카카오 id 원문 없음).
+    - 반대 순서(DB 먼저)를 쓰지 않는 이유: 커밋 후 unlink 실패 시 kakao_id·세션이 사라져 Admin 키 없이 다시 끊을 방법이 없다.
+    - 중복·경쟁: 같은 콜백 재요청은 1회용 state로 400(외부 호출·DB 변경 없음). 다른 회원·다른 세션은 state 연결 정보 불일치로 중단. 두 탭 동시 탈퇴는 먼저 unlink한 쪽이 토큰을 폐기해 다른 쪽 unlink 실패, 둘 다 6단계에 와도 회원 행 잠금 + 세션 버전으로 한 번만 탈퇴. "회원당 최신 state 하나만 유효" 보호는 불필요로 판단(넣지 않는 안 권장).
+  - **남은 설계 쟁점(다음에 결정)**:
+    - 재시도 시 카카오 동의 화면이 한 번 더 나오는 것을 받아들일지
+    - unlink 후 탈퇴 미완료를 관리자 회원 처리 기록(`KAKAO_UNLINK_WITHDRAW_INCOMPLETE`, 실패 무시)에도 남길지, WARN 로그만 둘지
+  - **구현 전 확인할 것**:
+    - unlink 후 재연결 시 같은 카카오 회원번호가 오는지(재시도 시 id 일치 검사와 탈퇴 후 재가입 제한이 이 전제에 기댐) — 카카오 개발자 문서 또는 테스트 계정으로 확인, 아직 미확인
+    - unlink 실패 응답 형식(허용된 오류 코드만 로그에 남기는 기존 `oauthFailure` 방식 적용)
+    - 실계정 대신 시험할 방법: 카카오 테스트 계정, 카카오 콘솔의 로컬 Redirect URI(`http://localhost:8090/api/auth/kakao/callback`) 등록 여부(미확인)
+  - **다음 시작 지점**: 위 "남은 설계 쟁점" 두 가지 결정 → "구현 전 확인할 것" 확인 → 새 브랜치(예: `feat/kakao-withdraw`)에서 구현: `KakaoStateService`(용도·연결 정보 저장, verify가 값 반환) → `KakaoOAuthService`(prompt=login 인가 URL, 탈퇴용 교환+조회+unlink, 토큰 비노출) → `AuthController`(시작 경로, 콜백 분기, 컨트롤러 `@Transactional` 제거, 카카오 로그인 이전 세션 revoke) → `WithdrawalService`(읽기 전용 사전 검사, `withdrawKakao`) → `withdraw-dialog.tsx`(재인증 버튼, 결과·실패 안내) → 테스트(state 용도 불일치·재사용·만료, 세션 없음·불일치, 카카오 id 불일치, unlink 실패 시 무변경, unlink 성공 후 DB 거절 시 롤백·로그, 동시 요청, 로그인 회귀·세션 회전) → `docs/member-withdrawal.md` 갱신. 운영 배포·실계정 탈퇴는 별도 승인 후.
 - **LATER-2 비밀번호 재설정 계정 열거**
   - 응답 통일 같은 작은 수정으로 끝나면 작은 보안 정리로 처리한다. 별도의 큰 설계·테스트가 필요하면 보류한다.
   - **[x] 2026-10-23 코드 완료·운영 배포(PR #15 `76e8985`)·운영 메일 수신 확인**: 결정 — 형식이 올바른 요청은 없는 아이디·이메일 불일치·카카오 계정·60초 쿨다운·대기열 실패와 관계없이 200 `CODE_SENT`, 카카오 안내 메일 없음, 형식 검증(400)·IP/이메일 제한(429)·nginx 제한은 유지(계정 조회 전 적용이라 계정과 무관). 쿨다운은 일치 계정에만(오타 정정 요청이 버려지지 않게). 관리자 재설정은 `requestForMember`로 분리해 쿨다운 429·대기열 503을 그대로 알린다. 화면 문구 "입력한 정보가 일치하면 인증번호가 발송됩니다. 메일이 오지 않으면 입력 정보와 스팸함을 확인해 주세요. 카카오 가입 회원은 카카오 로그인을 이용해 주세요." 응답 시간: 로컬 core 직접 측정 중앙값 일치 3.1~3.5ms vs 그 외 2.4~2.8ms(Redis 2회 등 동기 처리 차이), 제한으로 표본이 막혀 더미 쓰기로 맞추지 않음. 비동기 발송 실패는 `ResetMailService` WARN(`category=SMTP_CONNECTION_FAILED` 등, 수신자·코드 없음)으로 확인(로컬). 검증: `mvn test` 140/0 fail/0 skip(격리 PG16·Redis 통합 포함), `tsc --noEmit`. 상세 `docs/member-management-password-reset.md` "계정 확인 UX 응답"
