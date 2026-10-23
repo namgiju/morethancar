@@ -115,7 +115,7 @@
 [x] NOW-1: UI/UX 개선 및 Next.js 전환 — 메인대문/커뮤니티/내차고/인증/장터/관리자 포팅 전부 완료(2026-10-06). 로고 교체(morethancarLogo.png) + 공용 헤더 레이아웃(로고 확대·좌측 고정, 검색 확대·중앙, nav·로그인 우측 고정) + `/` 페이지 누락된 SiteFooter 추가까지 이어서 완료.
 [x] NOW-2: 실제 운영 배포 준비 (production secret/env, Compose 실행 조건, 오래된 인스턴스 정리) — 근거(문서 기록): 2026-10-13 EC2에서 prod 오버레이로 기동 성공(필수 env가 없으면 기동 거부), 배포 전 Neon Flyway V7 확인 + pg_dump 백업·복원 검증. 기록 없는 NOW-2-3의 2번(카카오 콘솔 운영 설정)은 아래 NOW-2-3에 남김
 [x] NOW-3: 실제 배포 (Cloudflare Named Tunnel + 현재 production compose) — 근거(문서 기록): 2026-10-13 `57d0327`, 2026-10-16 `98eb6ec` EC2 배포, cloudflared 포함 6개 서비스 healthy, morethancar.kr 실접속 200. 배포 후 확인 일부와 이후 커밋 반영 여부는 아래 NOW-3에 남김
-[~] NOW-4: 최소 운영 안정성 (Kakao HttpClient timeout, 최소 health monitoring/알림) — NOW-4-1 완료, NOW-4-2 코드 완료·배포와 외부 감시 등록 대기
+[~] NOW-4: 최소 운영 안정성 (Kakao HttpClient timeout, 최소 health monitoring/알림) — NOW-4-1 완료, NOW-4-2 운영 배포 완료(2026-10-23 `790654a`)·외부 감시 등록과 알림 수신 검증 대기
 [~] MOTORSPORT-IMPORT: 모터스포츠 공식 일정 자동 수집(2026-10-20) — `dcf475d` 운영 배포(V9, 수집 계정 id 4, 출처 비활성). 출처 이용 조건 금지(F1·NASCAR)/불명확(르망·슈퍼레이스·인제)이라 활성화·첫 등록·cron은 사용자 결정 대기. 인제는 운영 EC2에서 접속 불가. WRC 미지원(EC2에서는 200). 실패 메일 알림은 쓰지 않음(관리자 상태·로그만). EC2 아웃바운드가 443만 허용돼 비밀번호 재설정 메일(587) 발송 불가 → 보안 그룹 아웃바운드 TCP 587 추가 필요(별도 작업). 상세 docs/MOTORSPORT-IMPORT.md
 [ ] LATER-1: 카카오 회원 탈퇴 최소 구현 (배포 이후 제품 완성도 작업, 구 STEP 10-impl-D 축소)
 [ ] LATER-2: 비밀번호 재설정 응답 통일 (작은 보안 정리, 구 STEP 11 축소)
@@ -354,7 +354,15 @@
 - **NOW-4 최소 운영 안정성**
   - **[x] NOW-4-1 Kakao HttpClient timeout (2026-10-07, d98b2f1)**: `KakaoOAuthService`의 `HttpClient`에 연결 timeout 3초, 토큰·프로필 요청마다 요청 timeout 5초를 넣었다(최악 약 16초 후 실패). timeout 예외는 `AuthController` 카카오 콜백의 기존 `catch (Exception)` 실패 경로로 그대로 처리된다. 검증: Maven 컨테이너에서 컴파일 + `KakaoOAuthServiceTest` 통과(카카오 URL이 하드코딩이라 실제 timeout 발생은 재현하지 않음 — JDK 표준 동작). NOW-2/NOW-3보다 먼저 했지만 독립 작업이라 순서 영향 없음.
   - 서비스 다운을 알 수 있는 최소 health monitoring·알림(예: 외부 uptime 체크 하나)을 둔다. 장애 대응에 실제로 필요한 최소 수준만 한다.
-  - **[~] NOW-4-2 외부 감시용 health (2026-10-23, `feat/health-monitoring`)**: 코드 완료·운영 미배포. core `GET /api/health`(DB 연결 `isValid`), board `/health`에 별칭 `/api/board/health`를 붙여 nginx 기존 `/api/board` 경로로 노출(nginx 설정 변경 없음). 둘 다 3초 timeout, 정상 200 `{"status":"ok"}` / 장애 503 `{"status":"unavailable"}`, 원인은 로그에만. 로컬 Compose에서 DB·Redis·core/board 중지 시 감지 확인. 남은 일: 운영 배포, 외부 감시 서비스 등록·알림 확인(사용자). 상세 `docs/MONITORING.md`
+  - **[~] NOW-4-2 외부 감시용 health (2026-10-23, PR #12 `790654a`)**: 운영 배포 완료, 외부 감시 등록·알림 수신 검증 대기. core `GET /api/health`(DB 연결 `isValid`), board `/health`에 별칭 `/api/board/health`를 붙여 nginx 기존 `/api/board` 경로로 노출(nginx 설정 변경 없음). 둘 다 3초 timeout, 정상 200 `{"status":"ok"}` / 장애 503 `{"status":"unavailable"}`, 원인은 로그에만. 로컬 Compose에서 DB·Redis·core/board 중지 시 감지 확인. 상세 `docs/MONITORING.md`
+    - **운영 배포(2026-10-23)**: 운영 EC2 `18820ce`(PR #10) → `790654a`(PR #11 문서 정리 + PR #12). 반영 코드는 core·board뿐이고 Flyway 마이그레이션이 없어 DB 백업은 생략했다. `config --services`로 postgres 제외·cloudflared 포함·`SPRING_PROFILES_ACTIVE=prod` 확인 → `git pull --ff-only` → prod 오버레이 `up -d --build --wait` 성공, 6개 서비스 healthy, 배포 직후 3분간 core·board 로그에 오류·health 실패 없음. 서버의 git 미추적 파일(`.env`, `.env.backup.*`, `backups/`)은 그대로 보존했다. 운영 DB·컨테이너를 일부러 중지하는 장애 시험은 하지 않았다(장애 감지는 로컬 Compose 검증으로 갈음).
+    - **배포 후 확인(2026-10-23, `https://morethancar.kr`)**: `/` → 200(메인 페이지), `/api/health` → 200 `{"status":"ok"}`, `/api/board/health` → 200 `{"status":"ok"}`. health 응답은 `cache-control: no-store`, `cf-cache-status: DYNAMIC`(Cloudflare가 캐시하지 않음).
+    - **되돌리기(확인만, 미실행)**: 운영 저장소에서 `git checkout 18820ce` 후 prod 오버레이 `up -d --build --wait`. 마이그레이션이 없어 DB는 되돌릴 필요 없다.
+    - 남은 일(사용자):
+      - [ ] 외부 감시 서비스에 `https://morethancar.kr/api/health`·`https://morethancar.kr/api/board/health`(기대 200) 등록, 메인 `/`도 함께 등록 권장
+      - [ ] 감시 요청이 Cloudflare Bot Fight Mode·WAF에 막히지 않는지(모니터가 Up인지) 확인
+      - [ ] 장애(down) 알림 수신 검증 — 테스트 알림 또는 존재하지 않는 경로의 임시 모니터로 확인, 운영 서비스를 멈추지 않는다
+      - [ ] 복구(up) 알림 수신 검증
 - **LATER-1 카카오 회원 탈퇴** (NOW 작업과 배포 이후)
   - 지금은 카카오 계정의 탈퇴 요청을 400 `KAKAO_REAUTH_REQUIRED`로 안전하게 거부하는 상태를 유지한다.
   - 공개 서비스에서는 카카오 회원도 탈퇴할 수 있어야 하므로 제품 완성도 작업으로 남긴다.
