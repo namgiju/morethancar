@@ -36,7 +36,9 @@
 
 ## 외부 감시 등록
 
-UptimeRobot, Better Stack 같은 무료 HTTP 감시 서비스 하나에 모니터 두 개를 만든다.
+현재 운영 설정(2026-10-23): **UptimeRobot** 무료 플랜(운영자 GitHub 계정으로 로그인)에 아래 두 모니터와 메인 페이지(`https://morethancar.kr/`)를
+등록했다. 5분 주기, 알림은 계정 이메일로 장애(down)·복구(up) 모두 받는다. 무료 플랜은 상태 코드를 고를 수 없고 2xx·3xx를 정상으로 본다
+(세 URL 모두 리다이렉트 없이 200을 낸다). 다른 서비스로 옮길 때도 아래 값을 그대로 쓴다.
 
 | 모니터 | URL | 기대 상태 | 메서드 |
 |---|---|---|---|
@@ -60,9 +62,10 @@ UptimeRobot, Better Stack 같은 무료 HTTP 감시 서비스 하나에 모니�
 1. 두 모니터가 Up으로 바뀌는지 본다.
 2. Cloudflare가 감시 서비스 요청을 막지 않는지 본다. Bot Fight Mode나 WAF 규칙이 challenge(403)를 내면 장애로 오인된다.
    그러면 Cloudflare Security Events에서 막힌 요청을 확인하고, 두 health 경로를 예외로 둔다.
-3. 알림이 실제로 오는지 한 번 확인한다. 감시 서비스의 테스트 알림 기능을 쓰거나, 존재하지 않는 경로
-   (예: `https://morethancar.kr/api/health-test-404`)로 임시 모니터를 만들어 down 알림을 받은 뒤 지운다.
-   운영 서비스를 일부러 멈춰서 시험하지 않는다.
+3. 알림이 실제로 오는지 한 번 확인한다. 존재하지 않는 경로(예: `https://morethancar.kr/api/health-alert-test`, 404)로
+   임시 모니터를 만들어 down 알림을 받고, 그 모니터의 URL을 200을 내는 주소로 바꿔 up 알림을 받은 뒤 지운다.
+   UptimeRobot은 이미 등록된 URL과 같은 주소로는 저장하지 않으므로 `https://morethancar.kr/api/health?alert-test=1`처럼
+   쿼리 문자열을 붙인다. 운영 서비스를 일부러 멈춰서 시험하지 않는다.
 
 ## 알림을 받았을 때
 
