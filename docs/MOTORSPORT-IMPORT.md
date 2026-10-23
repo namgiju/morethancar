@@ -107,5 +107,6 @@ V9는 기존 행을 바꾸지 않는다. 수집으로 들어온 일정만 지우
 - (2026-10-20 기록) 당시 EC2에서 smtp.gmail.com:587에 연결되지 않아 아웃바운드가 443만 허용된 것으로 보고, core의 비밀번호 재설정
   메일도 발송되지 않는다고 기록했다. 운영 SMTP 설정은 587 + STARTTLS(필수) + 인증이다.
 - (2026-10-23 재확인) EC2 호스트와 core 컨테이너 모두 smtp.gmail.com:587 TCP 연결에 성공했다(호스트에서 `220 smtp.gmail.com ESMTP`
-  응답 수신). 같은 확인에서 465·25와 포트 80은 연결되지 않았고 www.google.com:443은 연결됐다. 보안 그룹 규칙 자체는 보지 않았고
-  (AWS CLI·콘솔 미사용), 실제 메일 발송 성공도 아직 확인하지 않았다. 상세는 `docs/internal/MORETHANCAR_NEXT_TASKS.md` LATER-2.
+  응답 수신). 같은 확인에서 465·25와 포트 80은 연결되지 않았고 www.google.com:443은 연결됐다. 같은 날 운영 일반 계정으로 비밀번호
+  재설정 메일 수신·재설정까지 성공했고 core 로그에 발송 실패가 없었다. 보안 그룹 규칙 자체는 보지 않았다(AWS CLI·콘솔 미사용).
+  상세는 `docs/internal/MORETHANCAR_NEXT_TASKS.md` LATER-2.
