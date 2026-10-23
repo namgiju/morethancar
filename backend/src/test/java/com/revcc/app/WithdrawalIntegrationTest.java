@@ -163,8 +163,9 @@ class WithdrawalIntegrationTest {
         String hashAfter=(String)userRow(w).get("password");
         assertThrows(ResponseStatusException.class,()->resets.reset(resetToken,"new-password-1","new-password-1"));
         assertEquals(hashAfter,userRow(w).get("password"));
-        var notFound=assertThrows(PasswordResetService.RequestFailure.class,()->resets.request(oldName,"x-"+email,"withdraw-test-2"));
-        assertEquals("USERNAME_NOT_FOUND",notFound.code());
+        // 옛 아이디 요청은 없는 아이디와 같은 응답(예외 없음)이고 메일을 보내지 않는다.
+        assertDoesNotThrow(()->resets.request(oldName,email,"withdraw-test-2"));
+        verify(mail,times(1)).send(anyString(),anyString());
 
         // 게시글·댓글·신고·운영 기록 유지.
         assertEquals(2,count("SELECT count(*)::int FROM board_posts WHERE author_id=?",id));

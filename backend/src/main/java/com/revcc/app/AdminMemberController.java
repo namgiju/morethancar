@@ -192,9 +192,9 @@ public class AdminMemberController {
         User actor=admin(token), target=user(id);
         if (target.isWithdrawn()) throw new ResponseStatusException(HttpStatus.CONFLICT,"탈퇴한 회원입니다.");
         if (target.getEmail()==null || target.getKakaoId()!=null) throw new ResponseStatusException(HttpStatus.CONFLICT,"이메일이 등록된 일반 계정만 재설정할 수 있습니다.");
-        resets.request(target.getUsername(),target.getEmail(),"admin:"+actor.getId());
+        resets.requestForMember(target,"admin:"+actor.getId());
         logs.save(new AdminMemberAction(actor.getId(),id,"PASSWORD_RESET_REQUEST"));
-        return PasswordResetController.message();
+        return Map.of("code","CODE_SENT","message","인증번호를 발송했습니다.");
     }
     @GetMapping("/{id}/actions") public List<Map<String,Object>> actions(@PathVariable Long id,
             @CookieValue(name=SharedSessionService.COOKIE,required=false) String token) {

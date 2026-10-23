@@ -118,7 +118,7 @@
 [x] NOW-4: 최소 운영 안정성 (Kakao HttpClient timeout, 최소 health monitoring/알림) — NOW-4-1·NOW-4-2 완료(2026-10-23, 운영 `790654a` + UptimeRobot 감시·이메일 알림 수신 확인)
 [~] MOTORSPORT-IMPORT: 모터스포츠 공식 일정 자동 수집(2026-10-20) — `dcf475d` 운영 배포(V9, 수집 계정 id 4, 출처 비활성). 출처 이용 조건 금지(F1·NASCAR)/불명확(르망·슈퍼레이스·인제)이라 활성화·첫 등록·cron은 사용자 결정 대기. 인제는 운영 EC2에서 접속 불가. WRC 미지원(EC2에서는 200). 실패 메일 알림은 쓰지 않음(관리자 상태·로그만). EC2 아웃바운드가 443만 허용돼 비밀번호 재설정 메일(587) 발송 불가 → 보안 그룹 아웃바운드 TCP 587 추가 필요(별도 작업). 상세 docs/MOTORSPORT-IMPORT.md
 [ ] LATER-1: 카카오 회원 탈퇴 최소 구현 (배포 이후 제품 완성도 작업, 구 STEP 10-impl-D 축소)
-[ ] LATER-2: 비밀번호 재설정 응답 통일 (작은 보안 정리, 구 STEP 11 축소)
+[~] LATER-2: 비밀번호 재설정 응답 통일 (작은 보안 정리, 구 STEP 11 축소) — 2026-10-23 코드 완료(`fix/password-reset-uniform-response`), 운영 미배포. 메일 발송 복구·실제 수신 확인은 별도 미완료
 [ ] LATER-5: 운영 성능 메모 — SSR 내부 API 호출이 nginx rate limit을 frontend IP 하나로 공유, `/_next/static` no-store (2026-10-06, 실제 429·속도 문제가 보이면 착수)
 [ ] LATER-4: 차량 기록/타임라인 — 자동 연결·사진 기록·기록 보존부터, timeline read API·UI·회고 모션은 마지막 (2026-10-06 계획, 아래 "차량 기록/타임라인" 참고)
 ```
@@ -369,7 +369,12 @@
   - 구현할 때 기존 STEP 10-impl-D 계획을 기계적으로 따르지 않는다. 카카오 재인증 + unlink + 탈퇴에 필요한 최소 구현만 다시 설계한다(참고: 추가 이슈의 "STEP 10-impl-C → D 전에 알아야 할 것").
 - **LATER-2 비밀번호 재설정 계정 열거**
   - 응답 통일 같은 작은 수정으로 끝나면 작은 보안 정리로 처리한다. 별도의 큰 설계·테스트가 필요하면 보류한다.
-- **LATER-3 `MAIL_UNAVAILABLE`이 사실상 도달 불가능한 경로로 보임** (STEP 4-3 `/password-reset` 포팅 검증 중 발견, 2026-10-06)
+  - **[~] 2026-10-23 코드 완료, 운영 미배포**: 결정 — 형식이 올바른 요청은 없는 아이디·이메일 불일치·카카오 계정·60초 쿨다운·대기열 실패와 관계없이 200 `CODE_SENT`, 카카오 안내 메일 없음, 형식 검증(400)·IP/이메일 제한(429)·nginx 제한은 유지(계정 조회 전 적용이라 계정과 무관). 쿨다운은 일치 계정에만(오타 정정 요청이 버려지지 않게). 관리자 재설정은 `requestForMember`로 분리해 쿨다운 429·대기열 503을 그대로 알린다. 화면 문구 "입력한 정보가 일치하면 인증번호가 발송됩니다. 메일이 오지 않으면 입력 정보와 스팸함을 확인해 주세요. 카카오 가입 회원은 카카오 로그인을 이용해 주세요." 응답 시간: 로컬 core 직접 측정 중앙값 일치 3.1~3.5ms vs 그 외 2.4~2.8ms(Redis 2회 등 동기 처리 차이), 제한으로 표본이 막혀 더미 쓰기로 맞추지 않음. 비동기 발송 실패는 `ResetMailService` WARN(`category=SMTP_CONNECTION_FAILED` 등, 수신자·코드 없음)으로 확인(로컬). 검증: `mvn test` 140/0 fail/0 skip(격리 PG16·Redis 통합 포함), `tsc --noEmit`. 상세 `docs/member-management-password-reset.md` "계정 확인 UX 응답"
+  - 남은 일:
+    - [ ] 운영 배포(core·frontend)
+    - [ ] 메일 발송 복구 — 운영 EC2 아웃바운드 587이 막혀 재설정 메일이 나가지 않는다(보안 그룹 변경, MOTORSPORT-IMPORT 항목의 별도 작업)
+    - [ ] 복구 후 실제 수신 확인(일치 계정 수신, 불일치·카카오 계정 미수신, 스팸함 여부)
+- **LATER-3 `MAIL_UNAVAILABLE`이 사실상 도달 불가능한 경로로 보임** — 2026-10-23 LATER-2에서 `MAIL_UNAVAILABLE` 응답 자체를 없앴다(대기열 등록 실패만 동기로 잡혔고 이제 로그만 남긴다). SMTP 실패는 원래대로 `ResetMailService` 로그로만 보인다. (STEP 4-3 `/password-reset` 포팅 검증 중 발견, 2026-10-06)
   - 원인: `ResetMailService.send()`가 `@Async`라 `PasswordResetService.request()`의 `try { mail.send(...) } catch (RuntimeException e) { ... MAIL_UNAVAILABLE ... }`는 비동기 메서드 호출이 즉시 반환된 뒤의 코드라, 실제 메일 발송 실패 예외가 이 catch로 동기 전파되지 않는다(발송 실패는 `ResetMailService` 내부에서 로그만 남기고 삼켜진다). 즉 메일 발송이 실패해도 `request()`는 그대로 `CODE_SENT` 성공을 반환할 가능성이 높다.
   - 프론트(legacy `password-reset.js`, Next `password-reset-form.tsx` 모두)는 `MAIL_UNAVAILABLE` 코드를 받으면 서버 메시지를 그대로 보여주도록 되어 있으나, 이 경로가 실제로 호출되는지는 이번 세션에서 확인하지 못했다.
   - 백엔드 비동기 예외 전파 구조를 손대는 일이라 이번 인증 Next.js 포팅 범위에서는 수정하지 않는다. 실제로 메일 발송 실패가 반복되는 운영 이슈가 확인되면 그때 원인 분석·수정을 진행한다.
