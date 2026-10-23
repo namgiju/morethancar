@@ -82,5 +82,6 @@ docker compose up -d --build --wait
 |---|---|
 | 개발 환경 설정 및 테스트 | [개발 환경 가이드](docs/DEVELOPMENT.md) |
 | 운영 배포 | [운영 배포 가이드](docs/DEPLOYMENT.md) |
+| 서비스 감시 | [health check·외부 감시 가이드](docs/MONITORING.md) |
 | 모터스포츠 일정 수집 | [일정 수집 가이드](docs/MOTORSPORT-IMPORT.md) |
 | DB 스키마 변경 관리 | [DB 마이그레이션 가이드](docs/DATABASE-MIGRATIONS.md) |

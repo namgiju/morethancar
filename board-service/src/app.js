@@ -33,7 +33,7 @@ const parts = [
   { id: 2, name: "BMW 320i 전용 에어 필터 (예시)", vehicleIds: [2] },
 ];
 
-export function createApp({ db, redis }) {
+export function createApp({ db, redis, healthTimeoutMs = 3_000 }) {
   const app = express();
   app.disable("x-powered-by");
   // nginx(단일 hop) 뒤에서 실행되므로 X-Forwarded-For의 클라이언트 IP를 req.ip로 신뢰한다.
@@ -44,10 +44,26 @@ export function createApp({ db, redis }) {
     res.set("Cache-Control", "no-store");
     next();
   });
-  app.get("/health", async (req, res) => {
-    await db.query("SELECT 1");
-    await redis.ping();
-    res.json({ status: "ok" });
+  // DB(SELECT 1)와 Redis(PING)를 확인한다. /health는 Compose healthcheck용(컨테이너 안),
+  // /api/board/health는 nginx의 /api/board 경로를 거쳐 외부 uptime 감시가 부른다.
+  // Redis가 끊기면 명령이 재연결까지 대기열에서 기다리고 DB는 연결 대기 5초·쿼리 15초까지 걸리므로,
+  // 전체를 healthTimeoutMs로 끊어 503을 낸다. 실패 원인은 로그에만 남기고 응답에는 싣지 않는다.
+  app.get(["/health", "/api/board/health"], async (req, res) => {
+    let timer;
+    try {
+      await Promise.race([
+        Promise.all([db.query("SELECT 1"), redis.ping()]),
+        new Promise((resolve, reject) => {
+          timer = setTimeout(() => reject(new Error("health check timed out")), healthTimeoutMs);
+        }),
+      ]);
+      res.json({ status: "ok" });
+    } catch (err) {
+      console.error("Health check failed:", err.message);
+      res.status(503).json({ status: "unavailable" });
+    } finally {
+      clearTimeout(timer);
+    }
   });
   app.use(["/api/board", "/api/parts"], async (req, res, next) => {
     req.user = await sessionUser(redis, req.headers.cookie);
