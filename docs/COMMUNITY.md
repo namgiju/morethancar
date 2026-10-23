@@ -71,8 +71,8 @@ scripts/run-board-system.sh scripts/community-system.mjs
 스키마를 삭제합니다. 운영 게시판에 테스트 글을 남기지 않습니다. 인증은 이 검사에서
 두 명의 테스트 세션을 주입하며, 실제 로그인·쿠키와 화면 연결은 별도 브라우저 검사로 확인했습니다.
 
-기존 `assignment-smoke.py`, `assignment-system.py`는 여전히 테스트 글을 남기는 기존
-과제 시연용 검사입니다. 일반 기능 검증에는 위 `community-system.mjs`를 사용합니다.
+`scripts/assignment-smoke.py`, `scripts/assignment-system.py`는 실행 중인 Docker 스택에 테스트 글을 남기는
+검사입니다. 일반 기능 검증에는 위 `community-system.mjs`를 사용합니다.
 
 ## 기존 테스트 글 정리
 

@@ -1,5 +1,7 @@
 # REV.CC 배포 전 전체 점검 보고서 (진행 중)
 
+> 2026-10-23 공개용 정리: 운영 서버 IP·보안 그룹·SSH 키 경로·백업 경로는 `<…>` 자리표시자로 바꿨다. "당시 Docker 실행 문서"는 삭제한 `docs/DOCKER-SUBMISSION.md`를 가리킨다. 운영 내용은 [DEPLOYMENT.md](../DEPLOYMENT.md), 로컬 개발 내용은 [DEVELOPMENT.md](../DEVELOPMENT.md)로 옮겼다.
+
 > 이 문서는 분석 진행 상황을 기록하는 작업 파일입니다. 세션이 중단되어도 이 파일을 먼저 읽고,
 > [완료] 항목은 재분석하지 않고, [진행중]부터 이어서 진행합니다.
 > 브랜치: `docker-assignment` / 코드 수정 없음, 분석 전용.
@@ -35,7 +37,7 @@
 ### 1. 프로젝트 구조 파악 — [완료]
 
 **컨테이너 구성 (docker-compose.yml, 6개)**: `proxy`(nginx, 유일하게 호스트 노출 `${REVCC_PORT:-8090}:80`) → `frontend`(assignment-frontend, nginx 정적서빙) / `core`(Spring Boot, 8080) / `board`(Node/Express, 3001) / `redis` / `postgres`(실제로는 앱이 Neon 원격 Postgres를 바라봄 — 로컬 postgres 컨테이너는 기본값 크리덴셜로 떠 있으나 앱 트래픽과 무관, §4 참고). 전부 `revcc-network` 단일 브리지 네트워크(계층 분리 없음).
-- 별도로 `frontend/`(Next.js, "My Garage" 프로토타입)가 존재하나 **기본 배포 스택에 포함되지 않음** — `docker-compose.garage.yml`이라는 선택적 오버레이로만 연결되고, `:3000`으로 nginx 우회 직접 노출됨. 과제 제출 범위(6-container)에는 포함되지 않는 별도 실험 기능.
+- 별도로 `frontend/`(Next.js, "My Garage" 프로토타입)가 존재하나 **기본 배포 스택에 포함되지 않음** — `docker-compose.garage.yml`이라는 선택적 오버레이로만 연결되고, `:3000`으로 nginx 우회 직접 노출됨. 기본 6-container 구성에는 포함되지 않는 별도 실험 기능.
 
 **요청 흐름**: 브라우저 → nginx(`:8090`) → `location /` → `frontend`(정적 HTML/JS) / `location ~ ^/api/(board|parts)` → `board:3001` / `location /api/` → `core:8080`. nginx가 `X-Real-IP`/`X-Forwarded-For`를 `$remote_addr` 기준으로 직접 설정(스푸핑 불가, nginx가 실제 최외곽 홉).
 
@@ -45,7 +47,7 @@
 
 **Redis 용도**: 세션 저장이 유일한 용도(캐싱/카운터 용도 없음). TTL 30분 고정(생성 시점 기준, sliding 아님). 인증 없이 접근 가능(무인증) — 네트워크 미노출로만 완화.
 
-**개발/운영 환경 차이**: `docker-compose.dev.yml`(로컬 DB/Redis 포트를 127.0.0.1에 한정 노출, 명시적 `-f` 필요), `docker-compose.override.yml`(assignment-frontend 소스 바인드마운트, **플래그 없이 자동 적용**됨), `docker-compose.prod.yml`(POSTGRES_PASSWORD 필수화, Spring `prod` 프로파일 활성화 → 세션 쿠키 Secure 강제). **다만 실제 문서(`docs/DOCKER-SUBMISSION.md`, `README.md`)는 prod.yml 사용법을 전혀 언급하지 않아, 문서대로 실행하면 하드닝이 적용되지 않는 override 경로로 흘러감** (§5 상세).
+**개발/운영 환경 차이**: `docker-compose.dev.yml`(로컬 DB/Redis 포트를 127.0.0.1에 한정 노출, 명시적 `-f` 필요), `docker-compose.override.yml`(assignment-frontend 소스 바인드마운트, **플래그 없이 자동 적용**됨), `docker-compose.prod.yml`(POSTGRES_PASSWORD 필수화, Spring `prod` 프로파일 활성화 → 세션 쿠키 Secure 강제). **다만 실제 문서(당시 Docker 실행 문서, `README.md`)는 prod.yml 사용법을 전혀 언급하지 않아, 문서대로 실행하면 하드닝이 적용되지 않는 override 경로로 흘러감** (§5 상세).
 
 **환경변수/secret 관리**: 전부 `.env` 기반 `${VAR}` 참조, 하드코딩된 실제 값 없음(§4). `.env.example`이 최신 변수들(DB_HOST, KAKAO_* 등)을 다수 누락 — 새 기여자가 그대로 따라하면 기동 실패 또는 약한 기본값 사용 위험.
 
@@ -170,7 +172,7 @@
 **[P1] `docker-compose.override.yml` 자동 적용 vs 문서 안내 불일치**
 - override 파일은 `docker compose up`(플래그 없이) 시 **자동 병합**되어 `assignment-frontend` 소스를 컨테이너에 바인드마운트(정적 파일이라 RCE 위험은 낮음, 이미지 불변성 훼손 수준).
 - `docker-compose.prod.yml` 헤더는 `-f docker-compose.yml -f docker-compose.prod.yml` 명시 사용을 안내(override 자동 배제, 올바른 설계).
-- **그러나 `docs/DOCKER-SUBMISSION.md`의 "일반 실행" 섹션(22행)은 플래그 없이 `docker compose up -d --build --wait`만 안내** — 이 명령은 override가 자동 적용되어, 배포판(Docker Hub 이미지) 내용이 아니라 로컬 소스 파일이 서빙됨. `README.md`/`DOCKER-SUBMISSION.md` 어디에도 `docker-compose.prod.yml`이 언급되지 않음 — **repo에서 유일한 실질적 하드닝 계층(강제 POSTGRES_PASSWORD, secure 쿠키)이 문서에서 완전히 고아 상태**. 다만 두 문서 모두 "이것이 production-ready"라는 허위 주장은 하지 않음(정직하게 로컬 데모용으로 범위 한정).
+- **그러나 당시 Docker 실행 문서의 "일반 실행" 섹션은 플래그 없이 `docker compose up -d --build --wait`만 안내** — 이 명령은 override가 자동 적용되어, 배포판(Docker Hub 이미지) 내용이 아니라 로컬 소스 파일이 서빙됨. `README.md`/당시 Docker 실행 문서 어디에도 `docker-compose.prod.yml`이 언급되지 않음 — **repo에서 유일한 실질적 하드닝 계층(강제 POSTGRES_PASSWORD, secure 쿠키)이 문서에서 완전히 고아 상태**. 다만 두 문서 모두 "이것이 production-ready"라는 허위 주장은 하지 않음(정직하게 로컬 데모용으로 범위 한정).
 
 **[P0] TLS(HTTPS) 종단 지점이 스택 어디에도 없음**
 - `nginx/default.conf`, `assignment-frontend/nginx.conf` 둘 다 `listen 443 ssl`/`ssl_certificate` 없음 — 전부 평문 HTTP(8090). 이 상태로 인터넷에 공개하면 로그인 자격증명/세션 쿠키가 평문으로 전송됨.
@@ -313,12 +315,12 @@
 ### 14. 죽은 코드 / 레거시 분석 — [완료]
 - **TODO/FIXME 등**: 전체 저장소에서 단 1건(`VehicleVerification.java:29`, 승인 후 원본 파기 배치 추가 예정 — 의도된 향후 작업 메모, 방치 흔적 아님).
 - **대규모 주석처리 코드**: 발견되지 않음(Java/JS/프론트 전체 스캔).
-- **OAuth/카카오 코드**: 죽은 코드 아님 — 실제로 살아서 쓰이고 있음(`assignment-frontend/auth/index.html`에 카카오 버튼과 아이디/비번 폼이 **둘 다 현재 살아있음**, 문서 `docs/DOCKER-SUBMISSION.md:71`의 "카카오 버튼만 제공한다"는 서술은 **현재 코드와 불일치하는 낡은 문서**).
-- **`docker-compose.garage.yml`**: 잊혀진 파일이 아니라 README/docs에 "선택적 애드온"으로 문서화된 현재진행형 실험 기능. 단, 메인 6-컨테이너 과제 제출 범위엔 포함 안 됨.
+- **OAuth/카카오 코드**: 죽은 코드 아님 — 실제로 살아서 쓰이고 있음(`assignment-frontend/auth/index.html`에 카카오 버튼과 아이디/비번 폼이 **둘 다 현재 살아있음**, 당시 Docker 실행 문서의 "카카오 버튼만 제공한다"는 서술은 **현재 코드와 불일치하는 낡은 문서**).
+- **`docker-compose.garage.yml`**: 잊혀진 파일이 아니라 README/docs에 "선택적 애드온"으로 문서화된 현재진행형 실험 기능. 단, 기본 6-컨테이너 구성엔 포함 안 됨.
 - **compose ↔ 디렉터리 1:1 매핑**: `backend/board-service/assignment-frontend/nginx`는 정확히 기본 compose 서비스 4개와 1:1 대응. **`frontend/`(Next.js)는 기본/운영 compose 어디에도 연결되지 않은 사실상 죽은 인프라**(garage 오버레이로만 도달 가능, 그마저도 nginx를 우회해 :3000 직접 노출).
 - **board-service 고아 엔드포인트**: export된 라우트 핸들러 중 미마운트된 것은 없음(전수 확인). 단 `/api/board/admin/logs`는 마운트되어 실제로 살아있지만 **문서와 프론트 어디서도 호출하지 않는 "UI 고아" API**(기능은 살아있음, 활용되지 않음).
 - **프론트 데드코드**: `garage/index.html`(nginx가 `/home`으로 강제 리다이렉트, 도달 불가), `app.js`의 "부품 호환성" 관련 코드(`#vehicle-select`, `#compatibility` — 어떤 HTML에도 없는 DOM ID 참조, 이전 장터 구현의 잔여물). JS 파일 중 완전히 미사용인 파일은 없음(전부 최소 1개 HTML에서 로드됨).
-- **문서-코드 불일치(오래된 문서)**: `ASSIGNMENT.md:161`("Java 테스트 2+3개 통과")은 현재 16개 클래스/1000줄+ 규모보다 훨씬 이전 스냅샷 — 실제보다 과소평가된 낡은 기록. `docs/AUTH-UI.md`("닉네임/이메일 컬럼 없음")도 이후 추가된 회원관리 기능으로 이미 대체된 서술.
+- **문서-코드 불일치(오래된 문서)**: `docs/AUTH-UI.md`("닉네임/이메일 컬럼 없음")도 이후 추가된 회원관리 기능으로 이미 대체된 서술.
 
 ### 15. 최종 등급별 정리 (P0~P3) — [완료]
 (전체 findings는 최종 답변 본문에 상세 서술. 목록/ID만 여기 기록)
@@ -332,7 +334,7 @@
 - P1-2: 전역 요청 본문 크기 제한 없음 → 메모리 고갈 DoS (application.yml/application-prod.yml)
 - P1-3: 스키마 소유권 3원화(Hibernate ddl-auto:update + 수동 마이그레이션 + board-service 매 부팅 schema.sql) — 마이그레이션 이력 관리 부재
 - P1-4: 부품 장터(market.js)에 관리자 모더레이션 기능 전무 → 사기/어뷰징 매물 삭제 불가
-- P1-5: docker-compose.override.yml 자동적용으로 인해 문서(`DOCKER-SUBMISSION.md`)대로 실행 시 `docker-compose.prod.yml` 하드닝이 적용되지 않음
+- P1-5: docker-compose.override.yml 자동적용으로 인해 당시 Docker 실행 문서대로 실행 시 `docker-compose.prod.yml` 하드닝이 적용되지 않음
 - P1-6: board-service `admin.js`/`admin-access.js`, `market.js` 인가 로직에 대한 자동 테스트 전무(회귀 보호 없음)
 - P1-7: CI 파이프라인 부재(.github/workflows 없음) — 1000줄+ 기존 테스트가 전혀 자동 실행되지 않음
 
@@ -354,7 +356,7 @@
 - P3-2: `moderation_logs` 테이블 인덱스 없음(현재는 무관, 로그 누적 시 검색 저하)
 - P3-3: `garage/index.html` 도달 불가능한 orphan 페이지, `app.js`의 부품 호환성 데드코드
 - P3-4: board-service `/api/board/admin/logs`가 문서·프론트 어디서도 쓰이지 않는 고아 API
-- P3-5: 문서-코드 불일치(ASSIGNMENT.md 낡은 테스트 통계, DOCKER-SUBMISSION.md의 "카카오 버튼만 제공" 서술이 실제와 다름, AUTH-UI.md 낡은 서술)
+- P3-5: 문서-코드 불일치(당시 Docker 실행 문서의 "카카오 버튼만 제공" 서술이 실제와 다름, AUTH-UI.md 낡은 서술)
 - P3-6: 카카오 닉네임 동기화 레이스(uncaught exception → 500, 좁은 범위)
 - P3-7: `VehicleController`에 남은 dev용 `@CrossOrigin(localhost:3000)` 죽은 코드
 - P3-8: 모니터링/알림 스택(Sentry, Prometheus 등) 부재 — healthcheck 탐지만 있고 알림 연동 없음

@@ -264,8 +264,8 @@ A(1~4)를 먼저 끝내고 B(5~8)로 넘어간다. A는 지도·외부 키가 �
 
 - 1단계 완료 `13ed78f`: V6 + 공개·운영 API + MANAGER 역할·운영자 권한 API. CI run 38154786026 성공.
 - 2단계 완료 `ed803e1`: 관리자 화면 리디자인(`AdminShell`), `/admin/motorsport`, `/admin/users`(사유 필수 + 확인 단계, 권한 변경 기록 API), 파비콘. 검증: Next 빌드·TypeScript 통과(CI에는 프론트 빌드가 없음), `mvn test` 135, `npm test` 53, Playwright 13항목, 13화면 × 3너비 가로 넘침 0.
-- 3·4단계 완료(공개 `/motorsport`, 메인 미리보기, 헤더 메뉴, 게시글 ↔ 일정 연결) — 자세한 내용은 `MORETHANCAR_NEXT_TASKS.md` 참고.
-- 스팟(5~8단계 상당) 완료 (2026-10-12, 커밋 전): 범위를 §9 결정 2(번복)에 따라 WINDING·SIM_RACING 2개 카테고리로 조정했고, 공개 제보·승인 대기열(§2 V7 원안의 `spot_photos`/`spot_corrections`/`spot_content_removals`, 결정 4·5)은 이번 범위에서 제외 — 관리자 직접 등록만 지원한다(신규 지시가 공개 제보 흐름을 요구하지 않음). 지도는 카카오맵 어댑터를 실제 키로 연결해 라이브 검증까지 마쳤다(CSP `img-src`/`connect-src`가 실제 타일 도메인 `kakaocdn.net` 대신 추정값 `daumcdn.net`만 허용해 타일이 안 뜨던 버그 1건 발견·수정, 2026-10-12). 자세한 구현·검증 내용은 `MORETHANCAR_NEXT_TASKS.md`의 "스팟(와인딩·심레이싱) V7 + `/spots` + `/admin/spots`" 항목 참고.
+- 3·4단계 완료(공개 `/motorsport`, 메인 미리보기, 헤더 메뉴, 게시글 ↔ 일정 연결) — 자세한 내용은 `docs/internal/MORETHANCAR_NEXT_TASKS.md` 참고.
+- 스팟(5~8단계 상당) 완료 (2026-10-12, 커밋 전): 범위를 §9 결정 2(번복)에 따라 WINDING·SIM_RACING 2개 카테고리로 조정했고, 공개 제보·승인 대기열(§2 V7 원안의 `spot_photos`/`spot_corrections`/`spot_content_removals`, 결정 4·5)은 이번 범위에서 제외 — 관리자 직접 등록만 지원한다(신규 지시가 공개 제보 흐름을 요구하지 않음). 지도는 카카오맵 어댑터를 실제 키로 연결해 라이브 검증까지 마쳤다(CSP `img-src`/`connect-src`가 실제 타일 도메인 `kakaocdn.net` 대신 추정값 `daumcdn.net`만 허용해 타일이 안 뜨던 버그 1건 발견·수정, 2026-10-12). 자세한 구현·검증 내용은 `docs/internal/MORETHANCAR_NEXT_TASKS.md`의 "스팟(와인딩·심레이싱) V7 + `/spots` + `/admin/spots`" 항목 참고.
 - 남은 것: 카카오맵 키 발급 후 실지도 검증, `mvn test`(Java 23 환경) 재시도, 브라우저 UI 실측, 운영 반영 전 `users_role_check` VALIDATE와 EC2 자동 시작 차단.
 
 ## 9. 결정 사항 (2026-10-12 확정)
@@ -281,7 +281,7 @@ A(1~4)를 먼저 끝내고 B(5~8)로 넘어간다. A는 지도·외부 키가 �
 
 ## 10. 위험과 대응
 
-- **Neon 마이그레이션 적용 시점**: V6/V7은 다음 core 기동 때 Neon에 적용된다. 로컬에서 Neon 연결로 core를 띄우지 않는다. 운영 재가동 절차(MORETHANCAR_NEXT_TASKS.md NOW-2-3 재검토)와 함께 적용 시점을 정한다.
+- **Neon 마이그레이션 적용 시점**: V6/V7은 다음 core 기동 때 Neon에 적용된다. 로컬에서 Neon 연결로 core를 띄우지 않는다. 운영 재가동 절차(docs/internal/MORETHANCAR_NEXT_TASKS.md NOW-2-3 재검토)와 함께 적용 시점을 정한다.
 - **잘못된 일정 정보**: 출처·확인일 필수, 상태 배지, "일정은 주최 측 사정으로 바뀔 수 있습니다" 고정 안내, 재확인 대기열.
 - **위험 운전 조장 우려(와인딩)**: 안전 정보 필수 필드, 교통법규 준수·과속 금지·안전한 정차 안내(결정 3), 관리자 승인 후 공개, 숨김 기능.
 - **사적 장소·개인정보 노출**: 제보 가이드(사유지·주거지 앞 제외), 사진 속 번호판·얼굴은 관리자 반려 사유.
