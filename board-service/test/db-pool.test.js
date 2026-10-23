@@ -29,7 +29,7 @@ async function startWithRealPool(t, port, timeoutMs) {
     host: "127.0.0.1", port, user: "revcc", password: "unused", database: "revcc",
   });
   db.on("error", () => {});
-  const app = createApp({ db, redis: { get: async () => JSON.stringify({ id: 7, username: "member" }) } });
+  const app = createApp({ db, redis: { get: async () => JSON.stringify({ id: 7, username: "member" }), ping: async () => "PONG" } });
   const server = app.listen(0, "127.0.0.1");
   await new Promise((r) => server.once("listening", r));
   t.after(async () => { server.closeAllConnections(); server.close(); await db.end().catch(() => {}); });

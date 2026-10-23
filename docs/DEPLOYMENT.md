@@ -100,6 +100,7 @@ DB 커넥션 풀은 core 10 + board 10이다. 평시에는 최대 20개를 쓰�
 docker compose -f docker-compose.yml -f docker-compose.prod.yml ps             # 모든 서비스 healthy, cloudflared 포함
 docker compose -f docker-compose.yml -f docker-compose.prod.yml port proxy 80  # 게시된 포트가 없어야 한다(오류가 정상)
 curl -sI https://morethancar.kr/ | grep -i strict-transport-security          # max-age=300
+curl -s https://morethancar.kr/api/health https://morethancar.kr/api/board/health  # 둘 다 {"status":"ok"}
 docker compose -f docker-compose.yml -f docker-compose.prod.yml logs proxy | tail  # 첫 칸이 실제 사용자 IP(172.16.238.2가 아님)
 ```
 
@@ -109,6 +110,7 @@ nginx의 IP 신뢰 경계·rate limit·HSTS 동작은 `scripts/nginx-forwarded-c
 ## 장애 대응
 
 위 설정에서 나오는 확인 지점이다. 정리된 장애 대응 절차는 아직 없다.
+외부 감시와 health 경로(`/health`, `/api/health`, `/api/board/health`)의 차이는 [MONITORING.md](MONITORING.md)에 있다.
 
 - **로그인이 안 됨**: 쿠키가 `Secure`이므로 HTTPS로 접속했는지 확인한다. Cloudflare의 Always Use HTTPS와 Tunnel 상태(`cloudflared` healthy)를 본다.
 - **모든 사용자가 429를 받음**: Cloudflare의 Remove visitor IP headers가 켜져 있거나, proxy 로그의 첫 칸이 `172.16.238.2`라면 실제 IP 복원이 깨진 것이다.
