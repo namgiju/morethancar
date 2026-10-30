@@ -71,8 +71,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # healthcheck는 생존 확인(/api/health/live)만 한다. DB를 읽는 경로를 10초마다 부르면 운영 Neon이
+    # 5분 비활동 정지(scale to zero)에 한 번도 들어가지 못한다. 이 경로는 Flyway를 포함한 기동이 끝나야
+    # 응답하므로 board의 depends_on(core healthy = 마이그레이션 완료) 조건은 그대로다.
+    # DB까지 보는 준비 확인(/api/health)은 외부 감시가 맡는다(docs/MONITORING.md).
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/vehicles"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health/live"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -93,8 +97,9 @@ services:
     depends_on:
       core:
         condition: service_healthy
+    # core와 같이 생존 확인만 한다(DB·Redis를 부르지 않는다). 준비 확인은 /api/board/health(외부 감시).
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5

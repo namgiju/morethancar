@@ -48,6 +48,17 @@ class HealthControllerTest {
             .andExpect(status().isServiceUnavailable());
     }
 
+    // 생존 확인은 DB가 죽어 있어도 200이고, DataSource에 손대지 않는다(Neon을 깨우지 않는다).
+    @Test void livenessNeverTouchesTheDatabase() throws Exception {
+        DataSource dataSource = mock(DataSource.class);
+        when(dataSource.getConnection()).thenThrow(new SQLException("database is down"));
+        mvc(dataSource, HealthController.TIMEOUT).perform(get("/api/health/live"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(content().json("{\"status\":\"ok\"}", true));
+        verifyNoInteractions(dataSource);
+    }
+
     @Test void hangingDatabaseIs503WithinTheTimeout() throws Exception {
         DataSource dataSource = mock(DataSource.class);
         when(dataSource.getConnection()).thenAnswer(invocation -> { Thread.sleep(10_000); return null; });

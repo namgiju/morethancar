@@ -37,6 +37,10 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --
 - core는 `SPRING_PROFILES_ACTIVE=prod`로 실행되어 세션 쿠키가 항상 `Secure`로 나간다. HTTPS는 Cloudflare에서 종단한다.
 - 모든 서비스가 `restart: unless-stopped`다. 프로세스가 죽거나 호스트가 재부팅되면 다시 올라온다.
   `docker compose stop`/`down`으로 멈춘 서비스는 다시 올리지 않는다. healthcheck가 unhealthy라는 것만으로는 재시작하지 않는다.
+- core·board의 Compose healthcheck는 DB를 건드리지 않는 생존 확인(`/api/health/live`, `/health/live`)만 부른다.
+  core는 Flyway 마이그레이션을 포함한 기동이 끝나야 응답하므로 `depends_on`(board는 core healthy 뒤 시작)과 `--wait`는
+  "마이그레이션 완료"까지 보장한다. DB 연결 상태는 healthy에 반영되지 않으니 배포 후 준비 확인(아래)을 따로 본다.
+  DB를 읽는 healthcheck를 다시 넣지 않는다 — Neon이 자동 정지하지 못한다([MONITORING.md](MONITORING.md#neon-자동-정지scale-to-zero와-health)).
 - nginx(로컬·운영 공통)
   - `server_tokens off`, upstream 응답 대기 30초
   - `/api` rate limit: IP당 초당 20·순간 200. 로그인·가입·아이디 확인·비밀번호 재설정·카카오는 IP당 분당 30·순간 30. 초과하면 JSON 429를 보낸다.
@@ -58,6 +62,8 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --
 | `CLOUDFLARE_TUNNEL_TOKEN` | Named Tunnel 토큰. 비밀번호처럼 다룬다 |
 
 DB 커넥션 풀은 core 10 + board 10이다. 평시에는 최대 20개를 쓰고, 재배포 중 구·신 컨테이너가 겹쳐도 40개다.
+요청이 없으면 두 풀 모두 연결을 닫는다(core는 유휴 60초 뒤·최소 유휴 0, board는 유휴 30초 뒤). 그래야 Neon이 5분 뒤 정지한다.
+운영 `.env`에 `CORE_DB_POOL_MIN_IDLE`을 1 이상으로 두지 않는다(예전 `.env.example` 값 2를 복사했다면 지우거나 0으로 바꾼다).
 연결을 5초 안에 얻지 못하거나 쿼리가 15초 안에 끝나지 않으면 요청은 503으로 끝난다. 조정 변수는 `.env.example`을 참고한다.
 
 ## Cloudflare Named Tunnel 준비 (최초 1회)
@@ -84,6 +90,8 @@ DB 커넥션 풀은 core 10 + board 10이다. 평시에는 최대 20개를 쓰�
    ```sh
    docker compose -f docker-compose.yml -f docker-compose.prod.yml config --services   # postgres가 없고 cloudflared가 있어야 한다
    docker compose -f docker-compose.yml -f docker-compose.prod.yml config | grep -E 'SPRING_PROFILES_ACTIVE|KAKAO_REDIRECT_URI'
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml config | grep -E 'DB_POOL_MIN_IDLE|DB_IDLE_TIMEOUT_MS|health/live'  # 최소 유휴 "0", healthcheck는 live 경로
+   scripts/compose-idle-check.sh   # 실제 .env 없이 저장소 설정만 검사(docker compose·python3 필요)
    ```
    필수 환경변수가 하나라도 없으면 이 단계에서 오류가 난다. `config` 전체 출력에는 `.env`의 비밀번호가 그대로 찍히므로
    공유하거나 로그에 남기지 않는다.
@@ -100,7 +108,8 @@ DB 커넥션 풀은 core 10 + board 10이다. 평시에는 최대 20개를 쓰�
 docker compose -f docker-compose.yml -f docker-compose.prod.yml ps             # 모든 서비스 healthy, cloudflared 포함
 docker compose -f docker-compose.yml -f docker-compose.prod.yml port proxy 80  # 게시된 포트가 없어야 한다(오류가 정상)
 curl -sI https://morethancar.kr/ | grep -i strict-transport-security          # max-age=300
-curl -s https://morethancar.kr/api/health https://morethancar.kr/api/board/health  # 둘 다 {"status":"ok"}
+curl -s https://morethancar.kr/api/health https://morethancar.kr/api/board/health  # 준비 확인(DB 포함). 둘 다 {"status":"ok"}
+curl -s https://morethancar.kr/api/health/live https://morethancar.kr/api/board/health/live  # 생존 확인. 둘 다 {"status":"ok"}
 docker compose -f docker-compose.yml -f docker-compose.prod.yml logs proxy | tail  # 첫 칸이 실제 사용자 IP(172.16.238.2가 아님)
 ```
 
@@ -110,7 +119,7 @@ nginx의 IP 신뢰 경계·rate limit·HSTS 동작은 `scripts/nginx-forwarded-c
 ## 장애 대응
 
 위 설정에서 나오는 확인 지점이다. 정리된 장애 대응 절차는 아직 없다.
-외부 감시와 health 경로(`/health`, `/api/health`, `/api/board/health`)의 차이는 [MONITORING.md](MONITORING.md)에 있다.
+외부 감시와 health 경로(생존 확인 `/health`·`/api/health/live`·`/api/board/health/live`, 준비 확인 `/api/health`·`/api/board/health`)의 차이는 [MONITORING.md](MONITORING.md)에 있다.
 
 - **로그인이 안 됨**: 쿠키가 `Secure`이므로 HTTPS로 접속했는지 확인한다. Cloudflare의 Always Use HTTPS와 Tunnel 상태(`cloudflared` healthy)를 본다.
 - **모든 사용자가 429를 받음**: Cloudflare의 Remove visitor IP headers가 켜져 있거나, proxy 로그의 첫 칸이 `172.16.238.2`라면 실제 IP 복원이 깨진 것이다.

@@ -27,6 +27,8 @@ spring:
     # 커넥션 풀. 운영 DB(Neon, 2026-09-30 확인 max_connections 901, 일반 사용자 가용 897)에
     # core 10 + board 10 = 평시 최대 20, 재배포로 구·신 컨테이너가 겹쳐도 40만 쓴다.
     # 풀이 다 차면 무한 대기하지 않고 connection-timeout 뒤 503으로 끝낸다(DatabaseUnavailableHandler).
+    # 아래 minimum-idle 2·idle-timeout 5분은 로컬 기본값이다. 운영(docker-compose.prod.yml)은 Neon 자동 정지를 위해
+    # 최소 유휴 0·유휴 60초로 덮어쓴다(유휴 연결의 keepalive 쿼리가 2분마다 Neon을 깨우기 때문).
     hikari:
       maximum-pool-size: ${DB_POOL_MAX:10}
       minimum-idle: ${DB_POOL_MIN_IDLE:2}
