@@ -5,6 +5,8 @@ import {ApiError, fetchPublicVehicle} from '../../lib/community-api';
 import type {PublicVehicle, VehiclePart} from '../../lib/community-types';
 import {imageUrl, partPeriodLabel, postUrl} from '../../lib/format';
 import {kstToday} from '../../lib/motorsport';
+import {partSharePath, partShareText, vehicleStatusLabel} from '../../lib/part-share';
+import CopyTextButton from './copy-text-button';
 import CommunityPage, {useNotice} from './community-page';
 import MemberLink from './member-link';
 import {useCommunitySession} from './use-community-session';
@@ -75,7 +77,7 @@ function VehicleBody({vehicle: v, own}: {vehicle: PublicVehicle; own: boolean}) 
   const current = parts.filter((p) => !p.removedOn);
   const past = parts.filter((p) => p.removedOn);
   const today = kstToday();
-  const status = v.archivedAt ? '이전 보유 차량' : v.verified ? '인증 차량' : '등록 차량';
+  const status = vehicleStatusLabel(v);
   const timeline = [
     ...(v.createdAt ? [{key: 'reg', date: kstDate(v.createdAt), rank: 0, label: '차고 등록', title: v.model, href: null as string | null}] : []),
     ...v.records.map((r) => ({key: `r${r.id}`, date: r.date, rank: 2, label: RECORD_LABELS[r.kind] || r.kind, title: r.title, href: null})),
@@ -101,6 +103,16 @@ function VehicleBody({vehicle: v, own}: {vehicle: PublicVehicle; own: boolean}) 
             후기: {p.title} →
           </a>
         ))}
+        {part.isPublic ? (
+          <>
+            <a className={styles.boardLink} href={partSharePath(v.id, part.id)}>
+              공유 링크 →
+            </a>
+            <CopyTextButton text={partShareText(part, v, today)} />
+          </>
+        ) : (
+          <p className={styles.muted}>비공개 부품이라 공유 링크가 열리지 않아요(나만 볼 수 있어요).</p>
+        )}
         {own && !v.archivedAt && (
           <a className={styles.boardLink} href={`/community/new?category=parts&vehicleId=${v.id}&partId=${part.id}`}>
             후기 쓰기 →

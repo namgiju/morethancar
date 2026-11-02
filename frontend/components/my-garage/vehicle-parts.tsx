@@ -2,7 +2,9 @@
 
 import {useState, type FormEvent} from 'react';
 import {createVehiclePart, deleteVehiclePart, updateVehiclePart, uploadImage} from '../../lib/community-api';
-import type {VehiclePart, VehiclePartInput} from '../../lib/community-types';
+import type {PublicVehicle, VehiclePart, VehiclePartInput} from '../../lib/community-types';
+import {partSharePath, partShareText} from '../../lib/part-share';
+import CopyTextButton from '../community/copy-text-button';
 import {imageUrl, partPeriodLabel} from '../../lib/format';
 import {kstToday} from '../../lib/motorsport';
 import CommunityDialog, {type DialogSpec} from '../community/community-dialog';
@@ -38,11 +40,14 @@ function numberOrNull(value: FormDataEntryValue | null) {
 // verification. Cost is shown here because this is the owner's own view.
 export default function VehicleParts({
   vehicleId,
+  vehicle,
   archived,
   parts,
   onChanged,
 }: {
   vehicleId: number;
+  // The owner's view of the vehicle (model/year/verified/archivedAt) for the share text.
+  vehicle: PublicVehicle;
   // Parts of an archived vehicle can't be linked to new posts, so no "후기 쓰기".
   archived: boolean;
   parts: VehiclePart[];
@@ -155,6 +160,16 @@ export default function VehicleParts({
             {part.brand} {part.name}
           </strong>
           {part.spec && <p>{part.spec}</p>}
+          {part.isPublic ? (
+            <>
+              <a className={styles.empty} href={partSharePath(vehicleId, part.id)}>
+                공유 링크
+              </a>
+              <CopyTextButton text={partShareText(part, {...vehicle, id: vehicleId}, kstToday())} />
+            </>
+          ) : (
+            <small className={styles.empty}>비공개 부품은 공유 링크가 열리지 않아요.</small>
+          )}
           <small className={styles.empty}>
             {[
               part.isPublic ? '' : '비공개',
@@ -349,7 +364,7 @@ export default function VehicleParts({
             )}
             <label>
               <input name="isPublic" type="checkbox" defaultChecked={editingPart?.isPublic ?? true} disabled={busy} />
-              공개 (끄면 나만 볼 수 있고 사진도 다른 사람에게 보이지 않아요)
+              공개 (끄면 나만 볼 수 있고 사진·공유 링크도 다른 사람에게 바로 보이지 않아요)
             </label>
           </details>
           <div className={styles.partActions}>
