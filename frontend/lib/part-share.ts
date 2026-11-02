@@ -25,7 +25,8 @@ export type ShareableVehicle = {
   archivedAt?: string | null;
 };
 
-export const partShareUrl = (vehicleId: number, partId: number) => `${SITE_URL}/community/cars/${vehicleId}/parts/${partId}`;
+export const partSharePath = (vehicleId: number, partId: number) => `/community/cars/${vehicleId}/parts/${partId}`;
+export const partShareUrl = (vehicleId: number, partId: number) => `${SITE_URL}${partSharePath(vehicleId, partId)}`;
 
 // Vehicle ownership axis, shown separately from the part's evidence label.
 export function vehicleStatusLabel(vehicle: {verified?: boolean; archivedAt?: string | null}): string {

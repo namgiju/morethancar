@@ -1,6 +1,6 @@
 'use client';
 
-import {useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import styles from './post-detail.module.css';
 
 // "텍스트 복사" for part history (MVP stage 5). When the clipboard API is
@@ -9,6 +9,8 @@ import styles from './post-detail.module.css';
 export default function CopyTextButton({text, label = '텍스트 복사'}: {text: string; label?: string}) {
   const [state, setState] = useState<'idle' | 'copied' | 'manual'>('idle');
   const area = useRef<HTMLTextAreaElement>(null);
+  // "복사했어요" only describes the text that was copied; start over when it changes.
+  useEffect(() => setState('idle'), [text]);
 
   async function copy() {
     try {

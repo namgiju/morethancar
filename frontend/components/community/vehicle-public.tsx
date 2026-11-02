@@ -5,7 +5,7 @@ import {ApiError, fetchPublicVehicle} from '../../lib/community-api';
 import type {PublicVehicle, VehiclePart} from '../../lib/community-types';
 import {imageUrl, partPeriodLabel, postUrl} from '../../lib/format';
 import {kstToday} from '../../lib/motorsport';
-import {partShareText, partShareUrl} from '../../lib/part-share';
+import {partSharePath, partShareText, vehicleStatusLabel} from '../../lib/part-share';
 import CopyTextButton from './copy-text-button';
 import CommunityPage, {useNotice} from './community-page';
 import MemberLink from './member-link';
@@ -77,7 +77,7 @@ function VehicleBody({vehicle: v, own}: {vehicle: PublicVehicle; own: boolean}) 
   const current = parts.filter((p) => !p.removedOn);
   const past = parts.filter((p) => p.removedOn);
   const today = kstToday();
-  const status = v.archivedAt ? '이전 보유 차량' : v.verified ? '인증 차량' : '등록 차량';
+  const status = vehicleStatusLabel(v);
   const timeline = [
     ...(v.createdAt ? [{key: 'reg', date: kstDate(v.createdAt), rank: 0, label: '차고 등록', title: v.model, href: null as string | null}] : []),
     ...v.records.map((r) => ({key: `r${r.id}`, date: r.date, rank: 2, label: RECORD_LABELS[r.kind] || r.kind, title: r.title, href: null})),
@@ -105,7 +105,7 @@ function VehicleBody({vehicle: v, own}: {vehicle: PublicVehicle; own: boolean}) 
         ))}
         {part.isPublic ? (
           <>
-            <a className={styles.boardLink} href={partShareUrl(v.id, part.id).replace(/^https:\/\/[^/]+/, '')}>
+            <a className={styles.boardLink} href={partSharePath(v.id, part.id)}>
               공유 링크 →
             </a>
             <CopyTextButton text={partShareText(part, v, today)} />

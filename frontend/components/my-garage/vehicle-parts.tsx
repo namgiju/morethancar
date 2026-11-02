@@ -3,7 +3,7 @@
 import {useState, type FormEvent} from 'react';
 import {createVehiclePart, deleteVehiclePart, updateVehiclePart, uploadImage} from '../../lib/community-api';
 import type {PublicVehicle, VehiclePart, VehiclePartInput} from '../../lib/community-types';
-import {partShareText, partShareUrl} from '../../lib/part-share';
+import {partSharePath, partShareText} from '../../lib/part-share';
 import CopyTextButton from '../community/copy-text-button';
 import {imageUrl, partPeriodLabel} from '../../lib/format';
 import {kstToday} from '../../lib/motorsport';
@@ -162,10 +162,10 @@ export default function VehicleParts({
           {part.spec && <p>{part.spec}</p>}
           {part.isPublic ? (
             <>
-              <a className={styles.empty} href={partShareUrl(vehicleId, part.id).replace(/^https:\/\/[^/]+/, '')}>
+              <a className={styles.empty} href={partSharePath(vehicleId, part.id)}>
                 공유 링크
               </a>
-              <CopyTextButton text={partShareText(part, vehicle, kstToday())} />
+              <CopyTextButton text={partShareText(part, {...vehicle, id: vehicleId}, kstToday())} />
             </>
           ) : (
             <small className={styles.empty}>비공개 부품은 공유 링크가 열리지 않아요.</small>

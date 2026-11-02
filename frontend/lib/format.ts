@@ -85,7 +85,7 @@ export const spotUrl = (id: number) => `/spots/${id}`;
 export function partPeriodLabel(part: ShareablePart, today: string): string {
   const span = partSpan(part, today);
   const used =
-    partDistance(part) || (part.installMileage !== null ? `장착 시 ${part.installMileage.toLocaleString()}km` : '');
+    partDistance(part) || (part.installMileage !== null ? `장착 시 ${part.installMileage.toLocaleString('ko-KR')}km` : '');
   return [
     part.removedOn ? `${part.installedOn} ~ ${part.removedOn}` : `${part.installedOn}부터`,
     part.removedOn ? `${span} 사용` : `${span}째`,
