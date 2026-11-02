@@ -666,8 +666,14 @@
 }
 
 .partButtons button,
+.partButtons a,
 .partActions button {
   white-space: nowrap;
+}
+
+.partButtons a {
+  text-decoration: none;
+  text-align: center;
 }
 
 .partActions {

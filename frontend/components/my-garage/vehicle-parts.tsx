@@ -202,6 +202,12 @@ export default function VehicleParts({
           )}
         </div>
         <div className={styles.partButtons}>
+          <a
+            className={styles.repButton}
+            href={`/community/new?category=parts&vehicleId=${vehicleId}&partId=${part.id}`}
+          >
+            후기 쓰기
+          </a>
           <button type="button" className={styles.repButton} disabled={busy} onClick={() => openForm(part)}>
             수정
           </button>

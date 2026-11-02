@@ -121,7 +121,7 @@
 [ ] LATER-1: 카카오 회원 탈퇴 최소 구현 (배포 이후 제품 완성도 작업, 구 STEP 10-impl-D 축소) — 2026-11-02 사용자 결정으로 보류, LATER-4 MVP 단계 1부터 먼저 진행
 [x] LATER-2: 비밀번호 재설정 응답 통일 (작은 보안 정리, 구 STEP 11 축소) — 2026-10-23 PR #15 운영 배포(`76e8985`), 운영 일반 계정으로 메일 수신·재설정 성공 확인
 [ ] LATER-5: 운영 성능 메모 — SSR 내부 API 호출이 nginx rate limit을 frontend IP 하나로 공유, `/_next/static` no-store (2026-10-06, 실제 429·속도 문제가 보이면 착수)
-[~] LATER-4: 차량 기록/타임라인 — 2026-11-02 MVP 6단계 계획으로 대체(아래 LATER-4 "MVP 계획"). 단계 1 인증 무결성 운영 배포(2026-11-02, PR #20 병합 `ac5614c`). 단계 2 차량 보관 운영 배포(2026-11-02, PR #22 병합 `4dfc3cd`, V10). 단계 3 부품 이력 운영 배포(2026-11-02, PR #24 병합 `3304f4f`, V11). 단계 4 진행 중
+[~] LATER-4: 차량 기록/타임라인 — 2026-11-02 MVP 6단계 계획으로 대체(아래 LATER-4 "MVP 계획"). 단계 1 인증 무결성 운영 배포(2026-11-02, PR #20 병합 `ac5614c`). 단계 2 차량 보관 운영 배포(2026-11-02, PR #22 병합 `4dfc3cd`, V10). 단계 3 부품 이력 운영 배포(2026-11-02, PR #24 병합 `3304f4f`, V11). 단계 4 후기 연결·공개 차고 구현·검증·PR(병합·배포는 사용자 결정 대기)
 ```
 
 - **NOW-1 UI/UX 개선 및 Next.js 전환**
@@ -465,6 +465,15 @@
       - **배포 후 확인(HTTP·읽기만, 운영 데이터 변경 없음)**: health 4종·`/`·`/login`·`/community`·`/home`·`/community/new`·`/api/vehicles`·`/api/board/posts` 200. 비로그인 `POST /api/board/garage/1/parts`·`PUT …/parts/1`·`DELETE …/parts/1`·`PATCH …/archive`·`POST …/records`·`PUT /api/board/garage/1` 모두 401, 잘못된 부품 id(`…/parts/abc`) 400. 공개 `GET /api/board/garage/1`(비로그인)에 `parts` 키 있음(0건)·비용 키 없음. 배포된 board에 부품 라우트 3개, frontend 산출물에 부품 삭제 확인 문구. 배포 직후 로그 오류 없음. (처음 점검에서 404·400이 나왔으나 proxy 로그로 점검 명령의 경로에 `%20/`가 붙은 것을 확인 — zsh가 `set -- $m`을 단어로 나누지 않음. 바른 경로로 다시 확인한 결과가 위다.)
       - **운영 미확인(운영 데이터를 바꾸지 않기 위해 실행하지 않음)**: 부품 추가·수정·탈거·삭제, 비공개 부품 사진 접근, 소유자 비용 표시, 화면. 로컬 브라우저·임시 PostgreSQL 시스템 테스트·CI로 갈음.
       - **되돌리기(미실행)**: `git checkout 4dfc3cd` 후 prod 오버레이 `up -d --build --wait`, 또는 `pre-v11-rollback` 태그 이미지. V11 테이블·컬럼은 남겨 둔다(이전 코드는 읽지 않음). 스키마까지 되돌리려면 위 백업(운영 복원 자체는 미검증).
+    - **[x] 단계 4 후기 연결 + 공개 차고 통합 (2026-11-02, 브랜치 `feat/mvp-4-part-reviews`, PR — 병합·배포 전)**: 마이그레이션 없음(`board_posts.part_id`는 V11에 이미 있음).
+      - **우선 처리 — 정비 기록 비용**: 확인 결과 `GET /api/board/garage/:id`가 `vehicle_records.cost`를 누구에게나 내려줬고, 공개 차고 화면(`vehicle-public.tsx`)이 그 값을 표시하고 있었다. 이제 소유자에게만 `cost`를 넣고 그 외 응답에는 키 자체가 없다. 화면은 `cost`가 없을 때를 처리(`!= null`).
+      - API(board, 기존 경로 확장): `postInput`이 `partId`를 받는다 — 본인 차량의 부품이 아니면 403, `vehicleId`가 비어 있으면 그 부품의 차량으로 채우고, 다른 차량이면 400. 보관 차량의 부품은 새 글·다른 글에 새로 연결할 수 없고(400) 이미 연결된 글은 유지(정책 (c)). `PUT /posts/:id`는 `partId`가 있을 때만 바꾸고(null이면 해제), 없으면 유지. 부품을 고르면 차량도 그 부품의 차량으로 바뀌고, 차량만 다른 차량(또는 해제)으로 바꾸면 기존 부품 연결은 같은 UPDATE에서 해제한다. `postSelect`에 `linkedPart`(공개 부품이고 작성자 소유 차량의 부품이며 작성자가 탈퇴하지 않았을 때만, `id·brand·name·spec·installedOn·removedOn·installMileage·removeMileage·hasPhoto`, 비용 없음)와 `partId`(작성자 본인에게만, 그 외 null).
+      - `GET /garage/:id` 확장: `verified`·`archivedAt`·`createdAt` 추가, `verificationStatus`는 소유자에게만, 정비 기록 비용 소유자만(위), `parts[]`(단계 3), `posts[]`(이 차량에 연결된 소유자의 삭제되지 않은 글 최근 50개, `id·title·category·createdAt·partId` — `partId`는 그 응답에서 보이는 부품일 때만). 번호판은 여전히 SELECT하지 않는다.
+      - 화면: 부품 카드(/home 수정 창, 공개 차고의 내 차량)에 "후기 쓰기" → `/community/new?category=parts&vehicleId=X&partId=Y`. 편집기는 쿼리로 차량·부품을 미리 선택하고, 선택한 차량의 부품 목록(보관 차량이면 현재 연결된 부품만)에서 바꾸거나 "연결하지 않음"으로 해제할 수 있다. 비공개 부품을 고르면 "비공개 부품이라 글에 장착 정보가 표시되지 않아요". 그 차량에 없는 부품 id는 버린다. 글 상세 사이드바에 "이 글의 부품 장착 정보" 박스(차량 박스와 따로, 예: "2025-03-02부터 · 7개월째 · 장착 시 12,000km · 사진 첨부", 탈거 부품은 기간·사용 거리). 공개 차고(`/community/cars/:id`): 헤더(인증 차량/등록 차량/이전 보유 차량) → 현재 장착 부품 → 타임라인(차고 등록·기록·부품 장착/탈거·연결 글을 클라이언트에서 날짜순으로 합침, 같은 날은 등록<장착<기록<탈거<글 순으로 최신 위) → 기록 → 과거 부품. 부품 카드마다 연결 후기 링크. 장착 기간 문구는 `lib/format.ts` `partPeriodLabel` 하나로.
+      - 삭제·수정 관계(테스트로 확인): 글 삭제(soft)는 부품에 영향 없음, 부품 삭제 → 글 `part_id` NULL·글 정상·박스 없음(단계 3), 부품 비공개 전환 → 박스 숨김·공개 차고 `posts[].partId` 숨김(소유자에게는 보임), 차량 영구 삭제 → 부품 CASCADE·글의 `vehicle_id`·`part_id` NULL·글은 남음.
+      - 검증: board `npm test` 111(기존 `app.test.js`의 INSERT 값 배열에 `part_id` 자리 추가). `scripts/run-board-system.sh` — community(기록 비용·심사 상태 소유자만, 번호판 없음, 부품만 골라 차량 채움, `linkedPart` 값·비용 없음, `partId` 작성자만, 남의 부품 403, 차량-부품 불일치 400, 수정 시 유지/해제/재연결/차량 변경 시 해제, 비공개 부품 박스·`posts[].partId` 숨김, 보관 차량 부품 새 글·다른 글 400·기존 글 유지, 글 soft delete 후 부품 유지, 차량 영구 삭제 후 부품 0·글 `vehicle_id`·`part_id` NULL·글 상세 정상), withdrawal(탈퇴 회원 차량 `GET /garage/:id` 404) 등 7개 PASS. motorsport-system은 기존 실패(같은 단언, 근거는 단계 3 기록). frontend `tsc`·`next build`. 로컬 브라우저(데스크톱): 부품 "후기 쓰기" 링크 → 편집기에 차량·부품 미리 선택 → 등록 → 글 상세 "이 글의 부품 장착 정보"(인증 오너 차량 박스와 따로) → 공개 차고 헤더 "인증 차량"·타임라인 4건·과거 부품 카드의 "후기: …" 링크.
+      - 미확인(단계 5 전체 검증에 포함): 390px 모바일 폭(이번 세션 창 크기 조정 불가는 단계 3과 같음), 비로그인·타인 시점의 화면(API는 시스템 테스트로 확인).
+      - 배포 메모(미실행): 마이그레이션 없음 → DB 백업은 생략 가능하지만 이전과 같이 롤백 이미지 태그는 남긴다. board와 frontend가 같이 바뀌므로 한 번의 `up -d --build --wait`. 새 frontend가 잠시 옛 board 응답을 받아도 `parts`·`posts`·`linkedPart` 등은 선택 필드로 처리.
 ### 보류 (현재 규모에서는 오버헤드 — 실제 필요가 생기면 재개)
 
 기록과 계획은 지우지 않는다. 기존 system/browser/E2E 테스트 자산도 지우지 않고, 큰 릴리스·배포 경계에서만 쓴다.
@@ -1250,7 +1259,7 @@ _(작업 중 발견하면 여기에 "STEP 번호 — 파일:설명" 형식으로
 
 - LATER-4 MVP 단계 2(2026-11-02) — `scripts/motorsport-system.mjs`가 게시글 목록 응답에 `motorsport_event_id`/`motorsportEventId`가 없어야 한다고 단언하지만(83행 부근), `postSelect`는 `motorsportEventId`를 내려준다. 단계 2 코드를 빼고 실행해도 같은 단언에서 실패하므로 기존 불일치다(어느 쪽이 의도인지 확인 필요, 수정하지 않음). CI는 이 수동 시스템 테스트를 돌리지 않는다.
 
-- LATER-4 MVP 단계 3(2026-11-02) — 기존 `GET /api/board/garage/:id`가 정비 기록(`vehicle_records`)의 `cost`를 누구에게나(비로그인 포함) 내려준다. 부품 비용은 소유자에게만 주도록 했지만 기록 비용은 원래 동작 그대로 두었다(범위 밖, 수정하지 않음). 공개 차고 통합(단계 4) 때 같이 정할 대상.
+- ~~LATER-4 MVP 단계 3(2026-11-02) — 기존 `GET /api/board/garage/:id`가 정비 기록(`vehicle_records`)의 `cost`를 누구에게나(비로그인 포함) 내려준다.~~ → **해결(단계 4, 2026-11-02)**: 소유자에게만 `cost`, 그 외 응답에는 키 없음.
 - LATER-4 MVP 단계 3(2026-11-02) — 위 단계 2의 motorsport-system 실패 항목에 근거 추가: 단계 1 이전 커밋 `10f2589`에서도 같은 단언으로 실패하고, 단언 도입 `13ed78f` 뒤 `c81c99c`가 응답에 `motorsportEventId`를 넣었다.
 
 ---

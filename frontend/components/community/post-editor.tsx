@@ -7,10 +7,11 @@ import {
   createPost,
   fetchMyVehicles,
   fetchPost,
+  fetchPublicVehicle,
   updatePost,
   uploadImage,
 } from '../../lib/community-api';
-import type {CommunityPost, LinkedMotorsportEvent, MyVehicle, PostInput} from '../../lib/community-types';
+import type {CommunityPost, LinkedMotorsportEvent, MyVehicle, PostInput, VehiclePart} from '../../lib/community-types';
 import type {PostCategory} from '../../lib/home-types';
 import {imageUrl, postUrl} from '../../lib/format';
 import {fetchEvents} from '../../lib/motorsport-api';
@@ -30,7 +31,7 @@ const MAX_IMAGES = 3;
 const TITLE_MAX = 150;
 const CONTENT_MAX = 5000;
 
-type Fields = Omit<PostInput, 'vehicleId' | 'motorsportEventId'> & {vehicleId: string; motorsportEventId: string};
+type Fields = Omit<PostInput, 'vehicleId' | 'motorsportEventId' | 'partId'> & {vehicleId: string; motorsportEventId: string; partId: string};
 type LoadState =
   | {status: 'loading'}
   | {status: 'login'}
@@ -67,13 +68,16 @@ export default function PostEditor({postId}: {postId?: number}) {
     const value = searchParams.get('category');
     return isCategory(value) ? value : 'free';
   })();
+  // "후기 쓰기" from a part card opens /community/new?category=parts&vehicleId=X&partId=Y.
+  const queryId = (name: string) => (/^[1-9]\d{0,9}$/.test(searchParams.get(name) ?? '') ? (searchParams.get(name) as string) : '');
   const emptyFields: Fields = {
     category: initialCategory,
     title: '',
     content: '',
     vehicle: '',
-    vehicleId: '',
+    vehicleId: queryId('vehicleId'),
     motorsportEventId: '',
+    partId: queryId('partId'),
     imageIds: [],
   };
 
@@ -103,6 +107,39 @@ export default function PostEditor({postId}: {postId?: number}) {
   const post = load.status === 'ready' ? load.post : null;
   const returnTo = post ? postUrl(post) : `/community${isCategory(searchParams.get('category')) ? `?category=${initialCategory}` : ''}`;
 
+  // Parts of the selected vehicle (owner view: private parts included). Parts of
+  // an archived vehicle can't be newly linked, so only the post's current link
+  // stays selectable there. A part id that isn't among them is dropped.
+  const [parts, setParts] = useState<VehiclePart[] | 'loading' | 'error' | null>(null);
+  const vehicleKey = ready ? fields.vehicleId : '';
+  useEffect(() => {
+    if (!vehicleKey || !Array.isArray(vehicles)) {
+      setParts(null);
+      return;
+    }
+    let cancelled = false;
+    const archived = Boolean(vehicles.find((v) => String(v.id) === vehicleKey)?.archivedAt);
+    const keep = post?.partId == null ? '' : String(post.partId);
+    setParts('loading');
+    fetchPublicVehicle(Number(vehicleKey))
+      .then((vehicle) => {
+        if (cancelled) return;
+        const list = (vehicle.parts ?? []).filter((p) => !archived || String(p.id) === keep);
+        setParts(list);
+        setFields((f) => (f.partId && !list.some((p) => String(p.id) === f.partId) ? {...f, partId: ''} : f));
+        setBaseline((b) => {
+          if (b === null) return b;
+          const base = JSON.parse(b) as Fields;
+          return base.partId && !list.some((p) => String(p.id) === base.partId) ? snapshot({...base, partId: ''}) : b;
+        });
+      })
+      .catch(() => !cancelled && setParts('error'));
+    return () => {
+      cancelled = true;
+    };
+  }, [vehicleKey, vehicles, post]);
+  const selectedPart = Array.isArray(parts) ? parts.find((p) => String(p.id) === fields.partId) ?? null : null;
+
   // --- Load: wait for the session, then (edit) the post, then my vehicles. ---
   const loadVehicles = useCallback(async (request: number, initial: Fields, isNew: boolean) => {
     setVehicles('loading');
@@ -118,12 +155,13 @@ export default function PostEditor({postId}: {postId?: number}) {
       const current = cars.filter((c) => !c.archivedAt);
       const linked = cars.some((c) => String(c.id) === initial.vehicleId)
         ? initial.vehicleId
-        : isNew && current.length === 1
+        : isNew && !initial.vehicleId && current.length === 1
           ? String(current[0].id)
           : '';
-      const start = {...initial, vehicleId: linked};
+      // A part link only makes sense with its vehicle; it's checked against that vehicle's parts below.
+      const start = {...initial, vehicleId: linked, partId: linked ? initial.partId : ''};
       setVehicles(cars);
-      setFields((f) => ({...f, vehicleId: linked}));
+      setFields((f) => ({...f, vehicleId: linked, partId: start.partId}));
       setBaseline(snapshot(start));
     } catch {
       if (request === version.current) setVehicles('error');
@@ -196,6 +234,7 @@ export default function PostEditor({postId}: {postId?: number}) {
             content: existing.content,
             vehicle: existing.vehicle || '',
             vehicleId: existing.vehicleId == null ? '' : String(existing.vehicleId),
+            partId: existing.partId == null ? '' : String(existing.partId),
             motorsportEventId: existing.motorsportEventId == null ? '' : String(existing.motorsportEventId),
             imageIds: [...existing.imageIds],
           }
@@ -295,6 +334,7 @@ export default function PostEditor({postId}: {postId?: number}) {
       ...fields,
       vehicleId: fields.vehicleId ? Number(fields.vehicleId) : null,
       motorsportEventId: fields.motorsportEventId ? Number(fields.motorsportEventId) : null,
+      partId: fields.partId ? Number(fields.partId) : null,
     };
     try {
       const result = post ? await updatePost(post.id, input) : await createPost(input);
@@ -422,7 +462,7 @@ export default function PostEditor({postId}: {postId?: number}) {
                         name="vehicleId"
                         value={fields.vehicleId}
                         // A legacy text-only vehicle label is kept unless the link changes.
-                        onChange={(e) => setFields((f) => ({...f, vehicleId: e.target.value, vehicle: ''}))}
+                        onChange={(e) => setFields((f) => ({...f, vehicleId: e.target.value, vehicle: '', partId: ''}))}
                       >
                         <option value="">연결하지 않음</option>
                         {vehicles.map((car) => (
@@ -432,6 +472,26 @@ export default function PostEditor({postId}: {postId?: number}) {
                         ))}
                       </select>
                     </label>
+                  )}
+                  {fields.vehicleId && Array.isArray(parts) && parts.length > 0 && (
+                    <label>
+                      부품 연결 (선택)
+                      <select
+                        name="partId"
+                        value={fields.partId}
+                        onChange={(e) => setFields((f) => ({...f, partId: e.target.value}))}
+                      >
+                        <option value="">연결하지 않음</option>
+                        {parts.map((part) => (
+                          <option key={part.id} value={String(part.id)}>
+                            {`${part.brand} ${part.name}${part.removedOn ? ' (탈거)' : ''}${part.isPublic ? '' : ' · 비공개'}`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  {selectedPart && !selectedPart.isPublic && (
+                    <p className={styles.muted}>비공개 부품이라 글에 장착 정보가 표시되지 않아요.</p>
                   )}
                   {Array.isArray(vehicles) && vehicles.length === 0 && (
                     <>

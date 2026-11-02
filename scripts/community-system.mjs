@@ -502,11 +502,86 @@ try {
   assert.equal((await db.query("SELECT count(*)::int AS n FROM community_images WHERE id=$1", [partImage.id])).rows[0].n, 1);
   await req(`/posts/${partPost.id}`, "DELETE", {});
   await req(`/garage/${otherCar.id}`, "DELETE", {}, tokenB);
+  // 후기 연결·공개 차고(MVP 단계 4).
+  // 정비 기록 비용·심사 상태는 소유자에게만, 번호판은 누구에게도 내려가지 않는다.
+  await req(`/garage/${car.id}/records`, "POST", { kind: "maintenance", title: "브레이크 패드", date: "2026-09-01", cost: 150000 }, tokenA, 201);
+  const ownGarage = await req(`/garage/${car.id}`);
+  assert.equal(ownGarage.records[0].cost, 150000);
+  assert.equal(ownGarage.verificationStatus, "APPROVED");
+  for (const token of [tokenB, ""]) {
+    const view = await req(`/garage/${car.id}`, "GET", undefined, token);
+    assert.ok(view.records.length && view.records.every((r) => !("cost" in r)));
+    assert.ok(!("verificationStatus" in view));
+    assert.equal(view.verified, true);
+    assert.equal(view.archivedAt, null);
+    assert.ok(view.createdAt);
+    assert.ok(!JSON.stringify(view).includes("150000") && !JSON.stringify(view).includes("PRIVATE-PLATE"));
+  }
+  const pub = await req(`/garage/${car.id}/parts`, "POST", { brand: "Ohlins", name: "DFV", installedOn: "2025-03-02", installMileage: 12000, cost: 2500000 }, tokenA, 201);
+  // 부품만 고르면 차량은 그 부품의 차량으로 채워진다. 글에는 공개 부품의 장착 정보(비용 없음)가 붙고, partId는 작성자만 본다.
+  const review = await req("/posts", "POST", { title: "DFV 후기", content: "좋다", category: "parts", partId: pub.id }, tokenA, 201);
+  let reviewDetail = await req(`/posts/${review.id}`);
+  assert.equal(reviewDetail.vehicleId, car.id);
+  assert.equal(reviewDetail.partId, pub.id);
+  assert.deepEqual(reviewDetail.linkedPart, { id: pub.id, brand: "Ohlins", name: "DFV", spec: "", installedOn: "2025-03-02", removedOn: null, installMileage: 12000, removeMileage: null, hasPhoto: false });
+  for (const token of [tokenB, ""]) {
+    const other = await req(`/posts/${review.id}`, "GET", undefined, token);
+    assert.equal(other.partId, null);
+    assert.equal(other.linkedPart.id, pub.id);
+    assert.ok(!JSON.stringify(other).includes("2500000"));
+  }
+  // 남의 부품 403, 다른 차량의 부품 400.
+  const carB = await req("/garage", "POST", { model: "Ray", year: 2020 }, tokenB, 201);
+  const partB = await req(`/garage/${carB.id}/parts`, "POST", { brand: "BBS", name: "LM", installedOn: "2024-01-01" }, tokenB, 201);
+  await req("/posts", "POST", { title: "x", content: "x", category: "parts", partId: partB.id }, tokenA, 403);
+  const carA2 = await req("/garage", "POST", { model: "Veloster N", year: 2022 }, tokenA, 201);
+  await req("/posts", "POST", { title: "x", content: "x", category: "parts", vehicleId: carA2.id, partId: pub.id }, tokenA, 400);
+  // 수정: partId 없으면 유지, null이면 해제(차량은 유지), 다시 연결, 차량만 바꾸면 부품 연결 해제.
+  const reviewBody = { title: "DFV 후기", content: "좋다", category: "parts" };
+  await req(`/posts/${review.id}`, "PUT", reviewBody);
+  assert.equal((await req(`/posts/${review.id}`)).partId, pub.id);
+  await req(`/posts/${review.id}`, "PUT", { ...reviewBody, partId: null });
+  reviewDetail = await req(`/posts/${review.id}`);
+  assert.deepEqual([reviewDetail.partId, reviewDetail.linkedPart, reviewDetail.vehicleId], [null, null, car.id]);
+  await req(`/posts/${review.id}`, "PUT", { ...reviewBody, partId: pub.id });
+  assert.equal((await req(`/posts/${review.id}`)).linkedPart.id, pub.id);
+  await req(`/posts/${review.id}`, "PUT", { ...reviewBody, vehicleId: carA2.id });
+  reviewDetail = await req(`/posts/${review.id}`);
+  assert.deepEqual([reviewDetail.vehicleId, reviewDetail.partId], [carA2.id, null]);
+  await req(`/posts/${review.id}`, "PUT", { ...reviewBody, vehicleId: car.id, partId: pub.id });
+  // 비공개 부품: 연결은 되지만 장착 정보 박스는 누구에게도(작성자 포함) 없다. 공개 차고 posts[]의 partId도 숨는다.
+  await req(`/garage/${car.id}/parts/${pub.id}`, "PUT", { brand: "Ohlins", name: "DFV", installedOn: "2025-03-02", installMileage: 12000, cost: 2500000, isPublic: false });
+  assert.equal((await req(`/posts/${review.id}`)).linkedPart, null);
+  assert.equal((await req(`/posts/${review.id}`, "GET", undefined, tokenB)).linkedPart, null);
+  assert.equal((await req(`/garage/${car.id}`, "GET", undefined, tokenB)).posts.find((p) => p.id === review.id).partId, null);
+  assert.equal((await req(`/garage/${car.id}`)).posts.find((p) => p.id === review.id).partId, pub.id);
+  await req(`/garage/${car.id}/parts/${pub.id}`, "PUT", { brand: "Ohlins", name: "DFV", installedOn: "2025-03-02", installMileage: 12000, cost: 2500000, isPublic: true });
+  const publicGarage = await req(`/garage/${car.id}`, "GET", undefined, "");
+  assert.deepEqual(publicGarage.posts.find((p) => p.id === review.id), { id: review.id, title: "DFV 후기", category: "parts", createdAt: publicGarage.posts.find((p) => p.id === review.id).createdAt, partId: pub.id });
+  // 보관 차량의 부품은 새 글에 연결할 수 없고, 이미 연결된 글은 그대로 수정할 수 있다.
+  const partA2 = await req(`/garage/${carA2.id}/parts`, "POST", { brand: "Bilstein", name: "B16", installedOn: "2024-06-01" }, tokenA, 201);
+  const archivedReview = await req("/posts", "POST", { title: "B16", content: "x", category: "parts", partId: partA2.id }, tokenA, 201);
+  await req(`/garage/${carA2.id}/archive`, "PATCH", { archived: true });
+  await req("/posts", "POST", { title: "x", content: "x", category: "parts", partId: partA2.id }, tokenA, 400);
+  await req(`/posts/${post.id}`, "PUT", { ...draft, partId: partA2.id }, tokenA, 400);
+  await req(`/posts/${archivedReview.id}`, "PUT", { title: "B16 수정", content: "x", category: "parts", partId: partA2.id });
+  assert.equal((await req(`/posts/${archivedReview.id}`)).linkedPart.id, partA2.id);
+  // 글 삭제(soft)는 부품에 영향 없음. 차량 영구 삭제 → 부품 CASCADE, 글의 vehicle_id·part_id는 NULL(글은 남는다).
+  await req(`/posts/${archivedReview.id}`, "DELETE", {});
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM vehicle_parts WHERE id=$1", [partA2.id])).rows[0].n, 1);
+  await db.query("UPDATE board_posts SET deleted=false,deleted_at=NULL,deleted_by=NULL,deleted_reason=NULL WHERE id=$1", [archivedReview.id]);
+  await req(`/garage/${carA2.id}`, "DELETE", {});
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM vehicle_parts WHERE vehicle_id=$1", [carA2.id])).rows[0].n, 0);
+  assert.deepEqual((await db.query("SELECT vehicle_id,part_id FROM board_posts WHERE id=$1", [archivedReview.id])).rows[0], { vehicle_id: null, part_id: null });
+  const orphan = await req(`/posts/${archivedReview.id}`);
+  assert.deepEqual([orphan.vehicleId, orphan.linkedPart, orphan.linkedVehicle], [null, null, null]);
+  for (const id of [review.id, archivedReview.id]) await req(`/posts/${id}`, "DELETE", {});
+  await req(`/garage/${carB.id}`, "DELETE", {}, tokenB);
   await req(`/garage/${car.id}`, "DELETE", {});
   await req(`/garage/${car.id}`, "GET", undefined, tokenA, 404);
   assert.equal((await db.query("SELECT count(*)::int AS n FROM vehicle_parts WHERE vehicle_id=$1", [car.id])).rows[0].n, 0);
   console.log(
-    "PASS: author profile/statistics, derived verification badge, private field exclusion, related filters, Flyway migrations, image validation, posts, search/categories, ownership, likes/bookmarks, comments/replies, notifications, reports, garage/records, garage verification integrity, vehicle archive, vehicle parts, cascade deletion.",
+    "PASS: author profile/statistics, derived verification badge, private field exclusion, related filters, Flyway migrations, image validation, posts, search/categories, ownership, likes/bookmarks, comments/replies, notifications, reports, garage/records, garage verification integrity, vehicle archive, vehicle parts, part reviews/public garage, cascade deletion.",
   );
 } finally {
   if (server) {

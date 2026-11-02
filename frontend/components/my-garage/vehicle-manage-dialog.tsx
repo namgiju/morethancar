@@ -327,7 +327,7 @@ export default function VehicleManageDialog({
                   <strong>{r.title}</strong>
                   {r.content && <p>{r.content}</p>}
                   <small className={styles.empty}>
-                    {[r.mileage !== null ? `${r.mileage.toLocaleString()} km` : '', r.cost !== null ? `${r.cost.toLocaleString()}원` : '']
+                    {[r.mileage !== null ? `${r.mileage.toLocaleString()} km` : '', r.cost != null ? `${r.cost.toLocaleString()}원` : '']
                       .filter(Boolean)
                       .join(' · ')}
                   </small>

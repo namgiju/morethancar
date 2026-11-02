@@ -75,3 +75,32 @@ export const listingUrl = (id: number) => `/parts/${id}`;
 
 export const motorsportUrl = (id: number) => `/motorsport/${id}`;
 export const spotUrl = (id: number) => `/spots/${id}`;
+
+// Part install box text shared by the post sidebar, the public garage and the
+// owner's part cards, e.g. "2025-03-02부터 · 7개월째 · 사진 첨부". Usage distance
+// appears only when both install and removal mileage are known. The evidence
+// label is computed ("사진 첨부" / "사용자 입력") — never 인증/검증.
+export function partPeriodLabel(
+  part: {installedOn: string; removedOn: string | null; installMileage: number | null; removeMileage: number | null; hasPhoto: boolean},
+  today: string,
+): string {
+  const end = part.removedOn ?? today;
+  const [y1, m1, d1] = part.installedOn.split('-').map(Number);
+  const [y2, m2, d2] = end.split('-').map(Number);
+  const months = Math.max(0, (y2 - y1) * 12 + (m2 - m1) - (d2 < d1 ? 1 : 0));
+  const span = months < 1 ? '1개월 미만' : `${months}개월`;
+  const used =
+    part.installMileage !== null && part.removeMileage !== null
+      ? `${(part.removeMileage - part.installMileage).toLocaleString()}km`
+      : part.installMileage !== null
+        ? `장착 시 ${part.installMileage.toLocaleString()}km`
+        : '';
+  return [
+    part.removedOn ? `${part.installedOn} ~ ${part.removedOn}` : `${part.installedOn}부터`,
+    part.removedOn ? `${span} 사용` : `${span}째`,
+    used,
+    part.hasPhoto ? '사진 첨부' : '사용자 입력',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}

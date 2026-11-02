@@ -101,6 +101,8 @@ try {
   // 탈퇴 회원의 차고·프로필은 없다.
   await req(`/api/board/members/${W}`, { expected: 404 });
   assert.deepEqual(await req(`/api/board/garage?owner=${W}`), []);
+  // MVP 단계 4: 탈퇴 회원의 차량 상세(공개 차고·공유 페이지의 데이터)는 404.
+  await req(`/api/board/garage/${wCar}`, { expected: 404 });
   console.log("PASS withdrawal (board view): V5 schema checks, withdrawn session refused, closed listing hidden from list/search/favorites/detail/view/favorite (admin detail only, no contact), sold listing kept with anonymous seller/no contact/region/photos, retained post and photo, closed-listing photo private, garage/profile/part photos removed.");
 } finally {
   server?.closeAllConnections?.();
