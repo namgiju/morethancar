@@ -1,4 +1,4 @@
-# Spring(core)과 Node(board) 테스트를 push/PR마다 자동 실행한다.
+# Spring(core)과 Node(board) 테스트, compose 설정 검사를 push/PR마다 자동 실행한다.
 # 로컬에서 쓰는 명령(mvn test, npm test)을 그대로 쓰고, 버전은 각 Dockerfile과 맞춘다
 # (maven:3.9.9-eclipse-temurin-23, node:22-alpine).
 name: CI
@@ -71,3 +71,13 @@ jobs:
           cache-dependency-path: board-service/package-lock.json
       - run: npm ci
       - run: npm test
+
+  compose:
+    # core/board healthcheck가 DB를 깨우는 경로로, 운영 Hikari 최소 유휴가 1 이상으로 돌아가면 Neon이 자동 정지하지 못한다.
+    name: Compose idle check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose version
+      - run: scripts/compose-idle-check.sh

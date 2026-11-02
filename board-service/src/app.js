@@ -44,8 +44,11 @@ export function createApp({ db, redis, healthTimeoutMs = 3_000 }) {
     res.set("Cache-Control", "no-store");
     next();
   });
-  // DB(SELECT 1)와 Redis(PING)를 확인한다. /health는 Compose healthcheck용(컨테이너 안),
-  // /api/board/health는 nginx의 /api/board 경로를 거쳐 외부 uptime 감시가 부른다.
+  // 생존 확인(liveness): DB·Redis를 건드리지 않고 프로세스가 요청을 받는지만 본다. Compose healthcheck처럼
+  // 자주 부르는 확인은 이쪽을 써야 Neon이 5분 비활동 뒤 정지할 수 있다. server.js는 Redis 연결 뒤에 listen한다.
+  app.get(["/health/live", "/api/board/health/live"], (req, res) => res.json({ status: "ok" }));
+  // 준비 확인(readiness): DB(SELECT 1)와 Redis(PING)를 확인한다. /health는 컨테이너 안에서 수동 점검용,
+  // /api/board/health는 nginx의 /api/board 경로를 거쳐 외부 uptime 감시가 부른다. 부를 때마다 DB를 깨운다.
   // Redis가 끊기면 명령이 재연결까지 대기열에서 기다리고 DB는 연결 대기 5초·쿼리 15초까지 걸리므로,
   // 전체를 healthTimeoutMs로 끊어 503을 낸다. 실패 원인은 로그에만 남기고 응답에는 싣지 않는다.
   app.get(["/health", "/api/board/health"], async (req, res) => {

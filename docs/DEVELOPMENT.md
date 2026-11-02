@@ -66,7 +66,7 @@ PGHOST=localhost PGPORT=5433 PGDATABASE=revcc PGUSER=revcc PGPASSWORD=revcc \
   REDIS_PASSWORD=revcc-local-redis npm start
 ```
 
-- API: http://localhost:3001 (`/health`로 확인)
+- API: http://localhost:3001 (`/health/live`는 프로세스만, `/health`는 DB·Redis까지 확인)
 - board는 DDL을 실행하지 않는다. core를 먼저 한 번 기동해 스키마를 만든다.
 
 ### Next.js (frontend)

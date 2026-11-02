@@ -86,9 +86,14 @@ services:
     restart: unless-stopped
     networks: [app, data]
     environment:
-      # DB 커넥션 풀(Hikari). 기본값은 application.yml(최대 10, 최소 유휴 2, 연결 대기 5초).
+      # DB 커넥션 풀(Hikari). 최대 10, 연결 대기 5초.
+      # 운영은 유휴 연결을 남기지 않는다(최소 유휴 0, 유휴 60초 뒤 닫음). HikariCP 6.3은 유휴 연결마다
+      # 2분(keepaliveTime 기본값)마다 확인 쿼리를 보내고 30분(max-lifetime)마다 새로 연결하므로,
+      # 최소 유휴가 1 이상이면 요청이 없어도 Neon이 5분 비활동 정지에 들어가지 못한다.
+      # 대신 유휴 뒤 첫 요청은 새 연결(+ Neon 정지 상태면 재기동) 시간만큼 느려진다.
       DB_POOL_MAX: ${CORE_DB_POOL_MAX:-10}
-      DB_POOL_MIN_IDLE: ${CORE_DB_POOL_MIN_IDLE:-2}
+      DB_POOL_MIN_IDLE: ${CORE_DB_POOL_MIN_IDLE:-0}
+      DB_IDLE_TIMEOUT_MS: ${CORE_DB_IDLE_TIMEOUT_MS:-60000}
       DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-5000}
       SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:?DB_HOST(Neon 호스트)를 설정해야 배포할 수 있습니다.}:${DB_PORT:-5432}/${DB_NAME:?DB_NAME을 설정해야 배포할 수 있습니다.}?sslmode=require
       POSTGRES_USER: ${DB_USER:?DB_USER를 설정해야 배포할 수 있습니다.}
@@ -111,6 +116,7 @@ services:
     networks: [app, data]
     environment:
       # DB 커넥션 풀(pg.Pool). 기본값은 src/db-pool.js(최대 10, 유휴 30초, 연결 대기 5초).
+      # pg-pool은 최소 유휴가 0(기본)이고 keepalive 쿼리가 없어 유휴 30초 뒤 연결을 모두 닫는다 — 따로 바꾸지 않는다.
       PG_POOL_MAX: ${BOARD_DB_POOL_MAX:-10}
       PG_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-5000}
       PGHOST: ${DB_HOST:?DB_HOST(Neon 호스트)를 설정해야 배포할 수 있습니다.}
