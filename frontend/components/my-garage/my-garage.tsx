@@ -55,6 +55,14 @@ export default function MyGarage() {
     if (session) load();
   }, [session, reloadKey, load]);
 
+  // The manage dialog stays open across reloads (state goes back to 'loading'),
+  // so keep the last known verification of the open vehicle instead of dropping it.
+  const [managedVehicle, setManagedVehicle] = useState<OwnerVehicle | undefined>();
+  useEffect(() => {
+    if (manageVehicleId === null) setManagedVehicle(undefined);
+    else if (state.status === 'ready') setManagedVehicle(state.vehicles.find((v) => v.id === manageVehicleId));
+  }, [manageVehicleId, state]);
+
   async function chooseRepresentative(vehicleId: number) {
     setRepBusyId(vehicleId);
     try {
@@ -187,6 +195,8 @@ export default function MyGarage() {
       {manageVehicleId !== null && (
         <VehicleManageDialog
           vehicleId={manageVehicleId}
+          verified={managedVehicle?.verified ?? false}
+          verificationStatus={managedVehicle?.verificationStatus ?? null}
           onClose={() => setManageVehicleId(null)}
           onChanged={() => setReloadKey((k) => k + 1)}
         />

@@ -119,3 +119,33 @@ function createApp({db,redis}) {
   return baseCreateApp({redis,db:{...db,query:(sql,values) => sql.startsWith('SELECT COALESCE(auth_version')
     ? Promise.resolve({rows:[{version:0,status:'ACTIVE',suspended_until:null}]}) : query(sql,values)}});
 }
+
+test("garage PUT: 심사 중 모델·연식 변경은 409, 타인 차량은 403, 인증 해제는 같은 UPDATE 안에서", async (t) => {
+  const calls = [];
+  let owned = true;
+  const app = createApp({
+    redis: { get: async () => JSON.stringify({ id: 7, username: "owner" }) },
+    db: { query: async (sql, values) => {
+      calls.push({ sql, values });
+      if (sql.startsWith("UPDATE owner_vehicles")) return { rows: [] };
+      return { rows: owned ? [{ "?column?": 1 }] : [] };
+    } },
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const put = () => fetch(`http://127.0.0.1:${server.address().port}/api/board/garage/5`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `REVCC_SESSION=${"c".repeat(43)}` },
+    body: JSON.stringify({ model: " 아반떼 N ", year: 2023 }),
+  });
+  const conflict = await put();
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).message, "인증 심사 중에는 차종·연식·번호판을 수정할 수 없어요.");
+  const update = calls.find((c) => c.sql.startsWith("UPDATE owner_vehicles"));
+  assert.deepEqual(update.values.slice(0, 3), [7, "아반떼 N", 2023]);
+  assert.match(update.sql, /WHERE owner_id=\$1 AND id=\$7 AND NOT \(verification_status IS NOT DISTINCT FROM 'PENDING'/);
+  assert.match(update.sql, /verification_status=CASE WHEN/);
+  owned = false;
+  assert.equal((await put()).status, 403);
+});

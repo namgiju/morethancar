@@ -530,13 +530,26 @@ export function communityRouter({ db, auth }) {
     );
     res.status(201).json(rows[0]);
   });
+  // 여기서 바꿀 수 있는 인증 핵심 필드는 모델·연식이다(제조사·번호판은 core API `PUT /api/garage/vehicles/:id`에서만 바꾼다).
+  // 심사 중(PENDING)이면 바꿀 수 없고, 승인된 차량에서 바꾸면 인증을 해제한다. SET·WHERE의 컬럼은 수정 전 값이다.
   router.put("/garage/:id", auth, async (req, res) => {
     const values = await vehicleInput(req.body, req.user.id);
+    const changed = "(model IS DISTINCT FROM $2 OR year IS DISTINCT FROM $3)";
+    const approved = "(verified OR verification_status='APPROVED')";
     const { rows } = await db.query(
-      `UPDATE owner_vehicles SET model=$2,year=$3,trim=$4,bio=$5,image_id=$6,updated_at=NOW() WHERE owner_id=$1 AND id=$7 RETURNING id`,
+      `UPDATE owner_vehicles SET model=$2,year=$3,trim=$4,bio=$5,image_id=$6,updated_at=NOW(),
+         verified=CASE WHEN ${changed} THEN false ELSE verified END,
+         verification_status=CASE WHEN ${changed} AND ${approved} THEN NULL ELSE verification_status END,
+         verified_at=CASE WHEN ${changed} AND ${approved} THEN NULL ELSE verified_at END
+       WHERE owner_id=$1 AND id=$7 AND NOT (verification_status IS NOT DISTINCT FROM 'PENDING' AND ${changed})
+       RETURNING id`,
       [...values, req.params.id],
     );
-    if (!rows.length) fail(403, "본인 차량만 수정할 수 있어요.");
+    if (!rows.length) {
+      const own = await db.query("SELECT 1 FROM owner_vehicles WHERE owner_id=$1 AND id=$2", [req.user.id, req.params.id]);
+      if (own.rows.length) fail(409, "인증 심사 중에는 차종·연식·번호판을 수정할 수 없어요.");
+      fail(403, "본인 차량만 수정할 수 있어요.");
+    }
     res.json(rows[0]);
   });
   router.delete("/garage/:id", auth, async (req, res) => {

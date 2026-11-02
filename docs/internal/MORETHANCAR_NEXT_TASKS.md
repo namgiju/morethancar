@@ -121,7 +121,7 @@
 [ ] LATER-1: 카카오 회원 탈퇴 최소 구현 (배포 이후 제품 완성도 작업, 구 STEP 10-impl-D 축소) — 2026-11-02 사용자 결정으로 보류, LATER-4 MVP 단계 1부터 먼저 진행
 [x] LATER-2: 비밀번호 재설정 응답 통일 (작은 보안 정리, 구 STEP 11 축소) — 2026-10-23 PR #15 운영 배포(`76e8985`), 운영 일반 계정으로 메일 수신·재설정 성공 확인
 [ ] LATER-5: 운영 성능 메모 — SSR 내부 API 호출이 nginx rate limit을 frontend IP 하나로 공유, `/_next/static` no-store (2026-10-06, 실제 429·속도 문제가 보이면 착수)
-[ ] LATER-4: 차량 기록/타임라인 — 자동 연결·사진 기록·기록 보존부터, timeline read API·UI·회고 모션은 마지막 (2026-10-06 계획, 아래 "차량 기록/타임라인" 참고)
+[~] LATER-4: 차량 기록/타임라인 — 2026-11-02 MVP 6단계 계획으로 대체(아래 LATER-4 "MVP 계획"). 단계 1 인증 무결성 구현·검증·커밋(브랜치, 미병합)
 ```
 
 - **NOW-1 UI/UX 개선 및 Next.js 전환**
@@ -402,6 +402,14 @@
   - **5. UI**: 같은 timeline API를 `/home`(내 차고)과 공개 차량 페이지(`/community/cars/:id`)에서 재사용한다. `vehicle-public.tsx`가 이미 `records`를 날짜순으로 보여주고 있어 UI 구조 자체는 크게 바뀌지 않는다(등록일·연결된 글이 같은 리스트에 섞여 들어가는 정도). 처음부터 화려한 모션 없이 일반적인 연대기 UI부터 만든다.
   - **6. 회고 모션그래픽** (가장 마지막 단계): 의미 있는 시점(차량을 "보관"으로 전환하는 시점 등)에서 기존 timeline 데이터로 만든다. 모션을 위한 별도 데이터는 저장하지 않는다.
   - **예상 난이도**: 1(자동 연결)·3(archived_at 컬럼+필터)은 작음, 2(사진 기록)는 중간(컬럼+kind 검증 변경+업로드 UI), 4(timeline API)는 중간(쿼리 설계·merge 로직), 5(UI)는 중간(기존 레이아웃 재사용 가능해 상대적으로 가벼움), 6(모션그래픽)은 범위 미정이라 가장 불확실 — 착수 시 별도로 다시 가늠한다.
+
+  - **MVP 계획(2026-11-02 사용자 지시, 위 2026-10-06 계획을 대체)**: 차량 등록 → 부품 기록 → 후기 작성 → 이력 공유 → 기록 축적. 단계 1 인증 무결성 / 2 차량 보관(V10 `archived_at`) / 3 부품 장착·탈거 이력(V11 `vehicle_parts`, `board_posts.part_id`) / 4 후기 연결 + 공개 차고 통합 / 5 부품 이력 공유(고정 URL + 텍스트 복사, 토큰 없음) / 6 이미지 리사이즈(6-a) + 캐시 분리(6-b, nginx 변경은 승인 후 병합). 위 1(자동 연결)·3(`archived_at`)은 단계 2에 들어가고, 2(사진 기록 kind)·4(timeline API)·6(회고 모션)은 이번 범위에서 빠진다(타임라인은 클라이언트에서 합친다).
+    - **진행 규칙**: 단계마다 최신 `main`(앞 단계 병합 후)에서 브랜치를 만든다. 커밋까지만 하고 push·PR·병합·운영 배포·다음 단계 착수는 단계별 보고 뒤 사용자 승인. 운영 서버·운영 DB·`.env`·`docker-compose.prod.yml`은 건드리지 않는다. 마이그레이션은 nullable 컬럼·새 테이블 추가만, 기존 행 수정·삭제 없음. 검증은 §5 경량화 원칙대로 관련 테스트 + CI 중심이고, 전체 회귀·전체 흐름 브라우저 확인은 단계 5 완료 후와 배포 전에만 한다.
+    - **확정된 정책(2026-11-02)**: (a) 인증 해제 핵심 필드 — Spring은 제조사·모델·연식·번호판, Express `PUT /garage/:id`는 모델·연식(이 경로는 trim·bio·사진도 고치지만 그 값은 인증과 무관). 값 비교는 서버가 trim한 뒤. (b) 보관 차량은 인증 신청 거부, 심사 중(PENDING) 차량은 보관 거부. (c) 보관 차량의 부품은 새 글에 연결할 수 없고 기존 글의 연결은 유지. (d) 부품 삭제 후 그 사진은 미참조 이미지로 남는다 — 알려진 제한(미참조 이미지 정리는 지금 회원 탈퇴 `WithdrawalService`에만 있다). (e) 부품 날짜 검증은 기존 records 기준(`recorded_on`과 같은 검증)을 따른다. (f) 이미지 캐시(6-b)는 board 공통 미들웨어의 `Cache-Control: no-store`(`app.js`)와 nginx server 레벨 `add_header Cache-Control "no-store"`(상속 끊김 포함)까지 확인한다. 공개 이미지를 비공개로 바꿔도 이미 받은 브라우저·중간 캐시는 최대 1시간(`max-age=3600`) 남을 수 있다 — 공개 범위 안내 문구와 정책에 이 점을 적는다. (g) 배포 순서 메모: 운영 DB 백업 → core(Flyway) → board → frontend, 롤백은 코드만 되돌리고 스키마는 남긴다(실행은 별도 승인).
+    - **[x] 단계 1 인증 무결성 (2026-11-02, 브랜치 `feat/mvp-1-verification-integrity`, 커밋만 — push·PR·배포 전)**: 문제 — 승인된 차량도 Spring `Vehicle.update()`와 Express `PUT /api/board/garage/:id`에서 핵심 필드를 바꿀 수 있었고 `verified=true`가 유지됐다. 변경: `Vehicle.update()` 한 메서드에서 trim 후 비교 → PENDING이면 409 "인증 심사 중에는 차종·연식·번호판을 수정할 수 없어요.", 승인(`verified` 또는 APPROVED)이면 `verified=false`·`verification_status=NULL`·`verified_at=NULL`, 미신청·REJECTED는 그대로 수정(REJECTED 상태 유지). Express는 한 UPDATE 문 안에서 CASE로 인증 컬럼을 초기화하고 WHERE에 PENDING+변경 제외 조건을 둔다. 갱신 행이 없으면 소유 여부만 다시 읽어 409/403을 나눈다(쓰기는 그 UPDATE 하나). `vehicle_verifications` 이력은 건드리지 않고, 재인증은 기존 `POST /api/garage/vehicles/{id}/verification`. 화면(`vehicle-manage-dialog.tsx`): 인증 차량에서 차종·연식을 바꿔 저장하면 CommunityDialog confirm "저장하면 오너 인증이 해제되고 다시 신청해야 해요.", 심사 중이면 두 칸 비활성 + 안내. 인증 상태는 `GET /garage/:id`에 없어서 `/home`이 이미 받는 Spring 목록(`OwnerVehicle`)에서 다이얼로그로 넘긴다(재조회 중에는 마지막 값 유지). 마이그레이션 없음.
+      - 검증: Spring `GarageVehicleServiceTest` 10건(승인 차량 핵심 필드 4종 변경 → 해제, 소개만·공백만 다른 값 → 유지, PENDING 핵심 변경 409·저장 안 됨·그 외 필드 허용, 미신청·REJECTED 자유 수정) + `VehicleVerificationControllerTest` 7건(해제 후 재신청 → PENDING 포함) + `GarageVehicleControllerTest` 4건 통과. Node `test/community.test.js` 4건(409 메시지·403 분기·SQL 조건) 통과. `scripts/run-board-system.sh scripts/community-system.mjs`(임시 PostgreSQL 16 + Flyway V1~V9) PASS — 실제 SQL로 승인 유지/해제(모델·연식 각각), PENDING 409·그 외 허용, REJECTED 유지, 미신청 자유 수정, 타인 403 확인. frontend `tsc --noEmit`·`next build` 통과. 전체 `mvn test`·`npm test`는 CI에 맡겼다(§5).
+      - 미확인: 브라우저로 confirm·비활성 화면을 직접 눌러 보지 않았다(전체 흐름 확인 때 함께, 저장소에 ESLint 설정 없음). Spring 경로는 지금 프런트엔드에서 호출하지 않는다(`updateOwnerVehicle`은 정의만 있음) — API로만 보호된다.
+      - 남은 위험: (1) 관리자 승인 API가 신청 행 상태를 확인하지 않아, 인증 해제 뒤 예전 신청 행을 다시 승인하면 새 서류 없이 인증이 돌아온다(아래 "발견된 추가 이슈", 이번에 고치지 않음). (2) Spring 수정과 관리자 승인이 동시에 일어나면 잠금이 없어 나중 저장이 이긴다(기존과 같은 수준, 발생 가능성 낮음).
 
 ### 보류 (현재 규모에서는 오버헤드 — 실제 필요가 생기면 재개)
 
@@ -1184,6 +1192,7 @@ _(작업 중 발견하면 여기에 "STEP 번호 — 파일:설명" 형식으로
 
 - NOW-4-3(2026-11-02) — UptimeRobot 기존 `/api/health`·`/api/board/health` 모니터에 지난 7일 가동률 약 70%, 2일 2시간 넘는 장애 1건이 기록돼 있다(10/23 등록 이후). 원인·영향 범위는 조사하지 않았다(EC2 컨테이너는 2026-11-02 배포 전 기준 core·board 9일, redis·cloudflared 2주 연속 실행 중이었으므로 앱 재시작은 아니었다). 같은 기간 `/` 모니터는 9일 넘게 Up이었고 health 두 모니터만 Down이었으며, 복구가 2026-11-01 00시 UTC 전후로 보인다. 2026-10-27에 이미 10월 사용량이 92.01 CU-hours(무료 한도 월 100)였으므로 **10월 무료 compute 한도를 다 써서 Neon이 월말까지 정지됐을 가능성**이 있다(미확인 — Neon Billing의 10월 사용량과 UptimeRobot 장애 시작 시각으로 확인할 것). 사실이면 그 기간 로그인·글쓰기 등 DB가 필요한 기능이 모두 실패했다.
 - NOW-4-3(2026-11-02) — 외부 스캐너가 준비 확인 `/api/health`를 직접 부른다(02:03 UTC, 176.100.243.133). 부를 때마다 Neon이 깨어난다. 빈도가 높아지면 준비 확인 경로를 외부에서 막거나 제한하는 방안을 따로 판단한다(지금은 그대로 둠).
+- LATER-4 MVP 단계 1(2026-11-02) — `AdminController.approve`·`VehicleVerification.approve()`는 신청 행이 PENDING인지 확인하지 않는다. 승인/반려가 끝난 예전 신청 행을 관리자가 다시 승인하면 차량이 `approveVerification()`으로 다시 인증된다 — 단계 1로 인증이 해제된 차량도 새 서류 없이 되살아날 수 있다. 관리자 화면에서 이미 처리된 신청에 승인 버튼이 보이는지 확인하고, 필요하면 PENDING 행만 승인·반려하도록 막는다(수정하지 않음, 기록만).
 
 ---
 

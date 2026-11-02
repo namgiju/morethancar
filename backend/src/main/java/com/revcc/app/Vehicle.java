@@ -3,8 +3,11 @@ package com.revcc.app;
 import jakarta.persistence.*;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 
 /** 소유 차량. 기존 HTML 차고의 owner_vehicles를 그대로 사용한다.
  * 공용 카탈로그 vehicles 및 그 조회 API와는 별개다. */
@@ -65,16 +68,30 @@ public class Vehicle {
         update(request);
     }
 
+    // 핵심 필드(제조사·모델·연식·번호판)는 인증 서류가 증명하는 값이다. 심사 중에는 바꿀 수 없고(409),
+    // 승인된 차량에서 바꾸면 인증을 해제한다(vehicle_verifications 이력은 그대로, 재인증은 기존 신청 경로).
     public void update(GarageVehicleRequest request) {
-        manufacturer = request.manufacturer().trim();
-        model = request.model().trim();
+        String newManufacturer = request.manufacturer().trim();
+        String newModel = request.model().trim();
+        String newLicensePlate = request.licensePlate().trim();
+        boolean coreChanged = !newManufacturer.equals(manufacturer) || !newModel.equals(model)
+            || !Objects.equals(request.modelYear(), modelYear) || !newLicensePlate.equals(licensePlate);
+        if (coreChanged && "PENDING".equals(verificationStatus))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "인증 심사 중에는 차종·연식·번호판을 수정할 수 없어요.");
+        if (coreChanged && (verified || "APPROVED".equals(verificationStatus))) {
+            verified = false;
+            verificationStatus = null;
+            verifiedAt = null;
+        }
+        manufacturer = newManufacturer;
+        model = newModel;
         modelYear = request.modelYear();
         trim = clean(request.trim());
         transmission = clean(request.transmission());
         color = clean(request.color());
         nickname = clean(request.nickname());
         description = clean(request.description());
-        licensePlate = request.licensePlate().trim();
+        licensePlate = newLicensePlate;
     }
 
     // 인증 요청 접수. 반려된 뒤 재신청할 때도 동일하게 PENDING으로 되돌린다.

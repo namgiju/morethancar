@@ -257,6 +257,36 @@ try {
     tokenB,
     403,
   );
+  // 인증 무결성(MVP 단계 1): 모델·연식은 심사 중 수정 불가(409), 승인 차량에서 바꾸면 인증 해제, 그 외 필드는 상태 유지.
+  const verification = async () =>
+    (await db.query("SELECT verified,verification_status AS status,verified_at AS at FROM owner_vehicles WHERE id=$1", [car.id])).rows[0];
+  const setVerification = (verified, status) =>
+    db.query("UPDATE owner_vehicles SET verified=$2,verification_status=$3,verified_at=CASE WHEN $2 THEN NOW() END WHERE id=$1", [car.id, verified, status]);
+  const edit = (body, expected = 200) =>
+    req(`/garage/${car.id}`, "PUT", { model: "아반떼 N", year: 2024, trim: "DCT", imageId: image.id, ...body }, tokenA, expected);
+  await setVerification(true, "APPROVED");
+  await edit({ model: " 아반떼 N ", bio: "소개만 수정" });
+  assert.deepEqual({ ...(await verification()), at: undefined }, { verified: true, status: "APPROVED", at: undefined });
+  assert.ok((await verification()).at);
+  await setVerification(false, "PENDING");
+  await edit({ year: 2023 }, 409);
+  await edit({ model: "아반떼 N 변경" }, 409);
+  await edit({ bio: "심사 중 소개 수정" });
+  assert.equal((await verification()).status, "PENDING");
+  await setVerification(false, "REJECTED");
+  await edit({ model: "아반떼 N 변경" });
+  assert.equal((await verification()).status, "REJECTED");
+  await edit({});
+  for (const changed of [{ model: "아반떼 N 변경" }, { year: 2023 }]) {
+    await setVerification(true, "APPROVED");
+    await edit(changed);
+    assert.deepEqual(await verification(), { verified: false, status: null, at: null });
+    await edit({});
+  }
+  await edit({ year: 2023 }); // 신청 전(NULL)은 자유롭게 수정
+  await req(`/garage/${car.id}`, "PUT", { model: "변조", year: 2024 }, tokenB, 403);
+  await edit({});
+  await setVerification(true, "APPROVED");
   await req(
     `/garage/${car.id}/records`,
     "POST",
@@ -318,7 +348,7 @@ try {
   await req(`/garage/${car.id}`, "DELETE", {});
   await req(`/garage/${car.id}`, "GET", undefined, tokenA, 404);
   console.log(
-    "PASS: author profile/statistics, derived verification badge, private field exclusion, related filters, Flyway migrations, image validation, posts, search/categories, ownership, likes/bookmarks, comments/replies, notifications, reports, garage/records, cascade deletion.",
+    "PASS: author profile/statistics, derived verification badge, private field exclusion, related filters, Flyway migrations, image validation, posts, search/categories, ownership, likes/bookmarks, comments/replies, notifications, reports, garage/records, garage verification integrity, cascade deletion.",
   );
 } finally {
   if (server) {
