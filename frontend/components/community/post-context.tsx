@@ -3,8 +3,8 @@
 import {useEffect, useState} from 'react';
 import {fetchPosts} from '../../lib/community-api';
 import type {CommunityPost} from '../../lib/community-types';
-import {imageUrl, motorsportUrl, postUrl} from '../../lib/format';
-import {dateRangeLabel} from '../../lib/motorsport';
+import {carUrl, imageUrl, motorsportUrl, partPeriodLabel, postUrl} from '../../lib/format';
+import {dateRangeLabel, kstToday} from '../../lib/motorsport';
 import {KIND_LABELS} from '../../lib/motorsport-types';
 import type {AuthorState} from './post-detail';
 import styles from './post-detail.module.css';
@@ -88,6 +88,24 @@ export default function PostContext({post, author}: {post: CommunityPost; author
           </>
         )}
       </section>
+
+      {/* Install box: only a public part of the author's own vehicle (server-side
+          linkedPart); kept apart from the vehicle's ownership label above. */}
+      {post.linkedPart && (
+        <section className={styles.card}>
+          <h3>이 글의 부품 장착 정보</h3>
+          <strong>
+            {post.linkedPart.brand} {post.linkedPart.name}
+          </strong>
+          {post.linkedPart.spec && <p className={styles.muted}>{post.linkedPart.spec}</p>}
+          <p className={styles.muted}>{partPeriodLabel(post.linkedPart, kstToday())}</p>
+          {post.vehicleId && (
+            <a className={styles.boardLink} href={carUrl(post.vehicleId)}>
+              이 차량의 기록 보기 →
+            </a>
+          )}
+        </section>
+      )}
 
       <section className={styles.card}>
         <h3>이 차종의 인기글</h3>

@@ -10,6 +10,19 @@ import type {PostCategory} from './home-types';
 // "is this a withdrawn author" on the client from other fields.
 export type PublicMemberId = number | null;
 
+// Public part linked to a post (no cost; see VehiclePart for the owner view).
+export type LinkedPart = {
+  id: number;
+  brand: string;
+  name: string;
+  spec: string;
+  installedOn: string;
+  removedOn: string | null;
+  installMileage: number | null;
+  removeMileage: number | null;
+  hasPhoto: boolean;
+};
+
 export type LinkedVehicle = {
   id: number;
   model: string;
@@ -48,6 +61,10 @@ export type CommunityPost = {
   vehicle: string;
   vehicleId: number | null;
   linkedVehicle: LinkedVehicle | null;
+  // The linked part's install box: only for a public part of the author's own
+  // vehicle (never cost). partId is the raw link, sent to the author only.
+  linkedPart: LinkedPart | null;
+  partId: number | null;
   // The event this post is tagged to (optional, set from the editor's "모터스포츠
   // 일정 연결"). motorsportEventId is the raw column (kept even if the event is
   // no longer public, so the editor can still show "현재 연결된 일정" context);
@@ -169,6 +186,8 @@ export type PostInput = {
   // Same contract as vehicleId: omitting the key keeps the existing link, an
   // explicit null unlinks. The editor always sends the key.
   motorsportEventId: number | null;
+  // Same contract again. Linking a part also links its vehicle.
+  partId: number | null;
   imageIds: number[];
 };
 
@@ -218,7 +237,8 @@ export type VehicleRecord = {
   title: string;
   content: string | null;
   mileage: number | null;
-  cost: number | null;
+  // Owner only — absent for everyone else.
+  cost?: number | null;
   date: string;
 };
 // A part's install/removal history (GET /api/board/garage/:id parts[]). Mounted
@@ -255,8 +275,22 @@ export type VehiclePartInput = {
   isPublic: boolean;
 };
 
-// parts is optional: during a deploy the new frontend can briefly hit an older board-service.
-export type PublicVehicle = Omit<GarageCard, 'recordCount'> & {records: VehicleRecord[]; parts?: VehiclePart[]};
+// A post linked to this vehicle (latest 50, not deleted). partId only when that
+// part is visible to the viewer.
+export type GaragePost = {id: number; title: string; category: PostCategory; createdAt: string; partId: number | null};
+
+// GET /api/board/garage/:id. Never carries the license plate. verificationStatus
+// and record/part cost are owner-only. The newer fields are optional: during a
+// deploy the new frontend can briefly hit an older board-service.
+export type PublicVehicle = Omit<GarageCard, 'recordCount'> & {
+  records: VehicleRecord[];
+  parts?: VehiclePart[];
+  posts?: GaragePost[];
+  verified?: boolean;
+  verificationStatus?: string | null;
+  archivedAt?: string | null;
+  createdAt?: string;
+};
 
 // Body of POST /api/board/garage and PUT /api/board/garage/:id (board-service's
 // vehicleInput() in community.js) — the public-profile fields of a vehicle row

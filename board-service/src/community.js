@@ -41,6 +41,10 @@ const postSelect = `SELECT p.id,p.title,p.content,${unlessWithdrawnSql("u", "p.a
  ${isWithdrawnSql("u")} AS "authorWithdrawn",
  ${unlessWithdrawnSql("u", "p.vehicle_id")} AS "vehicleId",
  ${unlessWithdrawnSql("u", "(SELECT json_build_object('id',v.id,'model',v.model,'year',v.year,'verified',v.verified,'imageId',v.image_id,'archived',v.archived_at IS NOT NULL) FROM owner_vehicles v WHERE v.id=p.vehicle_id AND v.owner_id=p.author_id)")} AS "linkedVehicle",
+ ${unlessWithdrawnSql("u", `(SELECT json_build_object('id',pp.id,'brand',pp.brand,'name',pp.name,'spec',pp.spec,'installedOn',pp.installed_on,'removedOn',pp.removed_on,
+   'installMileage',pp.install_mileage,'removeMileage',pp.remove_mileage,'hasPhoto',cardinality(${existingImageIdsSql("pp.image_ids")})>0)
+   FROM vehicle_parts pp JOIN owner_vehicles pv ON pv.id=pp.vehicle_id WHERE pp.id=p.part_id AND pp.is_public AND pv.owner_id=p.author_id)`)} AS "linkedPart",
+ CASE WHEN p.author_id=$1 THEN p.part_id END AS "partId",
  p.motorsport_event_id AS "motorsportEventId",
  (SELECT json_build_object('id',e.id,'kind',e.kind,'title',e.title,'startsOn',to_char(e.starts_on,'YYYY-MM-DD'),'endsOn',to_char(e.ends_on,'YYYY-MM-DD'))
   FROM motorsport_events e WHERE e.id=p.motorsport_event_id AND e.deleted_at IS NULL AND e.publication='PUBLISHED') AS "linkedMotorsportEvent",
@@ -106,8 +110,10 @@ export function communityRouter({ db, auth }) {
     return rows[0];
   };
   const images = (ids, userId) => validateOwnedImages(db, ids, userId);
-  // keepVehicleId: 수정 중인 글에 이미 연결된 차량. 보관한 차량은 새로 연결할 수 없지만 기존 연결은 유지한다.
-  async function postInput(body, userId, keepVehicleId = null) {
+  // keep: 수정 중인 글에 이미 연결된 차량·부품. 보관한 차량(과 그 부품)은 새로 연결할 수 없지만 기존 연결은 유지한다.
+  // 반환값 끝(9번째)은 부품 id. 부품만 고르면 차량은 그 부품의 차량으로 채운다.
+  async function postInput(body, userId, keep = {}) {
+    const keepVehicleId = keep.vehicleId ?? null;
     const {
       title,
       content,
@@ -126,6 +132,22 @@ export function communityRouter({ db, auth }) {
       if (!rows.length) fail(403, "본인 차량만 연결할 수 있어요.");
       if (rows[0].archived && rows[0].id !== keepVehicleId) fail(400, "보관한 차량은 새 글에 연결할 수 없어요.");
       linked = rows[0];
+    }
+    // 부품 후기 연결(MVP 단계 4): 본인 차량의 부품만(403), 차량을 함께 고르면 같은 차량의 부품이어야 한다(400).
+    // 비공개 부품도 연결할 수 있지만 글에는 장착 정보가 보이지 않는다(postSelect linkedPart).
+    let partId = null;
+    if (body?.partId != null && body.partId !== "") {
+      const { rows } = await db.query(
+        `SELECT pp.id,pv.id AS "vehicleId",pv.model,pv.archived_at IS NOT NULL AS archived
+         FROM vehicle_parts pp JOIN owner_vehicles pv ON pv.id=pp.vehicle_id WHERE pp.id=$1 AND pv.owner_id=$2`,
+        [positive(body.partId), userId],
+      );
+      if (!rows.length) fail(403, "본인 차량의 부품만 연결할 수 있어요.");
+      const part = rows[0];
+      if (part.archived && part.id !== (keep.partId ?? null)) fail(400, "보관한 차량의 부품은 새 글에 연결할 수 없어요.");
+      if (linked && linked.id !== part.vehicleId) fail(400, "선택한 차량의 부품이 아니에요.");
+      linked ??= { id: part.vehicleId, model: part.model };
+      partId = part.id;
     }
     // 공개(PUBLISHED)·미삭제 일정만 연결할 수 있다 — 존재하지 않거나 초안/비공개/삭제된
     // 일정 id는 motorsportRouter의 공개 조회와 같은 조건으로 거부한다.
@@ -147,6 +169,7 @@ export function communityRouter({ db, auth }) {
       await images(imageIds, userId),
       linked?.id ?? null,
       motorsportEventId,
+      partId,
     ];
   }
   router.post("/images", auth, imageLimiter, async (req, res) => {
@@ -235,8 +258,8 @@ export function communityRouter({ db, auth }) {
   router.post("/posts", auth, postLimiter, async (req, res) => {
     const values = await postInput(req.body, req.user.id);
     const { rows } = await db.query(
-      `INSERT INTO board_posts(title,content,author_id,category,vehicle,image_ids,vehicle_id,motorsport_event_id)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,title,content,category,author_id AS "authorId"`,
+      `INSERT INTO board_posts(title,content,author_id,category,vehicle,image_ids,vehicle_id,motorsport_event_id,part_id)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,title,content,category,author_id AS "authorId"`,
       values,
     );
     res.status(201).json(asPost(rows[0]));
@@ -257,22 +280,28 @@ export function communityRouter({ db, auth }) {
     if (!rows.length) fail(404, "삭제되었거나 없는 글입니다.");
     res.json(rows[0]);
   });
+  // vehicleId·partId·motorsportEventId는 본문에 있을 때만 바꾸고(null이면 해제), 없으면 유지한다.
+  // 부품을 고르면 차량도 그 부품의 차량으로 바뀐다. 차량만 다른 차량(또는 해제)으로 바꾸면 기존 부품 연결은 해제한다.
   router.put("/posts/:id", auth, async (req, res) => {
-    const current = Object.hasOwn(req.body ?? {}, "vehicleId")
-      ? (await db.query("SELECT vehicle_id FROM board_posts WHERE id=$1 AND author_id=$2 AND NOT deleted", [req.params.id, req.user.id])).rows[0]
+    const body = req.body ?? {};
+    const hasVehicle = Object.hasOwn(body, "vehicleId"), hasPart = Object.hasOwn(body, "partId");
+    const current = hasVehicle || hasPart
+      ? (await db.query("SELECT vehicle_id,part_id FROM board_posts WHERE id=$1 AND author_id=$2 AND NOT deleted", [req.params.id, req.user.id])).rows[0]
       : null;
-    const values = await postInput(req.body, req.user.id, current?.vehicle_id ?? null);
+    const values = await postInput(req.body, req.user.id, { vehicleId: current?.vehicle_id ?? null, partId: current?.part_id ?? null });
     const { rows } = await db.query(
       `UPDATE board_posts SET title=$1,content=$2,category=$4,
-      vehicle=CASE WHEN NOT $10 AND vehicle_id IS NOT NULL THEN vehicle ELSE $5 END,
-      image_ids=$6,vehicle_id=CASE WHEN $10 THEN $7 ELSE vehicle_id END,
-      motorsport_event_id=CASE WHEN $11 THEN $8 ELSE motorsport_event_id END,updated_at=NOW()
-      WHERE id=$9 AND author_id=$3 AND NOT deleted RETURNING id,category`,
+      vehicle=CASE WHEN NOT $11 AND vehicle_id IS NOT NULL THEN vehicle ELSE $5 END,
+      image_ids=$6,vehicle_id=CASE WHEN $11 THEN $7 ELSE vehicle_id END,
+      motorsport_event_id=CASE WHEN $12 THEN $8 ELSE motorsport_event_id END,
+      part_id=CASE WHEN $13 THEN $9::int WHEN $11 AND $7::int IS DISTINCT FROM vehicle_id THEN NULL ELSE part_id END,updated_at=NOW()
+      WHERE id=$10 AND author_id=$3 AND NOT deleted RETURNING id,category`,
       [
         ...values,
         req.params.id,
-        Object.hasOwn(req.body ?? {}, "vehicleId"),
-        Object.hasOwn(req.body ?? {}, "motorsportEventId"),
+        hasVehicle || values[8] != null,
+        Object.hasOwn(body, "motorsportEventId"),
+        hasPart,
       ],
     );
     if (!rows.length) fail(403, "본인이 작성한 글만 수정할 수 있어요.");
@@ -642,18 +671,22 @@ export function communityRouter({ db, auth }) {
   });
   router.get("/garage/:id", async (req, res) => {
     const { rows } = await db.query(
-      `SELECT v.id,v.owner_id AS "ownerId",u.username,v.model,v.year,v.trim,v.bio,v.image_id AS "imageId"
+      `SELECT v.id,v.owner_id AS "ownerId",u.username,v.model,v.year,v.trim,v.bio,v.image_id AS "imageId",
+       v.verified,v.verification_status AS "verificationStatus",v.archived_at AS "archivedAt",v.created_at AS "createdAt"
       FROM owner_vehicles v JOIN users u ON u.id=v.owner_id WHERE v.id=$1 AND NOT ${isWithdrawnSql("u")}`,
       [req.params.id],
     );
     if (!rows.length) fail(404, "차량을 찾을 수 없어요.");
+    // 공개 응답에는 번호판·등록증을 넣지 않는다(SELECT에 없음). 심사 상태·비용은 소유자에게만.
+    const owner = req.user?.id != null && String(req.user.id) === String(rows[0].ownerId);
+    const { verificationStatus, ...vehicle } = rows[0];
+    // 정비 기록 비용은 소유자에게만(2026-11-02 단계 4 — 이전에는 누구에게나 내려갔다).
     const records = await db.query(
-      `SELECT id,kind,title,content,mileage,cost,recorded_on::text AS date FROM vehicle_records WHERE vehicle_id=$1 ORDER BY recorded_on DESC,id DESC`,
+      `SELECT id,kind,title,content,mileage,${owner ? "cost," : ""}recorded_on::text AS date FROM vehicle_records WHERE vehicle_id=$1 ORDER BY recorded_on DESC,id DESC`,
       [req.params.id],
     );
     // 부품: 소유자에게는 비공개 부품과 비용까지, 그 외에는 공개 부품만 비용 없이 내려준다.
     // 증빙은 저장하지 않고 사진이 있으면 "사진 첨부"로 계산만 한다(hasPhoto). 현재 장착(탈거일 없음) 먼저.
-    const owner = req.user?.id != null && String(req.user.id) === String(rows[0].ownerId);
     const parts = await db.query(
       `SELECT id,brand,name,spec,installed_on::text AS "installedOn",removed_on::text AS "removedOn",
        install_mileage AS "installMileage",remove_mileage AS "removeMileage",${owner ? "cost," : ""}
@@ -662,11 +695,20 @@ export function communityRouter({ db, auth }) {
        ORDER BY removed_on IS NULL DESC,installed_on DESC,id DESC`,
       [req.params.id, owner],
     );
+    // 이 차량에 연결된 글(삭제 글 제외, 최근 50개). partId는 이 응답에서 보이는 부품일 때만 남긴다.
+    const visibleParts = new Set(parts.rows.map((p) => p.id));
+    const posts = await db.query(
+      `SELECT id,title,category,created_at AS "createdAt",part_id AS "partId" FROM board_posts
+       WHERE vehicle_id=$1 AND author_id=$2 AND NOT deleted ORDER BY id DESC LIMIT 50`,
+      [req.params.id, rows[0].ownerId],
+    );
     res.json({
-      ...rows[0],
+      ...vehicle,
       ownerId: Number(rows[0].ownerId),
+      ...(owner ? { verificationStatus } : {}),
       records: records.rows,
       parts: parts.rows,
+      posts: posts.rows.map((p) => ({ ...p, partId: visibleParts.has(p.partId) ? p.partId : null })),
     });
   });
   router.post("/garage/:id/records", auth, async (req, res) => {
