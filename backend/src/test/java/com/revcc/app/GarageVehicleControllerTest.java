@@ -26,7 +26,7 @@ class GarageVehicleControllerTest {
         """;
     private final GarageVehicleResponse response = new GarageVehicleResponse(15,7L,"Hyundai","Avante N",2024,
         "N","DCT","Performance Blue","my N","owner car",Instant.now(),Instant.now(),"owner",
-        "123가4567",false,null,null);
+        "123가4567",false,null,null,null);
 
     @BeforeEach void setup() {
         mvc = MockMvcBuilders.standaloneSetup(new GarageVehicleController(vehicles, sessions))

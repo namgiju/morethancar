@@ -16,6 +16,8 @@ export type LinkedVehicle = {
   year: number;
   verified: boolean;
   imageId: number | null;
+  // The vehicle was archived ("이전 보유 차량"): show that instead of 인증 오너/등록 차량.
+  archived: boolean;
 };
 
 // Only present when the linked motorsport_events row is still PUBLISHED and
@@ -116,6 +118,8 @@ export type MemberVehicle = {
   nickname: string;
   imageId: number | null;
   verified: boolean;
+  // Archived vehicles ("이전 차량") are listed but never count for the badge or representative.
+  archivedAt: string | null;
 };
 
 // GET /api/board/members/:id. Withdrawn members 404 (no public profile).
@@ -148,6 +152,7 @@ export type MyVehicle = {
   manufacturer: string | null;
   model: string;
   year: number;
+  archivedAt: string | null;
 };
 
 // Body of POST /api/board/posts and PUT /api/board/posts/:id, exactly what
@@ -268,6 +273,8 @@ export type OwnerVehicle = {
   verified: boolean;
   verificationStatus: string | null;
   verifiedAt: string | null;
+  // Set by board PATCH /api/board/garage/:id/archive (read-only in core).
+  archivedAt: string | null;
 };
 
 // Body of POST/PUT /api/garage/vehicles (GarageVehicleRequest). Only

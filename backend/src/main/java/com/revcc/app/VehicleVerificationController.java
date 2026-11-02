@@ -45,6 +45,9 @@ public class VehicleVerificationController {
             new ResponseStatusException(HttpStatus.NOT_FOUND, "차량을 찾을 수 없습니다."));
         if (!vehicle.getUser().getId().equals(userId))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인 차량만 인증을 신청할 수 있습니다.");
+        // 보관한 차량(이전 차량)은 지금 보유를 증명할 대상이 아니다. 복원한 뒤 신청한다.
+        if (vehicle.getArchivedAt() != null)
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "보관한 차량은 인증을 신청할 수 없어요. 복원한 뒤 신청해 주세요.");
         if ("PENDING".equals(vehicle.getVerificationStatus()))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 검토 중인 인증 신청이 있습니다.");
         if (vehicle.isVerified())

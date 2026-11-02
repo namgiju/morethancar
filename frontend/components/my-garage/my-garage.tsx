@@ -60,6 +60,9 @@ export default function MyGarage() {
   const [lastManaged, setLastManaged] = useState<OwnerVehicle | undefined>();
   const readyManaged = state.status === 'ready' ? state.vehicles.find((v) => v.id === manageVehicleId) : undefined;
   if (readyManaged && readyManaged !== lastManaged) setLastManaged(readyManaged);
+  // 현재 차량 / 이전 차량(보관) 분리는 한 번만 한다.
+  const currentVehicles = state.status === 'ready' ? state.vehicles.filter((v) => !v.archivedAt) : [];
+  const previousVehicles = state.status === 'ready' ? state.vehicles.filter((v) => v.archivedAt) : [];
   const managedVehicle =
     state.status === 'ready' ? readyManaged : lastManaged?.id === manageVehicleId ? lastManaged : undefined;
 
@@ -156,7 +159,8 @@ export default function MyGarage() {
                 <section className={styles.panel} aria-labelledby="garage-title">
                   <h2 id="garage-title">대표 차량</h2>
                   <RepresentativeVehicle
-                    vehicles={state.vehicles}
+                    vehicles={currentVehicles}
+                    hasArchived={previousVehicles.length > 0}
                     member={state.member}
                     onManage={setManageVehicleId}
                     onRequestVerification={setVerifyVehicleId}
@@ -164,18 +168,32 @@ export default function MyGarage() {
                 </section>
                 <aside className={styles.panel} aria-labelledby="owned-title">
                   <div className={styles.panelHeadingRow}>
-                    <h2 id="owned-title">보유 차량</h2>
+                    <h2 id="owned-title">현재 차량</h2>
                     <button type="button" className={styles.registerButton} onClick={() => setRegistrationOpen(true)}>
                       차량 등록
                     </button>
                   </div>
                   <OwnedVehicleList
-                    vehicles={state.vehicles}
+                    vehicles={currentVehicles}
                     member={state.member}
                     busyId={repBusyId}
                     onChooseRepresentative={chooseRepresentative}
                     onManage={setManageVehicleId}
                   />
+                  {previousVehicles.length > 0 && (
+                    <>
+                      <h3 className={styles.previousHeading}>이전 차량</h3>
+                      <p className={styles.empty}>보관한 차량이에요. 기록과 연결된 글은 그대로 남아 있어요.</p>
+                      <OwnedVehicleList
+                        vehicles={previousVehicles}
+                        member={state.member}
+                        busyId={repBusyId}
+                        onChooseRepresentative={chooseRepresentative}
+                        onManage={setManageVehicleId}
+                        archived
+                      />
+                    </>
+                  )}
                 </aside>
               </div>
               <div className={styles.panel}>
@@ -197,6 +215,7 @@ export default function MyGarage() {
           vehicleId={manageVehicleId}
           verified={managedVehicle?.verified ?? false}
           verificationStatus={managedVehicle?.verificationStatus ?? null}
+          archived={Boolean(managedVehicle?.archivedAt)}
           onClose={() => setManageVehicleId(null)}
           onChanged={() => setReloadKey((k) => k + 1)}
         />
@@ -237,16 +256,18 @@ function RepresentativeVehicle({
   member,
   onManage,
   onRequestVerification,
+  hasArchived,
 }: {
   vehicles: OwnerVehicle[];
   member: CommunityMember;
   onManage: (vehicleId: number) => void;
   onRequestVerification: (vehicleId: number) => void;
+  hasArchived: boolean;
 }) {
   if (!vehicles.length) {
     return (
       <p className={styles.empty}>
-        아직 등록된 차량이 없습니다.
+        {hasArchived ? '지금 타는 차량이 없습니다.' : '아직 등록된 차량이 없습니다.'}
         <br />
         차량을 등록하면 이곳에 대표 차량이 표시됩니다.
       </p>
@@ -294,12 +315,15 @@ function OwnedVehicleList({
   busyId,
   onChooseRepresentative,
   onManage,
+  archived = false,
 }: {
   vehicles: OwnerVehicle[];
   member: CommunityMember;
   busyId: number | null;
   onChooseRepresentative: (vehicleId: number) => void;
   onManage: (vehicleId: number) => void;
+  // 이전 차량(보관) 목록: 대표 차량으로 고를 수 없고, 수정 창에서 복원한다.
+  archived?: boolean;
 }) {
   if (!vehicles.length) return <p className={styles.empty}>등록된 차량이 없습니다.</p>;
   const repId = member.representativeVehicle?.id ?? vehicles[0].id;
@@ -322,14 +346,16 @@ function OwnedVehicleList({
               <strong>{vehicle.nickname || vehicle.model}</strong>
               <span>{[vehicle.modelYear, vehicle.trim].filter(Boolean).join(' · ')}</span>
             </a>
-            <button
-              type="button"
-              className={styles.repButton}
-              disabled={selected || busyId === vehicle.id}
-              onClick={() => onChooseRepresentative(vehicle.id)}
-            >
-              {selected ? '대표 차량' : busyId === vehicle.id ? '설정 중…' : '대표 차량 설정'}
-            </button>
+            {!archived && (
+              <button
+                type="button"
+                className={styles.repButton}
+                disabled={selected || busyId === vehicle.id}
+                onClick={() => onChooseRepresentative(vehicle.id)}
+              >
+                {selected ? '대표 차량' : busyId === vehicle.id ? '설정 중…' : '대표 차량 설정'}
+              </button>
+            )}
             <button type="button" className={styles.repButton} onClick={() => onManage(vehicle.id)}>
               수정
             </button>

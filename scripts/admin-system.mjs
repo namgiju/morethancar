@@ -168,6 +168,9 @@ try {
     "INSERT INTO owner_vehicles(owner_id,model,year,verified) VALUES(1,'one',2024,true),(1,'two',2024,true),(2,'unverified',2023,false)",
   );
   assert.equal((await req("/admin/badges"))[0].holders, 1);
+  // 보관한 인증 차량만 있는 회원은 인장 보유자로 세지 않는다(MVP 단계 2).
+  await db.query("INSERT INTO owner_vehicles(owner_id,model,year,verified,archived_at) VALUES(2,'sold',2020,true,NOW())");
+  assert.equal((await req("/admin/badges"))[0].holders, 1);
   // Admin operational access never grants authorship editing privileges.
   await req(
     "/posts/1",

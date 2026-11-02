@@ -94,6 +94,17 @@ class VehicleVerificationControllerTest {
         verify(verifications).saveAndFlush(any());
     }
 
+    // 보관한 차량은 인증을 신청할 수 없다(MVP 단계 2). 아무것도 저장하지 않는다.
+    @Test void archivedVehicleCannotApply() throws Exception {
+        org.springframework.test.util.ReflectionTestUtils.setField(vehicle, "archivedAt", java.time.Instant.now());
+        when(vehicles.findByIdForUpdate(1)).thenReturn(Optional.of(vehicle));
+        mvc.perform(post("/api/garage/vehicles/1/verification").cookie(new Cookie(SharedSessionService.COOKIE, "owner-token"))
+            .contentType(MediaType.APPLICATION_JSON).content("{\"data\":\"" + PNG + "\"}"))
+            .andExpect(status().isConflict());
+        verifyNoInteractions(verifications);
+        verify(vehicles, never()).saveAndFlush(any());
+    }
+
     @Test void rejectsInvalidImage() throws Exception {
         when(vehicles.findById(1)).thenReturn(Optional.of(vehicle));
         when(vehicles.findByIdForUpdate(1)).thenReturn(Optional.of(vehicle));

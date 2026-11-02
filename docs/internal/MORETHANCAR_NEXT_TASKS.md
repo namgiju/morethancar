@@ -121,7 +121,7 @@
 [ ] LATER-1: 카카오 회원 탈퇴 최소 구현 (배포 이후 제품 완성도 작업, 구 STEP 10-impl-D 축소) — 2026-11-02 사용자 결정으로 보류, LATER-4 MVP 단계 1부터 먼저 진행
 [x] LATER-2: 비밀번호 재설정 응답 통일 (작은 보안 정리, 구 STEP 11 축소) — 2026-10-23 PR #15 운영 배포(`76e8985`), 운영 일반 계정으로 메일 수신·재설정 성공 확인
 [ ] LATER-5: 운영 성능 메모 — SSR 내부 API 호출이 nginx rate limit을 frontend IP 하나로 공유, `/_next/static` no-store (2026-10-06, 실제 429·속도 문제가 보이면 착수)
-[~] LATER-4: 차량 기록/타임라인 — 2026-11-02 MVP 6단계 계획으로 대체(아래 LATER-4 "MVP 계획"). 단계 1 인증 무결성 운영 배포(2026-11-02, PR #20 병합 `ac5614c`). 단계 2는 사용자 결정 대기
+[~] LATER-4: 차량 기록/타임라인 — 2026-11-02 MVP 6단계 계획으로 대체(아래 LATER-4 "MVP 계획"). 단계 1 인증 무결성 운영 배포(2026-11-02, PR #20 병합 `ac5614c`). 단계 2 차량 보관 구현·검증·PR(병합·배포는 사용자 결정 대기)
 ```
 
 - **NOW-1 UI/UX 개선 및 Next.js 전환**
@@ -428,6 +428,15 @@
       - **되돌리기(미실행)**: 운영 저장소에서 `git checkout 10f2589` 후 prod 오버레이 `up -d --build --wait`. 마이그레이션이 없어 DB는 그대로 둔다.
       - 남은 위험: 운영 DB 쿼리 시간 제한(소켓 15초) 안에서 잠금 대기가 길어지면 요청이 503으로 끝난다(잠금은 요청 하나 동안만 잡으므로 실제 대기는 짧다). 같은 PENDING 신청을 두 관리자가 동시에 누르면 이제 직렬화되어 두 번째는 409다.
 
+    - **[x] 단계 2 차량 보관 (2026-11-02, 브랜치 `feat/mvp-2-vehicle-archive`, PR — 병합·배포 전)**: Flyway 번호는 최신 main(`1c686e5`)에서 V9까지 쓰였고 원격 브랜치·이력에도 V10이 없어 `V10__vehicle_archive.sql`(`owner_vehicles.archived_at TIMESTAMPTZ` nullable 추가만, 기존 행 변경 없음).
+      - API(board): `PATCH /api/board/garage/:id/archive {archived:boolean}` — 소유자만(아니면 403), 값이 boolean이 아니면 400. 차량 행을 `FOR UPDATE`로 잠그고 심사 중(PENDING)이면 보관 409. 보관은 `archived_at=COALESCE(archived_at,NOW())`, 복원은 NULL. 보관하면 같은 트랜잭션에서 `member_profiles.representative_vehicle_id`가 그 차량이면 NULL(복원해도 되돌리지 않음). 기록·연결 글·인증 이력은 그대로. `PUT /profile/representative-vehicle`는 보관 차량이면 400(INSERT…SELECT에 `archived_at IS NULL … FOR SHARE` — 보관과 겹치면 순서대로 판단). `GET /members/:id`: `vehicles[].archivedAt`, 인증 인장(`verified`·badges)은 보관하지 않은 인증 차량만으로 계산, 대표 차량은 보관하지 않은 차량 중에서(설정이 없으면 첫 현재 차량, 없으면 null), 목록은 현재 차량 먼저. `GET /garage/mine`에 `archivedAt`. 글 `linkedVehicle.archived`. 새 글 작성·다른 글 수정에서 보관 차량을 새로 연결하면 400, 이미 그 차량에 연결된 글은 수정해도 연결 유지(정책 (c)를 차량 연결에도 적용).
+      - API(core): `Vehicle.archivedAt` 읽기 전용 매핑(`insertable=false, updatable=false` — core 저장이 보관 값을 덮어쓰지 않음), `GarageVehicleResponse.archivedAt`. 인증 신청은 보관 차량이면 409 "보관한 차량은 인증을 신청할 수 없어요. 복원한 뒤 신청해 주세요."(단계 1의 차량 행 잠금 안에서 판단). 영구 삭제 API(core·board DELETE)는 그대로.
+      - 화면: `/home` "보유 차량"을 "현재 차량"으로 바꾸고 보관 차량은 아래 "이전 차량" 목록(대표 차량 설정 버튼 없음)으로. 대표 차량 카드는 현재 차량만. 차량 수정 창에 보관(확인 창)·복원, 심사 중이면 보관 버튼 비활성 + 안내, 삭제는 "영구 삭제"로 이름을 바꾸고 보관을 권하는 경고. 글 편집기는 보관 차량을 목록에서 빼되 수정 중인 글에 연결된 차량은 "· 이전 차량"으로 남기고, 새 글에서 현재 차량이 정확히 1대면 기본 선택("연결하지 않음"으로 바꿀 수 있음). 글 상세는 보관 차량이면 "이전 보유 차량". 커뮤니티 미니 차고의 대표 차량 대체값도 현재 차량만.
+      - 검증: Spring `VehicleVerificationControllerTest` 8(보관 차량 신청 409·저장 없음) 등 관련 테스트 통과. board `npm test` 111 통과. `scripts/run-board-system.sh` 전체 — community(보관·복원, 타인 403, 값 400, 심사 중 409, 대표 차량 해제·보관 차량 대표 지정 400/타인 403, 인장 계산 제외·복원 후 회복, 기록 유지, 연결 글 유지·`linkedVehicle.archived`, 새 글/다른 글 연결 400·기존 연결 글 수정 유지)·admin·market·moderation·withdrawn·post-soft-delete·withdrawal 7개 PASS. motorsport-system은 실패하지만 이번 코드를 빼고(V10만 둔 채) 돌려도 같은 단언에서 실패해 기존 문제로 판단(아래 "발견된 추가 이슈"). frontend `tsc`·`next build` 통과. 로컬 Docker 스택(V10 적용 확인) 브라우저: 승인 차량 보관 → 이전 차량 이동·대표 차량 K5로·인장 사라짐, 심사 중 차량 보관 버튼 비활성·안내, 새 글에서 현재 차량 1대 기본 선택·보관 차량 제외, 복원 → 인장 회복. 390px에서 보관 버튼이 두 줄로 꺾여 `nowrap`으로 고친 뒤 재확인. 글 상세의 "이전 보유 차량" 표시는 API 플래그만 시스템 테스트로 확인(화면은 보지 않음).
+      - 알려진 제한: 보관 차량의 공개 차량 페이지(`/community/cars/:id`)와 `GET /garage/:id`·`GET /garage`(공개 목록)는 아직 보관 여부를 표시하지 않는다 — 단계 4(공개 차고 통합)에서 `archivedAt`을 더한다. 부품장터 매물 편집기(`listing-editor.tsx`, 장터 비공개 상태)는 보관 차량도 목록에 보인다(장터 재오픈 범위 밖). 단계 1의 "부품 삭제 후 미참조 이미지" 등 단계 3 이후 제한은 그대로.
+      - 코드 리뷰(PR #22, 2026-11-02) 반영: (1) 관리자 `GET /admin/badges`의 인장 보유자 수가 보관 차량까지 셌다 → 보관하지 않은 인증 차량만(`admin-system.mjs`에 보관 인증 차량만 있는 회원 제외 확인). (2) 글의 `ownerVehicle`(작성자 첫 차량 모델)이 보관 차량을 고를 수 있었다 → 현재 차량만(`community-system.mjs`: 보관 중 null, 복원 후 원래 모델). `/home`의 현재/이전 차량 분리를 한 번만 계산하도록 정리.
+        - 반영하지 않은 지적: `PATCH /garage/:id/archive`의 id 검증 누락 지적은 사실과 다르다(`router.param("id")`가 `positive()`로 이미 400). 새 글 작성과 같은 차량 보관이 동시에 일어나면 보관 직후 글이 그 차량에 연결될 수 있다(연결 확인을 잠금 없이 함) — 같은 회원이 두 동작을 동시에 해야 하고 결과도 "이전 보유 차량" 표시뿐이라 받아들였다(알려진 제한). 새 글에서 현재 차량 1대를 기본 선택하는 것은 사용자가 정한 계획 그대로이며, 그 결과 글에 차량·인증 상태가 기본으로 표시된다는 점(사용자는 "연결하지 않음"으로 바꿀 수 있음)을 기록해 둔다. 공개 차고 목록·차량 상세의 보관 표시는 단계 4. 글 수정 시 기존 연결 조회 쿼리 1회 추가, 보관 목록 컴포넌트에 쓰지 않는 props, 미니 차고의 대체 선택 중복은 정리 수준이라 두었다.
+      - 배포 메모(미실행): V10은 컬럼 추가만이라 이전 코드와 공존한다. 순서는 운영 DB 백업 → core(Flyway V10) → board → frontend(한 번의 `up -d --build --wait`로 core가 먼저 healthy). 롤백은 코드만 되돌리고 컬럼은 남긴다(이전 코드는 이 컬럼을 읽지 않음, core는 `ddl-auto=validate`라 추가 컬럼 무관).
 ### 보류 (현재 규모에서는 오버헤드 — 실제 필요가 생기면 재개)
 
 기록과 계획은 지우지 않는다. 기존 system/browser/E2E 테스트 자산도 지우지 않고, 큰 릴리스·배포 경계에서만 쓴다.
@@ -1210,6 +1219,8 @@ _(작업 중 발견하면 여기에 "STEP 번호 — 파일:설명" 형식으로
 - NOW-4-3(2026-11-02) — UptimeRobot 기존 `/api/health`·`/api/board/health` 모니터에 지난 7일 가동률 약 70%, 2일 2시간 넘는 장애 1건이 기록돼 있다(10/23 등록 이후). 원인·영향 범위는 조사하지 않았다(EC2 컨테이너는 2026-11-02 배포 전 기준 core·board 9일, redis·cloudflared 2주 연속 실행 중이었으므로 앱 재시작은 아니었다). 같은 기간 `/` 모니터는 9일 넘게 Up이었고 health 두 모니터만 Down이었으며, 복구가 2026-11-01 00시 UTC 전후로 보인다. 2026-10-27에 이미 10월 사용량이 92.01 CU-hours(무료 한도 월 100)였으므로 **10월 무료 compute 한도를 다 써서 Neon이 월말까지 정지됐을 가능성**이 있다(미확인 — Neon Billing의 10월 사용량과 UptimeRobot 장애 시작 시각으로 확인할 것). 사실이면 그 기간 로그인·글쓰기 등 DB가 필요한 기능이 모두 실패했다.
 - NOW-4-3(2026-11-02) — 외부 스캐너가 준비 확인 `/api/health`를 직접 부른다(02:03 UTC, 176.100.243.133). 부를 때마다 Neon이 깨어난다. 빈도가 높아지면 준비 확인 경로를 외부에서 막거나 제한하는 방안을 따로 판단한다(지금은 그대로 둠).
 - LATER-4 MVP 단계 1(2026-11-02) — `AdminController.approve`·`VehicleVerification.approve()`는 신청 행이 PENDING인지 확인하지 않는다. 승인/반려가 끝난 예전 신청 행을 관리자가 다시 승인하면 차량이 `approveVerification()`으로 다시 인증된다 — 단계 1로 인증이 해제된 차량도 새 서류 없이 되살아날 수 있다. → **해결(2026-11-02, 같은 단계 1 브랜치)**: 승인·반려를 PENDING 신청만 허용(409). 관리자 화면은 원래 PENDING 행에만 버튼을 보여 줬다.
+
+- LATER-4 MVP 단계 2(2026-11-02) — `scripts/motorsport-system.mjs`가 게시글 목록 응답에 `motorsport_event_id`/`motorsportEventId`가 없어야 한다고 단언하지만(83행 부근), `postSelect`는 `motorsportEventId`를 내려준다. 단계 2 코드를 빼고 실행해도 같은 단언에서 실패하므로 기존 불일치다(어느 쪽이 의도인지 확인 필요, 수정하지 않음). CI는 이 수동 시스템 테스트를 돌리지 않는다.
 
 ---
 
