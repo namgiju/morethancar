@@ -3,7 +3,7 @@
 import {useState, type FormEvent} from 'react';
 import {createVehiclePart, deleteVehiclePart, updateVehiclePart, uploadImage} from '../../lib/community-api';
 import type {VehiclePart, VehiclePartInput} from '../../lib/community-types';
-import {imageUrl} from '../../lib/format';
+import {imageUrl, partPeriodLabel} from '../../lib/format';
 import {kstToday} from '../../lib/motorsport';
 import CommunityDialog, {type DialogSpec} from '../community/community-dialog';
 import styles from './my-garage.module.css';
@@ -38,10 +38,13 @@ function numberOrNull(value: FormDataEntryValue | null) {
 // verification. Cost is shown here because this is the owner's own view.
 export default function VehicleParts({
   vehicleId,
+  archived,
   parts,
   onChanged,
 }: {
   vehicleId: number;
+  // Parts of an archived vehicle can't be linked to new posts, so no "후기 쓰기".
+  archived: boolean;
   parts: VehiclePart[];
   onChanged: () => void;
 }) {
@@ -144,26 +147,16 @@ export default function VehicleParts({
   }
 
   function partCard(part: VehiclePart) {
-    const period = part.removedOn ? `${part.installedOn} ~ ${part.removedOn}` : `${part.installedOn}부터`;
-    const mileage =
-      part.installMileage !== null && part.removeMileage !== null
-        ? `${(part.removeMileage - part.installMileage).toLocaleString()} km 사용`
-        : part.installMileage !== null
-          ? `장착 시 ${part.installMileage.toLocaleString()} km`
-          : '';
     return (
       <div key={part.id} className={styles.recordRow}>
         <div>
-          <small className={styles.empty}>
-            {[period, mileage].filter(Boolean).join(' · ')}
-          </small>
+          <small className={styles.empty}>{partPeriodLabel(part, kstToday())}</small>
           <strong>
             {part.brand} {part.name}
           </strong>
           {part.spec && <p>{part.spec}</p>}
           <small className={styles.empty}>
             {[
-              part.hasPhoto ? '사진 첨부' : '사용자 입력',
               part.isPublic ? '' : '비공개',
               part.cost != null ? `${part.cost.toLocaleString()}원` : '',
             ]
@@ -202,12 +195,14 @@ export default function VehicleParts({
           )}
         </div>
         <div className={styles.partButtons}>
-          <a
-            className={styles.repButton}
-            href={`/community/new?category=parts&vehicleId=${vehicleId}&partId=${part.id}`}
-          >
-            후기 쓰기
-          </a>
+          {!archived && (
+            <a
+              className={styles.repButton}
+              href={`/community/new?category=parts&vehicleId=${vehicleId}&partId=${part.id}`}
+            >
+              후기 쓰기
+            </a>
+          )}
           <button type="button" className={styles.repButton} disabled={busy} onClick={() => openForm(part)}>
             수정
           </button>

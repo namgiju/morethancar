@@ -111,6 +111,7 @@ export default function PostEditor({postId}: {postId?: number}) {
   // an archived vehicle can't be newly linked, so only the post's current link
   // stays selectable there. A part id that isn't among them is dropped.
   const [parts, setParts] = useState<VehiclePart[] | 'loading' | 'error' | null>(null);
+  const [partsKey, setPartsKey] = useState(0);
   const vehicleKey = ready ? fields.vehicleId : '';
   useEffect(() => {
     if (!vehicleKey || !Array.isArray(vehicles)) {
@@ -137,7 +138,7 @@ export default function PostEditor({postId}: {postId?: number}) {
     return () => {
       cancelled = true;
     };
-  }, [vehicleKey, vehicles, post]);
+  }, [vehicleKey, vehicles, post, partsKey]);
   const selectedPart = Array.isArray(parts) ? parts.find((p) => String(p.id) === fields.partId) ?? null : null;
 
   // --- Load: wait for the session, then (edit) the post, then my vehicles. ---
@@ -148,7 +149,8 @@ export default function PostEditor({postId}: {postId?: number}) {
       if (request !== version.current) return;
       // Archived vehicles (이전 차량) can't be newly linked; the vehicle this
       // post is already linked to stays selectable so editing keeps the link.
-      const cars = mine.filter((c) => !c.archivedAt || String(c.id) === initial.vehicleId);
+      // A vehicleId from the "후기 쓰기" query of a new post doesn't count as an existing link.
+      const cars = mine.filter((c) => !c.archivedAt || (!isNew && String(c.id) === initial.vehicleId));
       // Like the legacy <select>: a link to a vehicle that isn't mine (any
       // more) falls back to "연결하지 않음". A new post with exactly one current
       // vehicle starts linked to it (the user can still pick "연결하지 않음").
@@ -472,6 +474,19 @@ export default function PostEditor({postId}: {postId?: number}) {
                         ))}
                       </select>
                     </label>
+                  )}
+                  {fields.vehicleId && parts === 'error' && (
+                    <p className={styles.muted}>
+                      부품 목록을 불러오지 못했어요.{' '}
+                      {fields.partId && (
+                        <button type="button" className={styles.textLink} onClick={() => setFields((f) => ({...f, partId: ''}))}>
+                          부품 연결 해제
+                        </button>
+                      )}{' '}
+                      <button type="button" className={styles.textLink} onClick={() => setPartsKey((k) => k + 1)}>
+                        다시 시도
+                      </button>
+                    </p>
                   )}
                   {fields.vehicleId && Array.isArray(parts) && parts.length > 0 && (
                     <label>

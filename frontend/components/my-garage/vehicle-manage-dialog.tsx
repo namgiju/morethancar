@@ -308,6 +308,7 @@ export default function VehicleManageDialog({
 
           <VehicleParts
             vehicleId={vehicleId}
+            archived={archived}
             parts={state.vehicle.parts ?? []}
             onChanged={() => {
               onChanged();

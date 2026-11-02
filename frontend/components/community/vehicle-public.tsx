@@ -101,7 +101,7 @@ function VehicleBody({vehicle: v, own}: {vehicle: PublicVehicle; own: boolean}) 
             후기: {p.title} →
           </a>
         ))}
-        {own && (
+        {own && !v.archivedAt && (
           <a className={styles.boardLink} href={`/community/new?category=parts&vehicleId=${v.id}&partId=${part.id}`}>
             후기 쓰기 →
           </a>
@@ -139,7 +139,6 @@ function VehicleBody({vehicle: v, own}: {vehicle: PublicVehicle; own: boolean}) 
       </section>
       <section className={styles.comments} aria-labelledby="timeline-title">
         <h3 id="timeline-title">타임라인 {timeline.length}</h3>
-        {!timeline.length && <p className={styles.emptyComments}>아직 기록이 없어요. 첫 정비나 장착 경험을 남겨보세요.</p>}
         {timeline.map((item) => (
           <div key={item.key} className={styles.comment}>
             <small className={styles.muted}>
@@ -157,6 +156,7 @@ function VehicleBody({vehicle: v, own}: {vehicle: PublicVehicle; own: boolean}) 
       </section>
       <section className={styles.comments} aria-labelledby="records-title">
         <h3 id="records-title">정비 · 튜닝 · 부품 기록 {v.records.length}</h3>
+        {!v.records.length && <p className={styles.emptyComments}>아직 기록이 없어요. 첫 정비나 장착 경험을 남겨보세요.</p>}
         {v.records.map((r) => {
           const facts = [r.mileage !== null ? `${r.mileage.toLocaleString()} km` : '', r.cost != null ? `${r.cost.toLocaleString()}원` : '']
             .filter(Boolean)
@@ -184,6 +184,4 @@ function VehicleBody({vehicle: v, own}: {vehicle: PublicVehicle; own: boolean}) 
 }
 
 // Timestamps (registration, posts) as KST calendar dates, to sort with plain dates.
-function kstDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-CA', {timeZone: 'Asia/Seoul'});
-}
+const kstDate = (iso: string) => kstToday(Date.parse(iso));

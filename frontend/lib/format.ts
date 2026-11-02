@@ -77,8 +77,9 @@ export const motorsportUrl = (id: number) => `/motorsport/${id}`;
 export const spotUrl = (id: number) => `/spots/${id}`;
 
 // Part install box text shared by the post sidebar, the public garage and the
-// owner's part cards, e.g. "2025-03-02부터 · 7개월째 · 사진 첨부". Usage distance
-// appears only when both install and removal mileage are known. The evidence
+// owner's part cards, e.g. "2025-03-02부터 · 7개월째 · 사진 첨부". Distance is the
+// usage when both mileages are known (the server and a DB CHECK keep removal >=
+// install), otherwise the install mileage alone. The evidence
 // label is computed ("사진 첨부" / "사용자 입력") — never 인증/검증.
 export function partPeriodLabel(
   part: {installedOn: string; removedOn: string | null; installMileage: number | null; removeMileage: number | null; hasPhoto: boolean},
