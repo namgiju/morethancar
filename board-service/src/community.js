@@ -186,14 +186,20 @@ export function communityRouter({ db, auth }) {
     // 공개 데이터가 참조하는 사진만 누구에게나 준다(image-references.js). 소유자는 작성 중 미리보기로,
     // 관리자(DB 기준 역할)는 신고 처리로 볼 수 있다. 정지·탈퇴 세션은 app.js 인증에서 이미 null이다.
     // 삭제된 글에만 쓰였거나 어디에도 쓰이지 않는 사진은 id를 알아도 404로, 없는 사진과 구분하지 않는다.
+    // 캐시(MVP 단계 6-b): 공개 사진은 1시간 공유 캐시를 허용한다 — 비공개로 바뀌거나 지워져도 이미 받은
+    // 브라우저·중간 캐시에는 최대 1시간 남을 수 있다(합의된 정책). 소유자·관리자라서 보이는 비공개 사진은
+    // private, no-store. 404는 공통 미들웨어(app.js)의 no-store 그대로. nginx는 이 경로만 upstream 값을 통과시킨다.
+    // 공개 여부는 한 번만 계산한다(publicImageSql은 참조 테이블마다 EXISTS라 두 번 쓰면 두 배로 든다).
     const { rows } = await db.query(
-      `SELECT i.mime,i.data FROM community_images i WHERE i.id=$1 AND (
-        i.owner_id=$2 OR EXISTS(SELECT 1 FROM users a WHERE a.id=$2 AND a.role='ADMIN') OR ${publicImageSql("i")})`,
+      `SELECT x.mime,x.data,x.public FROM (
+         SELECT i.mime,i.data,i.owner_id,${publicImageSql("i")} AS public FROM community_images i WHERE i.id=$1
+       ) x WHERE x.public OR x.owner_id=$2 OR EXISTS(SELECT 1 FROM users a WHERE a.id=$2 AND a.role='ADMIN')`,
       [req.params.id, req.user?.id ?? null],
     );
     if (!rows.length) fail(404, "사진을 찾을 수 없습니다.");
     res
       .set("X-Content-Type-Options", "nosniff")
+      .set("Cache-Control", rows[0].public ? "public, max-age=3600" : "private, no-store")
       .type(rows[0].mime)
       .send(rows[0].data);
   });

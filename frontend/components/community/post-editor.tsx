@@ -577,7 +577,7 @@ export default function PostEditor({postId}: {postId?: number}) {
                 </small>
 
                 <p className={editorStyles.uploadLabel}>
-                  사진 첨부 <span>JPG · PNG · WebP / 장당 3MB, 최대 3장</span>
+                  사진 첨부 <span>JPG · PNG · WebP / 장당 20MB(자동으로 줄여서 올려요), 최대 3장</span>
                 </p>
                 <label htmlFor="post-images" className={editorStyles.addPhoto} aria-disabled={uploading}>
                   ＋ 사진 추가

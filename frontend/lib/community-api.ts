@@ -161,14 +161,60 @@ export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
 // POST /api/board/images with a data: URL body, like app.js's uploadFile().
 // The type/size check mirrors the server's limits so bad files fail fast.
+// Originals larger than this aren't even decoded (memory on phones); 3MB still
+// applies to what is actually sent, same as the server's limit.
+const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
+const MAX_EDGE = 1600;
+
+// MVP stage 6-a: before upload, scale the long edge down to 1600px and
+// re-encode as WebP (quality 0.8), or JPEG where the browser can't encode
+// WebP. Images that already fit are sent unchanged. Any decode/encode failure
+// falls back to the original file — the server still checks type and size.
+async function resizeForUpload(file: File): Promise<Blob> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file, {imageOrientation: 'from-image'});
+  } catch {
+    return file;
+  }
+  try {
+    // Images that already fit are sent as they are, unless they're over 3MB (then re-encode at the same size).
+    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.size <= MAX_IMAGE_BYTES) return file;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) return file;
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const encode = (type: string) =>
+      new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, 0.8));
+    // toBlob falls back to PNG for types it can't encode; only accept what we asked for.
+    const webp = await encode('image/webp');
+    if (webp?.type === 'image/webp') return webp;
+    // JPEG has no alpha: only fall back to it for JPEG sources, so transparent PNGs never turn black.
+    if (file.type !== 'image/jpeg') return file;
+    const jpeg = await encode('image/jpeg');
+    return jpeg?.type === 'image/jpeg' ? jpeg : file;
+  } finally {
+    bitmap.close();
+  }
+}
+
+// Every community photo (posts, vehicles, parts, profile, market listings) goes
+// through here. The owner-verification document (submitVehicleVerification)
+// does not: it is sent as taken so it stays legible for review.
 export async function uploadImage(file: File): Promise<number> {
-  if (!IMAGE_TYPES.includes(file.type) || file.size > MAX_IMAGE_BYTES)
-    throw new Error('JPG, PNG, WebP 사진을 장당 3MB 이하로 선택해주세요.');
+  if (!IMAGE_TYPES.includes(file.type)) throw new Error('JPG, PNG, WebP 사진을 선택해주세요.');
+  if (file.size > MAX_SOURCE_BYTES) throw new Error('사진은 장당 20MB 이하로 선택해주세요.');
+  const blob = await resizeForUpload(file);
+  if (blob.size > MAX_IMAGE_BYTES) throw new Error('사진을 줄여도 3MB를 넘어요. 다른 사진을 선택해주세요.');
   const data = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = () => reject(new Error('사진을 읽지 못했어요.'));
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
   return (await apiFetch<{id: number}>('/api/board/images', jsonInit('POST', {data}))).id;
 }

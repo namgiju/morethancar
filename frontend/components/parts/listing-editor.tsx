@@ -423,7 +423,7 @@ export default function ListingEditor({listingId}: {listingId?: number}) {
                 </p>
 
                 <p className={styles.uploadLabel}>
-                  매물 사진 <span>JPG · PNG · WebP / 장당 3MB, 최대 3장</span>
+                  매물 사진 <span>JPG · PNG · WebP / 장당 20MB(자동으로 줄여서 올려요), 최대 3장</span>
                 </p>
                 <label htmlFor="listing-images" className={styles.addPhoto} aria-disabled={uploading}>
                   ＋ 사진 추가
