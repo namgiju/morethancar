@@ -60,6 +60,9 @@ export default function MyGarage() {
   const [lastManaged, setLastManaged] = useState<OwnerVehicle | undefined>();
   const readyManaged = state.status === 'ready' ? state.vehicles.find((v) => v.id === manageVehicleId) : undefined;
   if (readyManaged && readyManaged !== lastManaged) setLastManaged(readyManaged);
+  // 현재 차량 / 이전 차량(보관) 분리는 한 번만 한다.
+  const currentVehicles = state.status === 'ready' ? state.vehicles.filter((v) => !v.archivedAt) : [];
+  const previousVehicles = state.status === 'ready' ? state.vehicles.filter((v) => v.archivedAt) : [];
   const managedVehicle =
     state.status === 'ready' ? readyManaged : lastManaged?.id === manageVehicleId ? lastManaged : undefined;
 
@@ -156,8 +159,8 @@ export default function MyGarage() {
                 <section className={styles.panel} aria-labelledby="garage-title">
                   <h2 id="garage-title">대표 차량</h2>
                   <RepresentativeVehicle
-                    vehicles={state.vehicles.filter((v) => !v.archivedAt)}
-                    hasArchived={state.vehicles.some((v) => v.archivedAt)}
+                    vehicles={currentVehicles}
+                    hasArchived={previousVehicles.length > 0}
                     member={state.member}
                     onManage={setManageVehicleId}
                     onRequestVerification={setVerifyVehicleId}
@@ -171,18 +174,18 @@ export default function MyGarage() {
                     </button>
                   </div>
                   <OwnedVehicleList
-                    vehicles={state.vehicles.filter((v) => !v.archivedAt)}
+                    vehicles={currentVehicles}
                     member={state.member}
                     busyId={repBusyId}
                     onChooseRepresentative={chooseRepresentative}
                     onManage={setManageVehicleId}
                   />
-                  {state.vehicles.some((v) => v.archivedAt) && (
+                  {previousVehicles.length > 0 && (
                     <>
                       <h3 className={styles.previousHeading}>이전 차량</h3>
                       <p className={styles.empty}>보관한 차량이에요. 기록과 연결된 글은 그대로 남아 있어요.</p>
                       <OwnedVehicleList
-                        vehicles={state.vehicles.filter((v) => v.archivedAt)}
+                        vehicles={previousVehicles}
                         member={state.member}
                         busyId={repBusyId}
                         onChooseRepresentative={chooseRepresentative}

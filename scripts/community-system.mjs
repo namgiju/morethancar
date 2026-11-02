@@ -397,6 +397,8 @@ try {
   assert.ok(archivedMember.vehicles.find((v) => v.id === car.id).archivedAt);
   assert.ok((await req("/garage/mine")).find((v) => v.id === car.id).archivedAt);
   await req("/profile/representative-vehicle", "PUT", { vehicleId: car.id }, tokenA, 400);
+  // 글 작성자 표시(ownerVehicle)도 보관 차량은 쓰지 않는다.
+  assert.equal((await req(`/posts/${post.id}`)).ownerVehicle, null);
   await req("/profile/representative-vehicle", "PUT", { vehicleId: car.id }, tokenB, 403);
   assert.equal((await req(`/garage/${car.id}`)).records.length, 1);
   assert.equal((await verification()).status, "APPROVED");
@@ -413,6 +415,7 @@ try {
   const restoredMember = await req("/members/1", "GET", undefined, "");
   assert.equal(restoredMember.verified, true);
   assert.equal(restoredMember.representativeVehicle.id, car.id);
+  assert.equal((await req(`/posts/${post.id}`)).ownerVehicle, "아반떼 N");
   assert.equal((await req(`/posts/${linkedPost.id}`)).linkedVehicle.archived, false);
   await req(`/posts/${linkedPost.id}`, "DELETE", {});
   await req(

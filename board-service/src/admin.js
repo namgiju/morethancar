@@ -113,7 +113,8 @@ export function adminRouter({ db, auth }) {
   });
   router.get("/badges", async (req, res) => {
     const { rows } = await db.query(
-      "SELECT count(DISTINCT owner_id)::int AS holders FROM owner_vehicles WHERE verified=true",
+      // 회원 프로필의 인장 계산(GET /members/:id)과 같이 보관하지 않은 인증 차량만 센다.
+      "SELECT count(DISTINCT owner_id)::int AS holders FROM owner_vehicles WHERE verified=true AND archived_at IS NULL",
     );
     res.json([{ ...VERIFIED_OWNER_BADGE, holders: rows[0].holders }]);
   });

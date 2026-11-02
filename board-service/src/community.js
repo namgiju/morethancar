@@ -48,7 +48,7 @@ const postSelect = `SELECT p.id,p.title,p.content,${unlessWithdrawnSql("u", "p.a
  (SELECT COUNT(*)::int FROM board_likes l WHERE l.post_id=p.id) AS "likeCount",
  EXISTS(SELECT 1 FROM board_likes l WHERE l.post_id=p.id AND l.user_id=$1) AS liked,
  EXISTS(SELECT 1 FROM board_bookmarks b WHERE b.post_id=p.id AND b.user_id=$1) AS bookmarked,
- ${unlessWithdrawnSql("u", "(SELECT model FROM owner_vehicles v WHERE v.owner_id=p.author_id ORDER BY v.id LIMIT 1)")} AS "ownerVehicle"
+ ${unlessWithdrawnSql("u", "(SELECT model FROM owner_vehicles v WHERE v.owner_id=p.author_id AND v.archived_at IS NULL ORDER BY v.id LIMIT 1)")} AS "ownerVehicle"
  FROM (SELECT * FROM board_posts WHERE NOT deleted) p JOIN users u ON u.id=p.author_id`;
 const asPost = (row) => ({ ...row, authorId: publicMemberId(row.authorId) });
 
