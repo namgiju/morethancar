@@ -121,7 +121,7 @@
 [ ] LATER-1: 카카오 회원 탈퇴 최소 구현 (배포 이후 제품 완성도 작업, 구 STEP 10-impl-D 축소) — 2026-11-02 사용자 결정으로 보류, LATER-4 MVP 단계 1부터 먼저 진행
 [x] LATER-2: 비밀번호 재설정 응답 통일 (작은 보안 정리, 구 STEP 11 축소) — 2026-10-23 PR #15 운영 배포(`76e8985`), 운영 일반 계정으로 메일 수신·재설정 성공 확인
 [ ] LATER-5: 운영 성능 메모 — SSR 내부 API 호출이 nginx rate limit을 frontend IP 하나로 공유, `/_next/static` no-store (2026-10-06, 실제 429·속도 문제가 보이면 착수)
-[~] LATER-4: 차량 기록/타임라인 — 2026-11-02 MVP 6단계 계획으로 대체(아래 LATER-4 "MVP 계획"). 단계 1 인증 무결성 운영 배포(2026-11-02, PR #20 병합 `ac5614c`). 단계 2 차량 보관 운영 배포(2026-11-02, PR #22 병합 `4dfc3cd`, V10). 단계 3 부품 이력 운영 배포(2026-11-02, PR #24 병합 `3304f4f`, V11). 단계 4 후기 연결·공개 차고 운영 배포(2026-11-02, PR #26 병합 `3e42157`). 단계 5 공유 운영 배포(2026-11-02, PR #28 병합 `00958b0`). 단계 6 진행 중
+[~] LATER-4: 차량 기록/타임라인 — 2026-11-02 MVP 6단계 계획으로 대체(아래 LATER-4 "MVP 계획"). 단계 1 인증 무결성 운영 배포(2026-11-02, PR #20 병합 `ac5614c`). 단계 2 차량 보관 운영 배포(2026-11-02, PR #22 병합 `4dfc3cd`, V10). 단계 3 부품 이력 운영 배포(2026-11-02, PR #24 병합 `3304f4f`, V11). 단계 4 후기 연결·공개 차고 운영 배포(2026-11-02, PR #26 병합 `3e42157`). 단계 5 공유 운영 배포(2026-11-02, PR #28 병합 `00958b0`). 단계 6 이미지 리사이즈·캐시 구현·검증·PR(병합·배포는 사용자 결정 대기)
 ```
 
 - **NOW-1 UI/UX 개선 및 Next.js 전환**
@@ -499,6 +499,12 @@
       - **운영 미확인**: 운영에 공개 부품이 0건(공개 차량 1대, 공개 부품 0)이라 **정상 공유 페이지(200)와 OG 태그(제목·설명·URL·사진)는 운영에서 확인하지 못했다** — 로컬 전체 흐름(Playwright)에서만 확인. 운영자가 공개 부품을 등록한 뒤 공유 링크·카카오톡 등 미리보기로 확인할 수 있다.
       - 되돌리기(미실행): `git checkout 3e42157` 후 `up -d --build --wait`, 또는 `pre-mvp5-rollback` 태그.
       - 남은 것: 단계 6(이미지 리사이즈·캐시 분리)은 아직 하지 않았다. 운영 배포 전 확인은 HTTP·읽기로만 한다(운영 데이터 변경 없음).
+    - **[x] 단계 6 이미지 리사이즈 + 캐시 분리 (2026-11-02, 브랜치 `feat/mvp-6-image-resize-cache`, PR — 병합·배포 전)**: 마이그레이션 없음.
+      - 6-a(frontend): `lib/community-api.ts` `uploadImage`가 올리기 전에 긴 변을 1600px로 줄이고 WebP(품질 0.8)로 다시 인코딩한다(`toBlob`이 WebP를 못 만들면 JPEG, 둘 다 안 되면 원본). 이미 1600px 이하면 원본 그대로. 디코딩 실패도 원본(서버가 형식·크기를 검사). 서버의 3MB 제한·MIME 검증은 그대로이고, 클라이언트는 원본 20MB까지 받아 **줄인 결과**에 3MB를 적용한다(큰 원본도 줄여서 올릴 수 있게). 커뮤니티 사진은 게시글·차량·부품·프로필(아바타·커버)·매물 모두 이 함수 하나를 거친다(호출처 확인). 자동차등록증 인증 서류(`submitVehicleVerification`, Spring)는 판독성 때문에 줄이지 않는다(지시 범위 밖). 다시 인코딩하면 EXIF(위치 등)가 빠지지만 원본을 그대로 올리는 작은 사진은 EXIF가 남는다.
+      - 6-b(board): `GET /api/board/images/:id`가 `publicImageSql` 결과를 함께 읽어 공개 사진은 `Cache-Control: public, max-age=3600`, 소유자·관리자라서 보이는 비공개 사진은 `private, no-store`. 404는 공통 미들웨어(`app.js`)의 `no-store` 그대로. **정책: 공개 사진은 비공개로 바뀌거나 지워져도 이미 받은 브라우저·중간 캐시에 최대 1시간 남을 수 있다**(합의, 코드 주석·nginx 주석에도 기록). Cloudflare 캐시 규칙은 추가하지 않았다(확장자 없는 API 경로).
+      - 6-b(nginx): `location ~ ^/api/board/images/\d+$`를 board location 앞에 추가 — upstream `Cache-Control`을 통과시키고(`proxy_hide_header Cache-Control` 없음), 이 location에 `add_header`가 있으면 server 블록 헤더를 물려받지 않으므로 `X-Content-Type-Options`·`Referrer-Policy`·`Content-Security-Policy`·`Strict-Transport-Security`를 같은 값으로 다시 선언. board도 `nosniff`를 보내 중복되던 것은 이 location에서 `proxy_hide_header X-Content-Type-Options`로 하나만. rate limit(`revcc_api`)·프록시 헤더는 board location과 같다. 업로드(`POST /api/board/images`)와 다른 `/api` 경로는 그대로 `no-store`.
+      - 검증: board `npm test` 111, `community-system.mjs`(공개 사진 public 1시간 — 비로그인·소유자, 소유자 비공개 사진 private no-store, 비로그인 비공개·없는 사진 404 no-store) PASS. `scripts/nginx-forwarded-check.sh` **PASS(all nginx edge checks)** — 이 스크립트에 이미지 location 검사 추가(upstream Cache-Control만 통과, 터널 경유 https에서 HSTS `max-age=300`, nosniff·Referrer-Policy·CSP, 업로드·잘못된 이미지 경로·다른 API는 no-store). **주의: macOS 기본 bash 3.2에서는 이 스크립트가 원래부터 실패한다**(`$( cat <<'JS' … )` 안 주석의 짝 없는 `)`를 bash 3.2가 잘못 파싱, 변경 전 main에서도 같은 줄에서 실패, zsh는 `$TUNNEL_IP:h…`를 수식어로 해석해 실패) — `docker:27-cli` 컨테이너에 bash 5를 설치해 도커 소켓으로 실행했다. 로컬 Docker 스택 nginx 경유 curl: 공개 사진 200 `public, max-age=3600`, 소유자 비공개 200 `private, no-store`, 비로그인 비공개·없는 사진 404 `no-store`, 다섯 경우 모두 nosniff(1개)·Referrer-Policy·CSP, 업로드 응답·다른 API `no-store`(HSTS는 터널 경유에만 붙어 로컬 curl에는 없음 — 위 스크립트로 확인). 리사이즈(Playwright 390, 부품 사진 업로드): 3000×2000 PNG 1,581,099 bytes → 저장 `image/webp` 460,890 bytes 1600×1067, 120×80 PNG 225 bytes → 그대로 `image/png` 225 bytes.
+      - 남은 위험: 운영 반영 뒤 비공개로 바꾼 사진이 최대 1시간 캐시에 남는다(정책). 프로필·차량 대표 사진도 같은 공개 규칙이라 같은 캐시를 받는다.
 ### 보류 (현재 규모에서는 오버헤드 — 실제 필요가 생기면 재개)
 
 기록과 계획은 지우지 않는다. 기존 system/browser/E2E 테스트 자산도 지우지 않고, 큰 릴리스·배포 경계에서만 쓴다.
@@ -1288,6 +1294,8 @@ _(작업 중 발견하면 여기에 "STEP 번호 — 파일:설명" 형식으로
 - LATER-4 MVP 단계 3(2026-11-02) — 위 단계 2의 motorsport-system 실패 항목에 근거 추가: 단계 1 이전 커밋 `10f2589`에서도 같은 단언으로 실패하고, 단언 도입 `13ed78f` 뒤 `c81c99c`가 응답에 `motorsportEventId`를 넣었다.
 
 - LATER-4 MVP 단계 4 배포(2026-11-02) — **Neon 정지 상태에서 깨어나는 데 1분 가까이 걸린 적이 있다**(UTC 06:00:51~06:01:56 DB 요청 503, 평소 재기동은 1초 안팎). core·board의 연결 대기는 5초(`DB_CONNECTION_TIMEOUT_MS`)라 그동안 요청이 모두 503이 된다. 자동 정지(NOW-4-3)의 대가로, 드물게라도 반복되면 연결 대기 시간을 늘리거나 첫 연결 재시도, 또는 정지 해제(비용 증가)를 판단해야 한다. 원인(Neon 쪽 지연)은 콘솔 시작 시각으로만 추정했다 — 수정하지 않음, 관찰 대상.
+
+- LATER-4 MVP 단계 6(2026-11-02) — `scripts/nginx-forwarded-check.sh`가 macOS 기본 bash 3.2에서 파싱 오류로 실패한다(heredoc in `$()` + 주석 `1)`). zsh로도 안 된다. Linux bash 5 또는 `docker:27-cli`+bash 컨테이너에서 실행해야 한다 — 스크립트 수정은 하지 않음(주석의 괄호를 없애면 bash 3.2에서도 될 가능성).
 
 ---
 

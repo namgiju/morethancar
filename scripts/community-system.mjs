@@ -465,6 +465,12 @@ try {
   await req(`/garage/${car.id}/parts/${hidden.id}`, "PUT", { brand: "Brembo", name: "GT 키트", installedOn: "2024-05-01", cost: 3000000, isPublic: false, imageIds: [privateImage.id] });
   assert.equal((await fetch(base + `/images/${partImage.id}`)).status, 200);
   assert.equal((await fetch(base + `/images/${privateImage.id}`)).status, 404);
+  // 캐시(MVP 단계 6-b): 공개 사진 public 1시간, 소유자에게만 보이는 비공개 사진 private no-store, 404 no-store.
+  assert.equal((await fetch(base + `/images/${partImage.id}`)).headers.get("cache-control"), "public, max-age=3600");
+  assert.equal((await fetch(base + `/images/${partImage.id}`, { headers: { Cookie: `REVCC_SESSION=${tokenA}` } })).headers.get("cache-control"), "public, max-age=3600");
+  assert.equal((await fetch(base + `/images/${privateImage.id}`, { headers: { Cookie: `REVCC_SESSION=${tokenA}` } })).headers.get("cache-control"), "private, no-store");
+  assert.equal((await fetch(base + `/images/${privateImage.id}`)).headers.get("cache-control"), "no-store");
+  assert.equal((await fetch(base + "/images/999999")).headers.get("cache-control"), "no-store");
   assert.equal((await fetch(base + `/images/${privateImage.id}`, { headers: { Cookie: `REVCC_SESSION=${tokenB}` } })).status, 404);
   assert.equal((await fetch(base + `/images/${privateImage.id}`, { headers: { Cookie: `REVCC_SESSION=${tokenA}` } })).status, 200);
   const ownerView = (await req(`/garage/${car.id}`)).parts;

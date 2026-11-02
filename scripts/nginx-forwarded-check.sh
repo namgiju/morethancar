@@ -101,6 +101,15 @@ assert.equal(redirect.headers.get('strict-transport-security'), null, 'no HSTS o
 const apiHsts = (await get('/api/board/posts', { 'X-Forwarded-Proto': 'https' })).headers.get('strict-transport-security');
 assert.equal(apiHsts, trusted ? 'max-age=300' : null, 'HSTS on API responses too');
 console.log(`PASS ${process.env.ROLE}: HSTS ${trusted ? 'max-age=300 only for X-Forwarded-Proto: https' : 'never sent (even with forged X-Forwarded-Proto: https)'}`);
+// MVP 단계 6-b: 사진 조회 location은 upstream Cache-Control을 통과시키고(이 스텁은 보내지 않으므로 없어야 한다)
+// server 블록과 같은 보안 헤더를 다시 선언한다. 업로드 경로(/api/board/images)와 다른 API는 여전히 no-store.
+const image = await get('/api/board/images/1', { 'X-Forwarded-Proto': 'https' });
+assert.equal(image.headers.get('cache-control'), null, 'image location passes the upstream Cache-Control only');
+assert.equal(image.headers.get('strict-transport-security'), trusted ? 'max-age=300' : null, 'HSTS on image responses');
+for (const [k, v] of [['x-content-type-options', 'nosniff'], ['referrer-policy', 'same-origin']]) assert.equal(image.headers.get(k), v, `image ${k}`);
+assert.match(image.headers.get('content-security-policy'), /frame-ancestors 'none'/, 'image CSP');
+for (const path of ['/api/board/images', '/api/board/images/1/x', '/api/board/posts']) assert.equal((await get(path)).headers.get('cache-control'), 'no-store', `${path} stays no-store`);
+console.log(`PASS ${process.env.ROLE}: image location keeps upstream Cache-Control with the same security headers; other paths no-store`);
 
 // 3) server_tokens off + 기존 보안 헤더 유지
 const home = await get('/');
