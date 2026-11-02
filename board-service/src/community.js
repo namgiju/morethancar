@@ -5,6 +5,7 @@ import { Router } from "express";
 import { VERIFIED_OWNER_BADGE } from "./badges.js";
 
 import { fail, text, positive, integer } from "./validation.js";
+import { isoDate, kstToday } from "./motorsport.js";
 import { validateOwnedImages } from "./owned-images.js";
 import { rateLimiter } from "./rate-limit.js";
 
@@ -656,7 +657,7 @@ export function communityRouter({ db, auth }) {
     const parts = await db.query(
       `SELECT id,brand,name,spec,installed_on::text AS "installedOn",removed_on::text AS "removedOn",
        install_mileage AS "installMileage",remove_mileage AS "removeMileage",${owner ? "cost," : ""}
-       ${existingImageIdsSql("image_ids")} AS "imageIds",is_public AS "isPublic",cardinality(image_ids)>0 AS "hasPhoto"
+       ${existingImageIdsSql("image_ids")} AS "imageIds",is_public AS "isPublic",cardinality(${existingImageIdsSql("image_ids")})>0 AS "hasPhoto"
        FROM vehicle_parts WHERE vehicle_id=$1 AND ($2 OR is_public)
        ORDER BY removed_on IS NULL DESC,installed_on DESC,id DESC`,
       [req.params.id, owner],
@@ -714,22 +715,14 @@ export function communityRouter({ db, auth }) {
   });
   // 부품 장착·탈거 이력(MVP 단계 3). 현재 장착 = removed_on IS NULL. 탈거도 PUT으로 removedOn·removeMileage를 넣는다.
   // 날짜는 기록(records)과 같은 형식 검사를 하고, 한국 날짜(KST) 기준 미래 날짜는 받지 않는다.
-  function partDate(value, optional) {
+  function partDate(value, optional, label) {
     if (optional && (value == null || value === "")) return null;
-    if (
-      typeof value !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
-      Number.isNaN(Date.parse(value)) ||
-      new Date(value).toISOString().slice(0, 10) !== value
-    )
-      fail(400, "올바른 날짜를 입력해주세요.");
-    if (value > new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10))
-      fail(400, "미래 날짜는 입력할 수 없어요.");
+    if (isoDate(value, label) > kstToday()) fail(400, "미래 날짜는 입력할 수 없어요.");
     return value;
   }
   async function partInput(body, userId) {
-    const installedOn = partDate(body?.installedOn, false),
-      removedOn = partDate(body?.removedOn, true);
+    const installedOn = partDate(body?.installedOn, false, "장착일"),
+      removedOn = partDate(body?.removedOn, true, "탈거일");
     const installMileage = integer(body?.installMileage ?? null, 0, 2000000, true),
       removeMileage = integer(body?.removeMileage ?? null, 0, 2000000, true);
     if (removedOn && removedOn < installedOn) fail(400, "탈거일은 장착일보다 빠를 수 없어요.");

@@ -255,7 +255,8 @@ export type VehiclePartInput = {
   isPublic: boolean;
 };
 
-export type PublicVehicle = Omit<GarageCard, 'recordCount'> & {records: VehicleRecord[]; parts: VehiclePart[]};
+// parts is optional: during a deploy the new frontend can briefly hit an older board-service.
+export type PublicVehicle = Omit<GarageCard, 'recordCount'> & {records: VehicleRecord[]; parts?: VehiclePart[]};
 
 // Body of POST /api/board/garage and PUT /api/board/garage/:id (board-service's
 // vehicleInput() in community.js) — the public-profile fields of a vehicle row

@@ -454,6 +454,7 @@
       - 미확인: 390px 모바일 폭 — 이번 세션에서 Chrome 창 크기 조정이 적용되지 않았고(창 폭 1470 고정, `resize_window` 성공 응답에도 `innerWidth` 그대로), 같은 출처 iframe은 CSP `frame-ancestors 'none'`으로 막혀 확인하지 못했다. 버튼은 `nowrap`·세로 배치로 작성했다. 단계 5 뒤 전체 흐름 확인 때 함께 본다.
       - motorsport 시스템 테스트 실패(이번 변경과 무관한 근거): 실패 단언은 `scripts/motorsport-system.mjs`의 `assert.ok(listed && !("motorsport_event_id" in listed) && !("motorsportEventId" in listed))`. (1) **MVP 단계 1 이전 커밋 `10f2589`를 별도 작업 트리로 꺼내 같은 스크립트를 돌려도 같은 단언에서 실패**(2026-11-02 확인). (2) 이 단언은 `13ed78f`(2026-10-12, 모터스포츠 1단계)에서 들어왔고, 같은 날 `c81c99c`(글–일정 연결)가 `postSelect`에 `motorsportEventId`를 넣으면서 맞지 않게 됐다. (3) 단계 1~3은 `postSelect`의 모터스포츠 필드를 건드리지 않았다. 의도 확인 전이라 고치지 않는다(아래 "발견된 추가 이슈").
       - 알려진 제한: 부품 삭제 후 사진 행이 남는다(정책 (d)). 보관 차량의 부품을 새 글에 연결하지 못하게 하는 규칙(정책 (c))과 글–부품 연결 API는 단계 4. 공개 차고 화면(`/community/cars/:id`)의 부품 표시도 단계 4.
+      - 코드 리뷰(PR #24, 2026-11-02): 정확성 결함 없음(소유권·비용 비공개·비공개 부품 필터·사진 공개·탈퇴 CASCADE 확인). 낮은 수준 불일치 반영 — `hasPhoto`를 남아 있는 이미지 기준으로(`imageIds`와 일치), 수정 폼의 탈거일 `min=장착일`·탈거 주행거리 `min=장착 주행거리`, 탈거 필드를 접힌 "더보기" 밖으로(브라우저 검증이 숨은 칸에 걸리지 않게). 날짜 검사·KST 오늘은 기존 `motorsport.js`의 `isoDate`·`kstToday`(frontend는 `lib/motorsport.ts`의 `kstToday`)를 재사용. `PublicVehicle.parts`는 배포 중 새 frontend가 옛 board 응답을 받을 수 있어 선택 필드로. 반영하지 않음: `GET /garage/:id`의 기록·부품 쿼리 병렬화(성능 정리 수준).
       - 배포 메모(미실행): V11은 추가만이라 이전 코드와 공존. 배포 전 `docs/DEPLOYMENT.md` "DB 백업과 복원 확인" 절차로 백업·복원 확인 → core 먼저(V11 적용 확인) → 나머지. 롤백은 코드만(새 테이블·컬럼은 이전 코드가 읽지 않음).
 ### 보류 (현재 규모에서는 오버헤드 — 실제 필요가 생기면 재개)
 

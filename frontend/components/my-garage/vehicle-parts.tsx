@@ -4,15 +4,11 @@ import {useState, type FormEvent} from 'react';
 import {createVehiclePart, deleteVehiclePart, updateVehiclePart, uploadImage} from '../../lib/community-api';
 import type {VehiclePart, VehiclePartInput} from '../../lib/community-types';
 import {imageUrl} from '../../lib/format';
+import {kstToday} from '../../lib/motorsport';
 import CommunityDialog, {type DialogSpec} from '../community/community-dialog';
 import styles from './my-garage.module.css';
 
 const MAX_PHOTOS = 3;
-
-// KST date (the server rejects dates after today in KST), e.g. "2026-11-02".
-function kstToday() {
-  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
 
 function toInput(part: VehiclePart): VehiclePartInput {
   return {
@@ -275,6 +271,34 @@ export default function VehicleParts({
               disabled={busy}
             />
           </label>
+          {/* Removal fields stay outside "더보기" so browser validation can focus them. */}
+          {editingPart?.removedOn && (
+            <div className={styles.formRow}>
+              <label>
+                탈거일
+                <input
+                  name="removedOn"
+                  type="date"
+                  required
+                  min={editingPart.installedOn}
+                  max={kstToday()}
+                  defaultValue={editingPart.removedOn}
+                  disabled={busy}
+                />
+              </label>
+              <label>
+                탈거 시 주행거리(km)
+                <input
+                  name="removeMileage"
+                  type="number"
+                  min={editingPart.installMileage ?? 0}
+                  max={2000000}
+                  defaultValue={editingPart.removeMileage ?? ''}
+                  disabled={busy}
+                />
+              </label>
+            </div>
+          )}
           <details>
             <summary>더보기 (규격·주행거리·비용·사진·공개)</summary>
             <label>
@@ -291,18 +315,6 @@ export default function VehicleParts({
                 <input name="cost" type="number" min={0} max={2000000000} defaultValue={editingPart?.cost ?? ''} disabled={busy} />
               </label>
             </div>
-            {editingPart?.removedOn && (
-              <div className={styles.formRow}>
-                <label>
-                  탈거일
-                  <input name="removedOn" type="date" required max={kstToday()} defaultValue={editingPart.removedOn} disabled={busy} />
-                </label>
-                <label>
-                  탈거 시 주행거리(km)
-                  <input name="removeMileage" type="number" min={0} max={2000000} defaultValue={editingPart.removeMileage ?? ''} disabled={busy} />
-                </label>
-              </div>
-            )}
             <label>
               사진 (최대 {MAX_PHOTOS}장)
               <input
