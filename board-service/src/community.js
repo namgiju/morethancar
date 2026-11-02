@@ -516,14 +516,18 @@ export function communityRouter({ db, auth }) {
   });
   // keepYear: 수정 시 저장된 연식. Spring은 2100년까지 받으므로, 그대로 다시 보낸 연식은 이 범위 밖이어도 받는다
   // (그렇지 않으면 그런 차량은 소개·사진도 고칠 수 없다). 새 값은 지금처럼 올해+1까지만 받는다.
-  async function vehicleInput(body, userId, keepYear) {
+  function vehicleFields(body, userId, keepYear) {
     const model = text(body?.model, 100),
       year = keepYear != null && body?.year === keepYear ? keepYear : integer(body?.year, 1900, new Date().getFullYear() + 1);
     const trim = text(body?.trim, 100, false),
       bio = text(body?.bio, 1000, false);
     const imageId = body?.imageId == null ? null : positive(body.imageId);
-    if (imageId) await images([imageId], userId);
     return [userId, model, year, trim, bio, imageId];
+  }
+  async function vehicleInput(body, userId) {
+    const values = vehicleFields(body, userId);
+    if (values[5]) await images([values[5]], userId);
+    return values;
   }
   router.post("/garage", auth, async (req, res) => {
     const { rows } = await db.query(
@@ -537,7 +541,11 @@ export function communityRouter({ db, auth }) {
   // 차량 행을 잠그고 최신 값을 읽은 뒤 같은 트랜잭션에서 UPDATE한다. core의 차량 수정·인증 신청·관리자 승인/반려도
   // 같은 행을 잠그므로(GarageVehicleRepository.findByIdForUpdate) 서로 기다렸다가 커밋된 값으로 판단한다.
   router.put("/garage/:id", auth, async (req, res) => {
+    // 사진 소유 확인은 풀의 다른 연결을 쓰므로 트랜잭션 연결을 잡기 전에 끝낸다(동시 요청이 풀을 다 잡고 서로 기다리지 않게).
+    const imageId = req.body?.imageId == null ? null : positive(req.body.imageId);
+    if (imageId) await images([imageId], req.user.id);
     const client = await db.connect();
+    let broken;
     try {
       await client.query("BEGIN");
       const stored = (await client.query(
@@ -545,7 +553,7 @@ export function communityRouter({ db, auth }) {
         [req.user.id, req.params.id],
       )).rows[0];
       if (!stored) fail(403, "본인 차량만 수정할 수 있어요.");
-      const values = await vehicleInput(req.body, req.user.id, stored.year);
+      const values = vehicleFields(req.body, req.user.id, stored.year);
       // Spring으로 등록한 모델은 trim만 거쳐 저장된다. 정리(plainText) 결과가 저장값을 정리한 것과 같으면
       // 사용자가 모델을 바꾼 게 아니므로 저장값을 그대로 둔다(소개만 고쳤는데 409·인증 해제가 되지 않게).
       const cleaned = (v) => { try { return plainText(v).trim(); } catch { return null; } };
@@ -565,10 +573,11 @@ export function communityRouter({ db, auth }) {
       await client.query("COMMIT");
       res.json(rows[0]);
     } catch (error) {
-      await client.query("ROLLBACK");
+      // ROLLBACK까지 실패한 연결(끊김·시간 초과)은 풀에 돌려보내지 않고 버린다. 응답은 원래 오류로 한다.
+      await client.query("ROLLBACK").catch((rollbackError) => { broken = rollbackError; });
       throw error;
     } finally {
-      client.release();
+      client.release(broken);
     }
   });
   router.delete("/garage/:id", auth, async (req, res) => {

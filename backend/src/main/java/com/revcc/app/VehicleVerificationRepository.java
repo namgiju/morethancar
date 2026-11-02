@@ -23,6 +23,9 @@ public interface VehicleVerificationRepository extends JpaRepository<VehicleVeri
     @Query("select v.vehicle.id from VehicleVerification v where v.id = :id")
     Optional<Integer> findVehicleIdById(@Param("id") Integer id);
 
+    @Query("select max(v.id) from VehicleVerification v where v.vehicle.id = :vehicleId")
+    Integer findLatestIdByVehicleId(@Param("vehicleId") Integer vehicleId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select v from VehicleVerification v where v.id = :id")
     Optional<VehicleVerification> findByIdForUpdate(@Param("id") Integer id);

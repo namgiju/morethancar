@@ -157,3 +157,45 @@ test("garage PUT: 차량 행을 잠그고 읽은 뒤 같은 트랜잭션에서 U
   assert.equal((await put()).status, 403);
   assert.deepEqual(calls.map((c) => c.sql.split(/\s/)[0]), ["BEGIN", "SELECT", "ROLLBACK", "release"]);
 });
+
+test("garage PUT: 사진 소유 확인은 트랜잭션 연결을 잡기 전에 끝내고, ROLLBACK이 실패한 연결은 버린다", async (t) => {
+  const log = [];
+  let failLock = false;
+  const app = createApp({
+    redis: { get: async () => JSON.stringify({ id: 7, username: "owner" }) },
+    db: {
+      query: async (sql) => {
+        log.push(sql.includes("community_images") ? "images" : sql.split(/\s/)[0]);
+        return { rows: [{ id: 9 }] };
+      },
+      connect: async () => {
+        log.push("connect");
+        return {
+          query: async (sql) => {
+            log.push(sql.split(/\s/)[0]);
+            if (failLock && sql.startsWith("SELECT")) throw Object.assign(new Error("lock wait timed out"), { status: 503 });
+            if (failLock && sql === "ROLLBACK") throw new Error("connection terminated");
+            if (sql.startsWith("SELECT")) return { rows: [{ model: "아반떼 N", year: 2024 }] };
+            if (sql.startsWith("UPDATE")) return { rows: [{ id: 5 }] };
+            return { rows: [] };
+          },
+          release: (error) => log.push(error ? "release(destroy)" : "release"),
+        };
+      },
+    },
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const put = () => fetch(`http://127.0.0.1:${server.address().port}/api/board/garage/5`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `REVCC_SESSION=${"c".repeat(43)}` },
+    body: JSON.stringify({ model: "아반떼 N", year: 2024, bio: "소개", imageId: 9 }),
+  });
+  assert.equal((await put()).status, 200);
+  assert.deepEqual(log.filter((x) => x !== "SELECT"), ["images", "connect", "BEGIN", "UPDATE", "COMMIT", "release"]);
+  failLock = true;
+  log.length = 0;
+  assert.equal((await put()).status, 503);
+  assert.deepEqual(log.slice(-3), ["SELECT", "ROLLBACK", "release(destroy)"]);
+});

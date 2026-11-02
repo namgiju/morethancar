@@ -140,4 +140,19 @@ class VehicleVerificationConcurrencyIntegrationTest {
         assertEquals(false, row(id).get("verified"));
         assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM vehicle_verifications WHERE id=?", String.class, request));
     }
+
+    // 예전 데이터처럼 PENDING 신청이 둘 남아 있으면 최근 신청만 처리되고, 옛 서류로는 승인되지 않는다.
+    @Test void onlyTheLatestPendingRequestCanBeApproved() throws Exception {
+        User admin = create("ADMIN"), owner = create("USER");
+        int id = vehicle(owner, "PENDING", false);
+        String insert = "INSERT INTO vehicle_verifications(vehicle_id,document_mime,document_data) VALUES(?,'image/png',?) RETURNING id";
+        int older = jdbc.queryForObject(insert, Integer.class, id, new byte[]{1});
+        int latest = jdbc.queryForObject(insert, Integer.class, id, new byte[]{2});
+        Cookie a = session(admin);
+        assertEquals(409, mvc.perform(post("/api/admin/vehicle-verifications/"+older+"/approve").cookie(a)).andReturn().getResponse().getStatus());
+        assertEquals("PENDING", row(id).get("status"));
+        assertEquals(200, mvc.perform(post("/api/admin/vehicle-verifications/"+latest+"/approve").cookie(a)).andReturn().getResponse().getStatus());
+        assertEquals("APPROVED", row(id).get("status"));
+        assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM vehicle_verifications WHERE id=?", String.class, older));
+    }
 }

@@ -101,6 +101,8 @@ class VehicleVerificationControllerTest {
             .contentType(MediaType.APPLICATION_JSON).content("{\"data\":\"data:text/plain;base64,aGk=\"}"))
             .andExpect(status().isBadRequest());
         verifyNoInteractions(verifications);
+        // 서류 검사는 차량 행을 잠그기 전에 끝난다(잘못된 서류로 잠금을 잡지 않는다).
+        verify(vehicles, never()).findByIdForUpdate(any());
     }
 
     @Test void documentIsVisibleToOwnerAndAdminOnly() throws Exception {

@@ -60,7 +60,8 @@ export default function MyGarage() {
   const [lastManaged, setLastManaged] = useState<OwnerVehicle | undefined>();
   const readyManaged = state.status === 'ready' ? state.vehicles.find((v) => v.id === manageVehicleId) : undefined;
   if (readyManaged && readyManaged !== lastManaged) setLastManaged(readyManaged);
-  const managedVehicle = state.status === 'ready' ? readyManaged : lastManaged;
+  const managedVehicle =
+    state.status === 'ready' ? readyManaged : lastManaged?.id === manageVehicleId ? lastManaged : undefined;
 
   async function chooseRepresentative(vehicleId: number) {
     setRepBusyId(vehicleId);

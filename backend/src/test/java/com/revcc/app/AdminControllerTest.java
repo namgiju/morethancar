@@ -75,6 +75,7 @@ class AdminControllerTest {
         when(verifications.findVehicleIdById(id)).thenReturn(Optional.of(100 + id));
         when(vehicles.findByIdForUpdate(100 + id)).thenReturn(Optional.of(vehicle));
         when(verifications.findByIdForUpdate(id)).thenReturn(Optional.of(verification));
+        when(verifications.findLatestIdByVehicleId(100 + id)).thenReturn(id);
     }
 
     @Test void adminApprovesVerificationAndVehicle() throws Exception {
@@ -127,5 +128,21 @@ class AdminControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals("APPROVED", verification.getStatus());
         verify(vehicles, never()).saveAndFlush(any());
         verify(verifications, never()).saveAndFlush(any());
+    }
+
+    // 같은 차량에 PENDING 신청이 둘 남아 있으면(예전 데이터) 최근 신청만 처리한다.
+    @Test void onlyTheLatestRequestOfTheVehicleCanBeReviewed() throws Exception {
+        GarageVehicleRequest request = new GarageVehicleRequest("Hyundai", "Avante N", 2024, "N", "DCT", "Blue", "my N", "desc", "123가4567");
+        Vehicle vehicle = new Vehicle(owner(), request);
+        vehicle.markVerificationPending();
+        VehicleVerification older = new VehicleVerification(vehicle, "image/png", new byte[]{1});
+        stubLocked(8, vehicle, older);
+        when(verifications.findLatestIdByVehicleId(108)).thenReturn(9);
+        Cookie admin = new Cookie(SharedSessionService.COOKIE, "admin-token");
+        for (String action : new String[]{"approve", "reject"})
+            mvc.perform(post("/api/admin/vehicle-verifications/8/" + action).cookie(admin)).andExpect(status().isConflict());
+        org.junit.jupiter.api.Assertions.assertEquals("PENDING", vehicle.getVerificationStatus());
+        org.junit.jupiter.api.Assertions.assertEquals("PENDING", older.getStatus());
+        verify(vehicles, never()).saveAndFlush(any());
     }
 }

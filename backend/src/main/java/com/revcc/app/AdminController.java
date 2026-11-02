@@ -79,6 +79,8 @@ public class AdminController {
     // 핵심 필드 변경으로 해제된 인증이 새 서류 없이 되살아나고, 다시 반려하면 현재 인증이 지워진다.
     // 차량 → 신청 순서로 행을 잠그고(인증 신청과 같은 순서) 잠근 뒤의 최신 값으로 판단한다.
     // 차량도 PENDING이어야 한다 — 신청 행만 PENDING인 상태로 차량 정보가 바뀌었다면 그 서류로 승인하지 않는다.
+    // 그 차량의 가장 최근 신청이어야 한다 — 예전 데이터에 PENDING 신청이 여러 개 남아 있어도 옛 서류로 처리하지 않는다.
+    // (차량 행을 잠근 뒤라 그사이 새 신청이 끼어들지 못한다.)
     private VehicleVerification pendingVerification(Integer id) {
         Integer vehicleId = verifications.findVehicleIdById(id).orElseThrow(() ->
             new ResponseStatusException(HttpStatus.NOT_FOUND, "인증 신청을 찾을 수 없습니다."));
@@ -86,7 +88,8 @@ public class AdminController {
             new ResponseStatusException(HttpStatus.NOT_FOUND, "인증 신청을 찾을 수 없습니다."));
         VehicleVerification verification = verifications.findByIdForUpdate(id).orElseThrow(() ->
             new ResponseStatusException(HttpStatus.NOT_FOUND, "인증 신청을 찾을 수 없습니다."));
-        if (!"PENDING".equals(verification.getStatus()) || !"PENDING".equals(vehicle.getVerificationStatus()))
+        if (!"PENDING".equals(verification.getStatus()) || !"PENDING".equals(vehicle.getVerificationStatus())
+                || !id.equals(verifications.findLatestIdByVehicleId(vehicleId)))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 처리된 인증 신청입니다.");
         return verification;
     }
