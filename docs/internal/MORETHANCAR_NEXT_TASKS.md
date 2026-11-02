@@ -121,7 +121,7 @@
 [ ] LATER-1: 카카오 회원 탈퇴 최소 구현 (배포 이후 제품 완성도 작업, 구 STEP 10-impl-D 축소) — 2026-11-02 사용자 결정으로 보류, LATER-4 MVP 단계 1부터 먼저 진행
 [x] LATER-2: 비밀번호 재설정 응답 통일 (작은 보안 정리, 구 STEP 11 축소) — 2026-10-23 PR #15 운영 배포(`76e8985`), 운영 일반 계정으로 메일 수신·재설정 성공 확인
 [ ] LATER-5: 운영 성능 메모 — SSR 내부 API 호출이 nginx rate limit을 frontend IP 하나로 공유, `/_next/static` no-store (2026-10-06, 실제 429·속도 문제가 보이면 착수)
-[~] LATER-4: 차량 기록/타임라인 — 2026-11-02 MVP 6단계 계획으로 대체(아래 LATER-4 "MVP 계획"). 단계 1 인증 무결성 운영 배포(2026-11-02, PR #20 병합 `ac5614c`). 단계 2 차량 보관 운영 배포(2026-11-02, PR #22 병합 `4dfc3cd`, V10). 단계 3 부품 이력 운영 배포(2026-11-02, PR #24 병합 `3304f4f`, V11). 단계 4 후기 연결·공개 차고 운영 배포(2026-11-02, PR #26 병합 `3e42157`). 단계 5 공유 구현·전체 흐름 검증·PR(병합·배포는 사용자 결정 대기)
+[~] LATER-4: 차량 기록/타임라인 — 2026-11-02 MVP 6단계 계획으로 대체(아래 LATER-4 "MVP 계획"). 단계 1 인증 무결성 운영 배포(2026-11-02, PR #20 병합 `ac5614c`). 단계 2 차량 보관 운영 배포(2026-11-02, PR #22 병합 `4dfc3cd`, V10). 단계 3 부품 이력 운영 배포(2026-11-02, PR #24 병합 `3304f4f`, V11). 단계 4 후기 연결·공개 차고 운영 배포(2026-11-02, PR #26 병합 `3e42157`). 단계 5 공유 운영 배포(2026-11-02, PR #28 병합 `00958b0`). 단계 6 진행 중
 ```
 
 - **NOW-1 UI/UX 개선 및 Next.js 전환**
@@ -480,7 +480,7 @@
       - **배포 직후 DB 연결 실패(약 65초, 원인: Neon 재기동 지연으로 판단)**: UTC 06:00:51~06:01:56 동안 DB가 필요한 요청이 모두 503(core `HikariPool ... Connection is not available, request timed out`, board `Connection terminated due to connection timeout`). 그 사이 EC2에서 Neon 호스트 DNS·TCP 5432 연결은 정상, Neon 콘솔 Computes는 "ACTIVE · Started a minute ago"(06:02 무렵 시작). 06:02:37부터 readiness·`/api/vehicles`·글 목록 모두 200, 이후 오류 없음. proxy 로그상 5xx 14건은 모두 점검 요청(운영자 IP)과 그 요청이 부른 frontend SSR이었고 외부 사용자 요청은 없었다. 같은 날 01:47·05:12·05:37 재기동은 1초 안팎이었는데 이번에는 연결 대기(5초)를 크게 넘겼다 — Neon 자동 정지(scale to zero)를 켠 뒤 생길 수 있는 위험으로 기록한다(아래 "발견된 추가 이슈"). 앱 코드 변경과의 연관은 찾지 못했다(core는 재시작되지 않았고 board 연결 실패도 같은 시각).
       - **배포 후 확인(HTTP·읽기만)**: 회복 뒤 health 4종·주요 페이지·API 200, 비로그인 `POST /api/board/posts`·`PUT /api/board/posts/1`·`POST /api/board/garage/1/parts` 401. **비로그인 차량 상세(`GET /api/board/garage/1`, 공개 목록의 유일한 차량)**: 키는 `archivedAt·bio·createdAt·id·imageId·model·ownerId·trim·username·verified·year`와 `records·parts·posts`뿐 — `verificationStatus`·번호판 키 없음, 기록·부품에 `cost` 키 없음. 다만 운영 차량의 기록·부품이 0건이라 "행이 있을 때 비용이 빠지는지"는 운영에서 확인하지 못했다(임시 PostgreSQL 시스템 테스트로 확인). 공개 글 상세에 `linkedPart` 키·`partId: null`(비로그인), 비용·번호판 없음. 공개 회원 프로필에도 심사 상태·번호판·비용 없음.
       - **되돌리기(미실행)**: `git checkout 3304f4f` 후 `up -d --build --wait`, 또는 `pre-mvp4-rollback` 태그 이미지. DB 변경 없음.
-    - **[x] 단계 5 부품 이력 공유 + MVP 전체 흐름 검증 (2026-11-02, 브랜치 `feat/mvp-5-part-share`, PR — 병합·배포 전)**: 새 API·토큰·마이그레이션 없음.
+    - **[x] 단계 5 부품 이력 공유 + MVP 전체 흐름 검증 (2026-11-02, PR #28 → 병합 `00958b0`, 운영 배포 완료)**: 새 API·토큰·마이그레이션 없음.
       - 고정 URL `/community/cars/[id]/parts/[partId]`(Next 페이지 하나, `app/community/cars/[id]/parts/[partId]/page.tsx`). 데이터는 서버에서 비로그인으로 `GET /api/board/garage/:id`(`lib/server-api.ts` `fetchPublicVehicleServer`)를 부르고 `parts[]`에서 찾는다 — 그래서 비공개·삭제·탈퇴 회원 부품은 **소유자에게도** `notFound()`(404). 공유 범위는 `is_public` 하나로, 비공개로 바꾸면 링크도 바로 404(소유자 안내: 부품 폼 공개 체크박스 문구, 비공개 부품 카드에 "공유 링크가 열리지 않아요"). 메타데이터와 페이지는 React `cache`로 한 번만 조회(이 Next 16.3 문서 권장). `generateMetadata`: 제목 "브랜드 제품명 장착 이력", 설명(기간·사용 거리·차량·차량 상태·부품 기록), canonical, `og:type/title/description/url/site_name`, 첫 사진 절대 URL(`https://morethancar.kr/api/board/images/:id`). 루트 레이아웃에 `metadataBase`가 없어 기존 EV 페이지처럼 절대 URL을 직접 쓴다.
       - 표시: 부품 정보·규격, 장착 기간·사용 거리, 장착 시 주행거리, 사진, "부품 기록: 사진 첨부/사용자 입력"과 "차량: 연식 모델 · 인증 차량/등록 차량/이전 보유 차량"을 따로, 연결 후기 링크, 면책 "소유자가 입력한 기록이며 morethancar가 보증하지 않습니다".
       - 텍스트 복사(`components/community/copy-text-button.tsx`): 부품 카드(/home 수정 창, 공개 차고)와 공유 페이지. `navigator.clipboard`가 없거나 실패하면 선택된 읽기 전용 textarea(5줄)로 대신한다. 형식은 지시서 4줄 그대로, 생성 함수는 의존성 없는 `lib/part-share.ts` `partShareText`(기간·사용 거리·증빙·차량 상태 계산도 여기로 모아 `partPeriodLabel`과 공유). 입력에 번호판·비용·이름·연락처가 섞여 있어도 출력에 넣지 않는다(단위 테스트).
@@ -494,6 +494,10 @@
         - 스크린샷 18장은 작업 폴더(scratchpad `pw-shots/`)에만 있다.
       - **전체 회귀(단계 5 완료 시점, 저장소 규칙)**: Spring `mvn test` 전체 155건(실제 PostgreSQL 16·Redis, 실패·건너뜀 0), board `npm test` 111, `scripts/run-board-system.sh` 8개 중 7개 PASS(motorsport는 기존 실패, 근거는 단계 3), frontend `tsc`·`next build`·공유 문구 테스트 3.
       - 코드 리뷰(PR #28, 2026-11-02) 반영: (1) 백엔드 오류(예: Neon 재기동 지연) 때 공유 페이지가 500이었다 → "부품 이력을 잠시 불러오지 못했어요" 안내(404와 구분, 메타데이터는 noindex 기본값). 로컬에서 board를 멈춘 상태로 확인(200·안내 문구, 다시 켜면 정상). (2) hydration 불일치 가능성 — 클라이언트 컴포넌트가 렌더 중 `kstToday()`를 다시 계산하고 숫자 포맷에 로케일이 없었다 → 서버가 계산한 `today`를 넘기고 `toLocaleString('ko-KR')`. (3) 공유 페이지가 차량 전체(모든 기록·부품·글)를 클라이언트로 넘겼다 → 표시에 필요한 차량 필드와 그 부품의 후기만. 정리: 공개 차고 헤더도 `vehicleStatusLabel`, 공유 링크는 `partSharePath`(정규식으로 도메인 떼던 것 제거), /home 카드의 공유 문구는 `vehicleId` 기준, "복사했어요"는 문구가 바뀌면 초기화. 수정 뒤 전체 흐름 Playwright 다시 70/70. 반영하지 않음: `serverApi` 재사용(404 처리 차이), 사이트 주소 상수 통합(기존 EV·sitemap 등과 같은 패턴).
+      - **운영 배포(2026-11-02, UTC 06:24:31~06:25:14)**: CI(`dc099ee`) 통과 후 병합. 롤백 기준 EC2 `3e42157`(PR #26), 이미지 태그 `revcc-*:pre-mvp5-rollback`(core `d1f14ee9be1d`, board `c61679f7796e`, frontend `ac739e62544e`). 마이그레이션 없음(DB 백업 생략). `up -d --build --wait`로 frontend만 교체, 6개 서비스 healthy.
+      - **배포 후 확인(HTTP·읽기만)**: health 4종·주요 페이지·`/api/vehicles` 200. 공유 URL 404 — 없는 부품(`/community/cars/1/parts/999999`)·없는 차량(`/community/cars/999999/parts/1`)·잘못된 id(`/community/cars/abc/parts/1`), 404 페이지에는 OG 태그 없음. 배포 직후 로그 오류 없음.
+      - **운영 미확인**: 운영에 공개 부품이 0건(공개 차량 1대, 공개 부품 0)이라 **정상 공유 페이지(200)와 OG 태그(제목·설명·URL·사진)는 운영에서 확인하지 못했다** — 로컬 전체 흐름(Playwright)에서만 확인. 운영자가 공개 부품을 등록한 뒤 공유 링크·카카오톡 등 미리보기로 확인할 수 있다.
+      - 되돌리기(미실행): `git checkout 3e42157` 후 `up -d --build --wait`, 또는 `pre-mvp5-rollback` 태그.
       - 남은 것: 단계 6(이미지 리사이즈·캐시 분리)은 아직 하지 않았다. 운영 배포 전 확인은 HTTP·읽기로만 한다(운영 데이터 변경 없음).
 ### 보류 (현재 규모에서는 오버헤드 — 실제 필요가 생기면 재개)
 
@@ -1317,6 +1321,7 @@ _(작업 중 발견하면 여기에 "STEP 번호 — 파일:설명" 형식으로
 | LATER-4 MVP 단계 2 차량 보관 | 완료·운영 배포(2026-11-02) | 2026-11-02 | PR #22 병합 `4dfc3cd` | V10 `owner_vehicles.archived_at`. 보관·복원(심사 중 409), 보관 시 대표 차량 해제, 보관 차량 인증 신청 409·대표 지정 400·새 글 연결 400(기존 연결 유지), 인장·인장 보유자 수·작성자 차종 표시는 현재 차량만, `/home` 현재/이전 차량. 배포 전 백업(`neon-pre-v10-20261102-051055.dump`, 임시 컨테이너 복원 확인)·롤백 이미지 태그, core 먼저 V10 적용 확인 후 나머지. 운영은 HTTP·읽기 확인만. 상세 §4 LATER-4 |
 | LATER-4 MVP 단계 3 부품 이력 | 완료·운영 배포(2026-11-02) | 2026-11-02 | PR #24 병합 `3304f4f` | V11 `vehicle_parts`·`board_posts.part_id`. 부품 추가·수정·탈거·삭제(소유자 SQL 강제, KST 미래 날짜 거부, 사진 3장·본인 사진), `GET /garage/:id` parts(비용·비공개는 소유자만), 공개 부품 사진만 공개, 탈퇴 시 부품·사진 정리. 배포 전 백업(`neon-pre-v11-20261102-053627.dump`, 복원 확인)·롤백 태그, core 먼저 V11. 운영은 HTTP·읽기 확인만. **390px 미검증(단계 5)**. 상세 §4 LATER-4 |
 | LATER-4 MVP 단계 4 후기 연결·공개 차고 | 완료·운영 배포(2026-11-02) | 2026-11-02 | PR #26 병합 `3e42157` | 정비 기록 비용·심사 상태 소유자만, 글–부품 연결(`partId`, `linkedPart`), 공개 차고 헤더·현재 부품·타임라인·과거 부품·후기 링크. 마이그레이션 없음, 롤백 태그 `pre-mvp4-rollback`. 배포 직후 Neon 재기동 지연으로 약 65초 503(외부 사용자 요청 없음). 비로그인 차량 상세에 비용·심사 상태·번호판 없음 확인(운영 기록·부품 0건). 상세 §4 LATER-4 |
+| LATER-4 MVP 단계 5 부품 이력 공유 | 완료·운영 배포(2026-11-02) | 2026-11-02 | PR #28 병합 `00958b0` | 고정 공유 URL·OG·텍스트 복사(대체 textarea), 공개 여부로만 공유 통제. MVP 전체 흐름 Playwright 70/70(390·데스크톱, 비로그인·타인·소유자), 전체 회귀. 운영은 404 경로만 확인 — 공개 부품 0건이라 정상 공유 페이지·OG는 운영 미확인. 상세 §4 LATER-4 |
 
 ---
 
