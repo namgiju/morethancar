@@ -17,10 +17,10 @@ try {
   await admin.query(`CREATE SCHEMA ${schema}`);
   db = new pg.Pool({ options: `-c search_path=${schema}` });
   await applyFlywayMigrations(db);
-  // V4: image_ids GIN 인덱스.
+  // V4: image_ids GIN 인덱스(V11에서 vehicle_parts에도 추가).
   const indexes = (await db.query(
     `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname=$1 AND indexname LIKE '%image_ids_gin' ORDER BY 1`, [schema])).rows;
-  assert.deepEqual(indexes.map((r) => r.indexname), ["board_posts_image_ids_gin", "parts_listings_image_ids_gin"]);
+  assert.deepEqual(indexes.map((r) => r.indexname), ["board_posts_image_ids_gin", "parts_listings_image_ids_gin", "vehicle_parts_image_ids_gin"]);
   assert.ok(indexes.every((r) => /USING gin \(image_ids\)/.test(r.indexdef)));
 
   await db.query(`INSERT INTO users(id,username,password,role) VALUES

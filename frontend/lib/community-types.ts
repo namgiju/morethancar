@@ -221,7 +221,41 @@ export type VehicleRecord = {
   cost: number | null;
   date: string;
 };
-export type PublicVehicle = Omit<GarageCard, 'recordCount'> & {records: VehicleRecord[]};
+// A part's install/removal history (GET /api/board/garage/:id parts[]). Mounted
+// now = removedOn null. The owner gets private parts and cost; everyone else
+// only public parts, without cost. hasPhoto is the computed evidence label
+// ("사진 첨부" vs "사용자 입력") — never call it 인증/검증.
+export type VehiclePart = {
+  id: number;
+  brand: string;
+  name: string;
+  spec: string;
+  installedOn: string;
+  removedOn: string | null;
+  installMileage: number | null;
+  removeMileage: number | null;
+  cost?: number | null;
+  imageIds: number[];
+  isPublic: boolean;
+  hasPhoto: boolean;
+};
+
+// Body of POST /api/board/garage/:id/parts and PUT .../parts/:partId (a full
+// replacement; removal = the same body with removedOn/removeMileage set).
+export type VehiclePartInput = {
+  brand: string;
+  name: string;
+  spec: string;
+  installedOn: string;
+  removedOn: string | null;
+  installMileage: number | null;
+  removeMileage: number | null;
+  cost: number | null;
+  imageIds: number[];
+  isPublic: boolean;
+};
+
+export type PublicVehicle = Omit<GarageCard, 'recordCount'> & {records: VehicleRecord[]; parts: VehiclePart[]};
 
 // Body of POST /api/board/garage and PUT /api/board/garage/:id (board-service's
 // vehicleInput() in community.js) — the public-profile fields of a vehicle row

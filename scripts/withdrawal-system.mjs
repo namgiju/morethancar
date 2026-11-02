@@ -39,13 +39,16 @@ try {
   }
   const image = async (id, token = "") => (await fetch(`${origin}/api/board/images/${id}`, { headers: cookie(token) })).status;
   const upload = async () => (await req("/api/board/images", { method: "POST", token: "w", data: { data: png }, expected: 201 })).id;
-  const [postImage, sellingImage, soldImage, carImage, avatar] = [await upload(), await upload(), await upload(), await upload(), await upload()];
+  const [postImage, sellingImage, soldImage, carImage, avatar, partImage] = [await upload(), await upload(), await upload(), await upload(), await upload(), await upload()];
   const post = (await req("/api/board/posts", { method: "POST", token: "w", expected: 201, data: { title: "W 글", content: "남는 글", imageIds: [postImage] } })).id;
   const item = (title, status, imageId) => ({ title, description: "설명", price: 1000, category: "wheels", status, vehicle: "Avante",
     region: "서울 마포구", contact: "010-1234-5678", imageIds: [imageId] });
   const selling = (await req("/api/parts/listings", { method: "POST", token: "w", data: item("판매중 휠", "selling", sellingImage), expected: 201 })).id;
   const sold = (await req("/api/parts/listings", { method: "POST", token: "w", data: item("판매완료 휠", "sold", soldImage), expected: 201 })).id;
-  await req("/api/board/garage", { method: "POST", token: "w", data: { model: "Avante", year: 2022, imageId: carImage }, expected: 201 });
+  const wCar = (await req("/api/board/garage", { method: "POST", token: "w", data: { model: "Avante", year: 2022, imageId: carImage }, expected: 201 })).id;
+  // MVP 단계 3: 공개 부품 사진은 탈퇴 전에는 공개, 탈퇴(차량 CASCADE + 미참조 사진 정리) 뒤에는 부품·사진 모두 없다.
+  await req(`/api/board/garage/${wCar}/parts`, { method: "POST", token: "w", data: { brand: "Michelin", name: "PS4S", installedOn: "2025-03-02", imageIds: [partImage] }, expected: 201 });
+  assert.equal(await image(partImage), 200);
   await req("/api/board/profile", { method: "PUT", token: "w", data: { bio: "", avatarImageId: avatar } });
   await req(`/api/parts/listings/${selling}/favorite`, { method: "PUT", token: "a", data: { active: true } });
   assert.equal((await req(`/api/parts/listings/${selling}`, { token: "a" })).contact, "010-1234-5678");
@@ -91,12 +94,14 @@ try {
   // 사진: 공개 글·판매완료 매물 사진은 공개, 닫힌 매물 사진은 비공개(관리자만), 차량·프로필 사진은 삭제됨.
   assert.deepEqual([await image(postImage), await image(soldImage)], [200, 200]);
   assert.deepEqual([await image(sellingImage), await image(sellingImage, "a"), await image(sellingImage, "z")], [404, 404, 200]);
-  assert.deepEqual([await image(carImage, "z"), await image(avatar, "z")], [404, 404]);
+  assert.deepEqual([await image(carImage, "z"), await image(avatar, "z"), await image(partImage, "z")], [404, 404, 404]);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM vehicle_parts WHERE vehicle_id=$1", [wCar])).rows[0].n, 0);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM community_images WHERE id=$1", [partImage])).rows[0].n, 0);
   assert.equal((await db.query("SELECT count(*)::int AS n FROM community_images WHERE id=ANY($1)", [[carImage, avatar]])).rows[0].n, 0);
   // 탈퇴 회원의 차고·프로필은 없다.
   await req(`/api/board/members/${W}`, { expected: 404 });
   assert.deepEqual(await req(`/api/board/garage?owner=${W}`), []);
-  console.log("PASS withdrawal (board view): V5 schema checks, withdrawn session refused, closed listing hidden from list/search/favorites/detail/view/favorite (admin detail only, no contact), sold listing kept with anonymous seller/no contact/region/photos, retained post and photo, closed-listing photo private, garage/profile photos removed.");
+  console.log("PASS withdrawal (board view): V5 schema checks, withdrawn session refused, closed listing hidden from list/search/favorites/detail/view/favorite (admin detail only, no contact), sold listing kept with anonymous seller/no contact/region/photos, retained post and photo, closed-listing photo private, garage/profile/part photos removed.");
 } finally {
   server?.closeAllConnections?.();
   server?.close();

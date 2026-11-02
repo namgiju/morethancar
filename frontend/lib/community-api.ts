@@ -17,6 +17,7 @@ import type {
   CommunityReport,
   MyVehicle,
   PostInput,
+  VehiclePartInput,
   VehicleProfileInput,
   VehicleRecordInput,
   WithdrawInfo,
@@ -263,6 +264,21 @@ export async function updateVehicleProfile(id: number, input: VehicleProfileInpu
 // restore; records and linked posts stay. 409 while a verification is under review.
 export async function archiveVehicle(id: number, archived: boolean): Promise<{id: number; archivedAt: string | null}> {
   return apiFetch(`/api/board/garage/${id}/archive`, jsonInit('PATCH', {archived}));
+}
+
+// POST /api/board/garage/:id/parts — owner only (403 otherwise).
+export async function createVehiclePart(vehicleId: number, input: VehiclePartInput): Promise<{id: number}> {
+  return apiFetch(`/api/board/garage/${vehicleId}/parts`, jsonInit('POST', input));
+}
+
+// PUT /api/board/garage/:id/parts/:partId — owner only; also used to record removal.
+export async function updateVehiclePart(vehicleId: number, partId: number, input: VehiclePartInput): Promise<{id: number}> {
+  return apiFetch(`/api/board/garage/${vehicleId}/parts/${partId}`, jsonInit('PUT', input));
+}
+
+// DELETE /api/board/garage/:id/parts/:partId — owner only.
+export async function deleteVehiclePart(vehicleId: number, partId: number): Promise<{ok: true}> {
+  return apiFetch(`/api/board/garage/${vehicleId}/parts/${partId}`, jsonInit('DELETE', {}));
 }
 
 // DELETE /api/board/garage/:id — owner only. Deletes the vehicle's records

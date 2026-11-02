@@ -655,6 +655,46 @@
   display: block;
 }
 
+/* Vehicle parts (MVP stage 3): edit/remove/delete buttons stacked on the right,
+   inline removal form, photo thumbnails. Buttons never wrap at 390px. */
+.partButtons {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.partButtons button,
+.partActions button {
+  white-space: nowrap;
+}
+
+.partActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.partInlineForm {
+  margin-top: 8px;
+}
+
+.partPhotos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.partPhotos span {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
 .recordRow p {
   margin: 2px 0;
   font-size: 13px;

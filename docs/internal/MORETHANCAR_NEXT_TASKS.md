@@ -121,7 +121,7 @@
 [ ] LATER-1: 카카오 회원 탈퇴 최소 구현 (배포 이후 제품 완성도 작업, 구 STEP 10-impl-D 축소) — 2026-11-02 사용자 결정으로 보류, LATER-4 MVP 단계 1부터 먼저 진행
 [x] LATER-2: 비밀번호 재설정 응답 통일 (작은 보안 정리, 구 STEP 11 축소) — 2026-10-23 PR #15 운영 배포(`76e8985`), 운영 일반 계정으로 메일 수신·재설정 성공 확인
 [ ] LATER-5: 운영 성능 메모 — SSR 내부 API 호출이 nginx rate limit을 frontend IP 하나로 공유, `/_next/static` no-store (2026-10-06, 실제 429·속도 문제가 보이면 착수)
-[~] LATER-4: 차량 기록/타임라인 — 2026-11-02 MVP 6단계 계획으로 대체(아래 LATER-4 "MVP 계획"). 단계 1 인증 무결성 운영 배포(2026-11-02, PR #20 병합 `ac5614c`). 단계 2 차량 보관 운영 배포(2026-11-02, PR #22 병합 `4dfc3cd`, V10). 단계 3은 사용자 결정 대기
+[~] LATER-4: 차량 기록/타임라인 — 2026-11-02 MVP 6단계 계획으로 대체(아래 LATER-4 "MVP 계획"). 단계 1 인증 무결성 운영 배포(2026-11-02, PR #20 병합 `ac5614c`). 단계 2 차량 보관 운영 배포(2026-11-02, PR #22 병합 `4dfc3cd`, V10). 단계 3 부품 이력 구현·검증·PR(병합·배포는 사용자 결정 대기)
 ```
 
 - **NOW-1 UI/UX 개선 및 Next.js 전환**
@@ -444,6 +444,17 @@
       - **배포 후 확인(실제로 한 것, 운영 데이터 변경 없음)**: health 4종·`/`·`/login`·`/community`·`/home`·`/community/new`·`/api/vehicles`·`/api/board/posts` 200. 비로그인 `PATCH /api/board/garage/1/archive` 401, 잘못된 id `PATCH /api/board/garage/abc/archive` 400, 비로그인 `PUT /api/board/profile/representative-vehicle` 401. 공개 글 목록 응답에 `ownerVehicle`·`linkedVehicle` 키 유지, 공개 회원 프로필 `vehicles[].archivedAt` 키 존재(읽기만). 배포된 board에 보관 라우트, frontend 산출물에 보관 확인 창 문구 반영. 배포 직후 4분 core·board·frontend 로그 오류 없음(기존 Flyway 버전 경고만).
       - **운영 미확인(운영 데이터를 바꾸지 않기 위해 실행하지 않음)**: 실제 보관·복원, 심사 중 보관 409, 대표 차량 해제·지정 거부, 보관 차량 인증 신청 409, 글 연결 규칙, 화면의 현재/이전 차량 표시와 보관 버튼 — 로컬 Docker 스택 브라우저 확인·임시 PostgreSQL 시스템 테스트·CI로 갈음했다. 운영에서 확인하려면 운영자가 본인 계정·차량으로 직접 해 봐야 한다(보관 후 복원하면 원상태, 단 대표 차량 설정은 복원되지 않음).
       - **되돌리기(미실행)**: 앱은 `git checkout ac5614c` 후 prod 오버레이 `up -d --build --wait`, 또는 위 `pre-v10-rollback` 태그 이미지로 재기동. V10 컬럼은 남겨 둔다(이전 코드는 읽지 않고 core는 `ddl-auto=validate`라 추가 컬럼 무관). 스키마까지 되돌려야 하면 위 백업으로 복원(운영 복원 절차는 아직 문서화되지 않음 — `docs/DEPLOYMENT.md` "되돌리기").
+    - **[x] 단계 3 부품 장착·탈거 이력 (2026-11-02, 브랜치 `feat/mvp-3-vehicle-parts`, PR — 병합·배포 전)**: Flyway는 최신 main(`34c27d6`)에서 V10까지, 원격 브랜치에도 V11이 없어 `V11__vehicle_parts.sql`(지시서 스키마 그대로: `vehicle_parts` 새 테이블 + CHECK·인덱스, `board_posts.part_id` nullable FK `ON DELETE SET NULL` + 부분 인덱스. 기존 행 변경 없음).
+      - API(board, records 라우트 패턴): `POST /garage/:id/parts`, `PUT /garage/:id/parts/:partId`(전체 교체, 탈거도 이 경로로 `removedOn`·`removeMileage`), `DELETE /garage/:id/parts/:partId`. 모든 쓰기는 `owner_vehicles.owner_id`를 SQL 조건으로 강제하고, 부품이 없으면 내 차량이면 404(다른 차량 경로 포함)·아니면 403. `vehicle_id`는 본문에서 받지 않는다. `router.param("partId")`는 `positive`. 필수 브랜드·제품명·장착일, 사진 최대 3장(`validateOwnedImages` — 본인 사진만), 공개 여부 boolean. 날짜는 records와 같은 형식 검사 + **한국 날짜(KST) 기준 미래 거부**(records 자체에는 미래 검사가 없다 — 지시서의 "미래 날짜 거부"를 KST로 적용). 탈거일<장착일·탈거 주행거리<장착 주행거리는 400(DB CHECK도 같은 규칙). 입력 검증(400)이 소유권(403)보다 먼저다(records와 같은 순서, 정보 노출 없음).
+      - 조회: 단계 4 전에 화면이 쓸 수 있도록 `GET /garage/:id`에 `parts[]`를 먼저 넣었다 — 소유자에게는 비공개 부품과 `cost`, 그 외(타인·비로그인)에는 공개 부품만·`cost` 키 없음. 현재 장착 먼저, `hasPhoto`(사진 첨부/사용자 입력 계산), `imageIds`는 남아 있는 이미지만. 단계 4의 `posts[]`·`verificationStatus` 정리 등은 그대로 단계 4.
+      - 사진 공개 규칙(`image-references.js` `publicImageSql`): 공개 부품의 `image_ids`이고 차량 소유자가 탈퇴하지 않았을 때만 누구에게나. 비공개 부품 사진은 소유자(업로더)만, 다른 회원·비로그인 404. 부품을 지우면 그 사진은 더 이상 공개되지 않지만 사진 행은 남는다(알려진 제한 — 미참조 사진 정리는 회원 탈퇴에만 있다).
+      - 탈퇴: `WithdrawalService` 코드는 바꾸지 않았다(4단계 차량 삭제 → 부품 CASCADE → 7단계 미참조 사진 정리). `WithdrawalIntegrationTest`(실제 PostgreSQL)에 부품+부품 사진을 넣어 탈퇴 후 부품 0·사진 삭제 확인, board `withdrawal-system.mjs`에도 탈퇴 전 공개 200 → 탈퇴 후 부품·사진 없음 추가.
+      - 화면: `/home` 차량 수정 창에 "부품" 섹션(`components/my-garage/vehicle-parts.tsx`) — 현재 장착/과거 부품 목록, 추가·수정 폼(필수 브랜드·제품명·장착일, 규격·주행거리·비용·사진·공개는 "더보기"), 탈거 버튼 → 탈거일·탈거 주행거리만 받는 작은 폼, 삭제 확인 창. 사진은 기존 `uploadImage`. 카드에는 "사진 첨부/사용자 입력"·"비공개"·비용(소유자 화면)만 표시하고 "인증·검증" 표현은 쓰지 않는다. 기존 기록 폼의 "부품" 종류는 그대로.
+      - 검증: board `npm test` 111 통과. `scripts/run-board-system.sh` — community(생성 201·타인 403·비로그인 401, 잘못된 날짜·KST 내일·빈 브랜드/제품명·탈거일 역전·주행거리 역전·공개 값·남의 사진·사진 4장·비용 음수·주행거리 초과 400, 오늘 날짜 201, 비공개 부품 사진 비로그인·타인 404·소유자 200, 공개 부품 사진 200, 소유자만 비용·비공개 부품, 타인·비로그인 응답에 `cost` 키·값 없음, 수정·탈거 타인 403·내 다른 차량 경로 404·남의 차량 경로 403, `vehicle_id` 불변, 현재/과거 정렬, DB CHECK, 부품 삭제 시 글 `part_id` NULL·글 유지·사진 비공개(행은 남음), 재삭제 404, 차량 삭제 CASCADE)·admin·market·moderation·withdrawn·post-soft-delete·withdrawal PASS. **post-soft-delete는 V11의 새 GIN 인덱스(`vehicle_parts_image_ids_gin`) 때문에 인덱스 목록 단언이 깨져 기대 목록에 추가해 해결**(이번 작업으로 생긴 실패). Spring `WithdrawalIntegrationTest`(위)·관련 테스트. frontend `tsc`·`next build`. 로컬 Docker 스택(V11 적용) 브라우저(데스크톱): 부품 추가(사진 업로드 미리보기·비용) → "현재 장착" 카드(사진 첨부·비용) → 탈거(주행거리 21000) → "과거 부품"으로 이동, "9,000 km 사용" 표시.
+      - 미확인: 390px 모바일 폭 — 이번 세션에서 Chrome 창 크기 조정이 적용되지 않았고(창 폭 1470 고정, `resize_window` 성공 응답에도 `innerWidth` 그대로), 같은 출처 iframe은 CSP `frame-ancestors 'none'`으로 막혀 확인하지 못했다. 버튼은 `nowrap`·세로 배치로 작성했다. 단계 5 뒤 전체 흐름 확인 때 함께 본다.
+      - motorsport 시스템 테스트 실패(이번 변경과 무관한 근거): 실패 단언은 `scripts/motorsport-system.mjs`의 `assert.ok(listed && !("motorsport_event_id" in listed) && !("motorsportEventId" in listed))`. (1) **MVP 단계 1 이전 커밋 `10f2589`를 별도 작업 트리로 꺼내 같은 스크립트를 돌려도 같은 단언에서 실패**(2026-11-02 확인). (2) 이 단언은 `13ed78f`(2026-10-12, 모터스포츠 1단계)에서 들어왔고, 같은 날 `c81c99c`(글–일정 연결)가 `postSelect`에 `motorsportEventId`를 넣으면서 맞지 않게 됐다. (3) 단계 1~3은 `postSelect`의 모터스포츠 필드를 건드리지 않았다. 의도 확인 전이라 고치지 않는다(아래 "발견된 추가 이슈").
+      - 알려진 제한: 부품 삭제 후 사진 행이 남는다(정책 (d)). 보관 차량의 부품을 새 글에 연결하지 못하게 하는 규칙(정책 (c))과 글–부품 연결 API는 단계 4. 공개 차고 화면(`/community/cars/:id`)의 부품 표시도 단계 4.
+      - 배포 메모(미실행): V11은 추가만이라 이전 코드와 공존. 배포 전 `docs/DEPLOYMENT.md` "DB 백업과 복원 확인" 절차로 백업·복원 확인 → core 먼저(V11 적용 확인) → 나머지. 롤백은 코드만(새 테이블·컬럼은 이전 코드가 읽지 않음).
 ### 보류 (현재 규모에서는 오버헤드 — 실제 필요가 생기면 재개)
 
 기록과 계획은 지우지 않는다. 기존 system/browser/E2E 테스트 자산도 지우지 않고, 큰 릴리스·배포 경계에서만 쓴다.
@@ -1228,6 +1239,9 @@ _(작업 중 발견하면 여기에 "STEP 번호 — 파일:설명" 형식으로
 - LATER-4 MVP 단계 1(2026-11-02) — `AdminController.approve`·`VehicleVerification.approve()`는 신청 행이 PENDING인지 확인하지 않는다. 승인/반려가 끝난 예전 신청 행을 관리자가 다시 승인하면 차량이 `approveVerification()`으로 다시 인증된다 — 단계 1로 인증이 해제된 차량도 새 서류 없이 되살아날 수 있다. → **해결(2026-11-02, 같은 단계 1 브랜치)**: 승인·반려를 PENDING 신청만 허용(409). 관리자 화면은 원래 PENDING 행에만 버튼을 보여 줬다.
 
 - LATER-4 MVP 단계 2(2026-11-02) — `scripts/motorsport-system.mjs`가 게시글 목록 응답에 `motorsport_event_id`/`motorsportEventId`가 없어야 한다고 단언하지만(83행 부근), `postSelect`는 `motorsportEventId`를 내려준다. 단계 2 코드를 빼고 실행해도 같은 단언에서 실패하므로 기존 불일치다(어느 쪽이 의도인지 확인 필요, 수정하지 않음). CI는 이 수동 시스템 테스트를 돌리지 않는다.
+
+- LATER-4 MVP 단계 3(2026-11-02) — 기존 `GET /api/board/garage/:id`가 정비 기록(`vehicle_records`)의 `cost`를 누구에게나(비로그인 포함) 내려준다. 부품 비용은 소유자에게만 주도록 했지만 기록 비용은 원래 동작 그대로 두었다(범위 밖, 수정하지 않음). 공개 차고 통합(단계 4) 때 같이 정할 대상.
+- LATER-4 MVP 단계 3(2026-11-02) — 위 단계 2의 motorsport-system 실패 항목에 근거 추가: 단계 1 이전 커밋 `10f2589`에서도 같은 단언으로 실패하고, 단언 도입 `13ed78f` 뒤 `c81c99c`가 응답에 `motorsportEventId`를 넣었다.
 
 ---
 

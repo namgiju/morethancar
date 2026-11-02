@@ -123,6 +123,9 @@ class WithdrawalIntegrationTest {
         jdbc.update("INSERT INTO garage_guestbook(owner_id,author_id,content) VALUES(?,?,'A가 W 차고에'),(?,?,'W가 A 차고에')",id,a.getId(),a.getId(),id);
         int car=jdbc.queryForObject("INSERT INTO owner_vehicles(owner_id,model,year,image_id,license_plate) VALUES(?,'Avante',2022,?,'12가3456') RETURNING id",Integer.class,id,imgCar);
         jdbc.update("INSERT INTO vehicle_records(vehicle_id,kind,title,recorded_on) VALUES(?,'maintenance','오일 교환',CURRENT_DATE)",car);
+        // MVP 단계 3: 부품과 부품 사진(공개). 차량 삭제(CASCADE) 뒤 7단계 미참조 사진 정리로 함께 지워져야 한다.
+        int imgPart=image(id);
+        jdbc.update("INSERT INTO vehicle_parts(vehicle_id,brand,name,installed_on,image_ids) VALUES(?,'Michelin','PS4S',CURRENT_DATE,ARRAY[?]::int[])",car,imgPart);
         jdbc.update("INSERT INTO vehicle_verifications(vehicle_id,document_mime,document_data) VALUES(?,'image/png',?)",car,new byte[]{9});
         jdbc.update("UPDATE board_posts SET vehicle_id=? WHERE id=?",car,live);
         jdbc.update("INSERT INTO member_profiles(user_id,bio,avatar_image_id,cover_image_id,representative_vehicle_id) VALUES(?,'소개',?,?,?)",id,imgShared,imgCover,car);
@@ -187,6 +190,8 @@ class WithdrawalIntegrationTest {
         // 차고: 차량·정비기록·자동차등록증·프로필·내 차고 방명록 삭제, 타인 차고에 쓴 방명록 유지.
         assertEquals(0,count("SELECT count(*)::int FROM owner_vehicles WHERE owner_id=?",id));
         assertEquals(0,count("SELECT count(*)::int FROM vehicle_records WHERE vehicle_id=?",car));
+        assertEquals(0,count("SELECT count(*)::int FROM vehicle_parts WHERE vehicle_id=?",car));
+        assertEquals(0,count("SELECT count(*)::int FROM community_images WHERE id=?",imgPart));
         assertEquals(0,count("SELECT count(*)::int FROM vehicle_verifications WHERE vehicle_id=?",car));
         assertEquals(0,count("SELECT count(*)::int FROM member_profiles WHERE user_id=?",id));
         assertEquals(0,count("SELECT count(*)::int FROM garage_guestbook WHERE owner_id=?",id));
