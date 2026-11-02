@@ -442,10 +442,71 @@ try {
     (await req("/notifications", "GET", undefined, tokenB)).length,
     0,
   );
+  // 부품 장착·탈거 이력(MVP 단계 3): 소유권·검증·비용 비공개·비공개 사진·다른 차량 경로·삭제·차량 삭제 CASCADE.
+  const partImage = await req("/images", "POST", { data: png }, tokenA, 201);
+  const otherImage = await req("/images", "POST", { data: png }, tokenB, 201);
+  const kstToday = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 33 * 3600 * 1000).toISOString().slice(0, 10);
+  const tire = { brand: "Michelin", name: "Pilot Sport 4S", spec: "245/40R18", installedOn: "2025-03-02", installMileage: 12000, cost: 1200000, imageIds: [partImage.id] };
+  // 입력 검증(남의 사진 400 등)이 소유권(403)보다 먼저다 — records와 같은 순서.
+  await req(`/garage/${car.id}/parts`, "POST", { ...tire, imageIds: [] }, tokenB, 403);
+  await req(`/garage/${car.id}/parts`, "POST", tire, "", 401);
+  for (const bad of [
+    { installedOn: "2025-02-30" }, { installedOn: tomorrow }, { brand: "" }, { name: undefined },
+    { removedOn: "2025-03-01" }, { removedOn: "2025-04-01", removeMileage: 11000 }, { isPublic: "no" },
+    { imageIds: [otherImage.id] }, { imageIds: [partImage.id, 1, 2, 3] }, { cost: -1 }, { installMileage: 2000001 },
+  ])
+    await req(`/garage/${car.id}/parts`, "POST", { ...tire, ...bad }, tokenA, 400);
+  await req(`/garage/${car.id}/parts`, "POST", { ...tire, installedOn: kstToday }, tokenA, 201).then((p) => req(`/garage/${car.id}/parts/${p.id}`, "DELETE", {}));
+  const part = await req(`/garage/${car.id}/parts`, "POST", tire, tokenA, 201);
+  const hidden = await req(`/garage/${car.id}/parts`, "POST", { brand: "Brembo", name: "GT 키트", installedOn: "2024-05-01", cost: 3000000, isPublic: false, imageIds: [] }, tokenA, 201);
+  // 비공개 부품 사진·비공개 부품: 소유자만. 공개 부품 사진은 누구나.
+  const privateImage = await req("/images", "POST", { data: png }, tokenA, 201);
+  await req(`/garage/${car.id}/parts/${hidden.id}`, "PUT", { brand: "Brembo", name: "GT 키트", installedOn: "2024-05-01", cost: 3000000, isPublic: false, imageIds: [privateImage.id] });
+  assert.equal((await fetch(base + `/images/${partImage.id}`)).status, 200);
+  assert.equal((await fetch(base + `/images/${privateImage.id}`)).status, 404);
+  assert.equal((await fetch(base + `/images/${privateImage.id}`, { headers: { Cookie: `REVCC_SESSION=${tokenB}` } })).status, 404);
+  assert.equal((await fetch(base + `/images/${privateImage.id}`, { headers: { Cookie: `REVCC_SESSION=${tokenA}` } })).status, 200);
+  const ownerView = (await req(`/garage/${car.id}`)).parts;
+  assert.deepEqual(ownerView.map((p) => [p.id, p.cost, p.isPublic, p.hasPhoto]), [[part.id, 1200000, true, true], [hidden.id, 3000000, false, true]]);
+  for (const token of [tokenB, ""]) {
+    const view = await req(`/garage/${car.id}`, "GET", undefined, token);
+    assert.deepEqual(view.parts.map((p) => p.id), [part.id]);
+    assert.ok(!("cost" in view.parts[0]));
+    assert.ok(!JSON.stringify(view.parts).includes("1200000"));
+  }
+  // 수정·탈거(PUT): 타인 403, 다른 차량 경로 — 남의 차량이면 403, 내 다른 차량이면 404. vehicle_id는 바뀌지 않는다.
+  const otherCar = await req("/garage", "POST", { model: "K5", year: 2021 }, tokenB, 201);
+  const removal = { ...tire, removedOn: "2025-10-01", removeMileage: 21000, vehicleId: otherCar.id };
+  const removalB = { ...removal, imageIds: [] };
+  await req(`/garage/${car.id}/parts/${part.id}`, "PUT", removalB, tokenB, 403);
+  await req(`/garage/${otherCar.id}/parts/${part.id}`, "PUT", removalB, tokenB, 404);
+  await req(`/garage/${otherCar.id}/parts/${part.id}`, "PUT", removal, tokenA, 403);
+  await req(`/garage/${otherCar.id}/parts/${part.id}`, "DELETE", {}, tokenB, 404);
+  await req(`/garage/${car.id}/parts/${part.id}`, "PUT", { ...removal, removeMileage: 100 }, tokenA, 400);
+  await req(`/garage/${car.id}/parts/${part.id}`, "PUT", removal);
+  const removed = (await db.query("SELECT vehicle_id,removed_on::text AS r,remove_mileage FROM vehicle_parts WHERE id=$1", [part.id])).rows[0];
+  assert.deepEqual(removed, { vehicle_id: car.id, r: "2025-10-01", remove_mileage: 21000 });
+  assert.deepEqual((await req(`/garage/${car.id}`)).parts.map((p) => [p.id, p.removedOn]), [[hidden.id, null], [part.id, "2025-10-01"]]);
+  // DB CHECK도 같은 규칙을 막는다(API 우회 방어).
+  await assert.rejects(db.query("UPDATE vehicle_parts SET removed_on='2020-01-01' WHERE id=$1", [part.id]), /check/);
+  // 글이 부품을 가리켜도 부품을 지우면 part_id만 NULL(글은 남는다). 지운 부품의 사진은 더 이상 공개되지 않는다(사진 행은 남음, 알려진 제한).
+  const partPost = await req("/posts", "POST", { title: "타이어 후기", content: "내용", category: "free" }, tokenA, 201);
+  await db.query("UPDATE board_posts SET part_id=$1 WHERE id=$2", [part.id, partPost.id]);
+  await req(`/garage/${car.id}/parts/${part.id}`, "DELETE", {}, tokenB, 403);
+  await req(`/garage/${car.id}/parts/${part.id}`, "DELETE", {});
+  await req(`/garage/${car.id}/parts/${part.id}`, "DELETE", {}, tokenA, 404);
+  assert.equal((await db.query("SELECT part_id FROM board_posts WHERE id=$1", [partPost.id])).rows[0].part_id, null);
+  await req(`/posts/${partPost.id}`);
+  assert.equal((await fetch(base + `/images/${partImage.id}`)).status, 404);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM community_images WHERE id=$1", [partImage.id])).rows[0].n, 1);
+  await req(`/posts/${partPost.id}`, "DELETE", {});
+  await req(`/garage/${otherCar.id}`, "DELETE", {}, tokenB);
   await req(`/garage/${car.id}`, "DELETE", {});
   await req(`/garage/${car.id}`, "GET", undefined, tokenA, 404);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM vehicle_parts WHERE vehicle_id=$1", [car.id])).rows[0].n, 0);
   console.log(
-    "PASS: author profile/statistics, derived verification badge, private field exclusion, related filters, Flyway migrations, image validation, posts, search/categories, ownership, likes/bookmarks, comments/replies, notifications, reports, garage/records, garage verification integrity, vehicle archive, cascade deletion.",
+    "PASS: author profile/statistics, derived verification badge, private field exclusion, related filters, Flyway migrations, image validation, posts, search/categories, ownership, likes/bookmarks, comments/replies, notifications, reports, garage/records, garage verification integrity, vehicle archive, vehicle parts, cascade deletion.",
   );
 } finally {
   if (server) {

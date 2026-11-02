@@ -14,6 +14,7 @@ import type {PublicVehicle, VehicleProfileInput, VehicleRecordKind} from '../../
 import {imageUrl} from '../../lib/format';
 import CommunityDialog, {type DialogSpec} from '../community/community-dialog';
 import styles from './my-garage.module.css';
+import VehicleParts from './vehicle-parts';
 
 const RECORD_LABELS: Record<VehicleRecordKind, string> = {maintenance: '정비', tuning: '튜닝', parts: '부품'};
 
@@ -304,6 +305,15 @@ export default function VehicleManageDialog({
               </button>
             </div>
           </form>
+
+          <VehicleParts
+            vehicleId={vehicleId}
+            parts={state.vehicle.parts ?? []}
+            onChanged={() => {
+              onChanged();
+              load();
+            }}
+          />
 
           <h3>정비 · 튜닝 · 부품 기록 {state.vehicle.records.length}</h3>
           {!state.vehicle.records.length && <p className={styles.empty}>아직 기록이 없어요.</p>}

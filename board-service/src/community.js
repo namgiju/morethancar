@@ -5,6 +5,7 @@ import { Router } from "express";
 import { VERIFIED_OWNER_BADGE } from "./badges.js";
 
 import { fail, text, positive, integer } from "./validation.js";
+import { isoDate, kstToday } from "./motorsport.js";
 import { validateOwnedImages } from "./owned-images.js";
 import { rateLimiter } from "./rate-limit.js";
 
@@ -90,6 +91,10 @@ export function communityRouter({ db, auth }) {
   });
   router.param("recordId", (req, res, next, id) => {
     req.params.recordId = positive(id);
+    next();
+  });
+  router.param("partId", (req, res, next, id) => {
+    req.params.partId = positive(id);
     next();
   });
   const exists = async (id) => {
@@ -646,10 +651,22 @@ export function communityRouter({ db, auth }) {
       `SELECT id,kind,title,content,mileage,cost,recorded_on::text AS date FROM vehicle_records WHERE vehicle_id=$1 ORDER BY recorded_on DESC,id DESC`,
       [req.params.id],
     );
+    // 부품: 소유자에게는 비공개 부품과 비용까지, 그 외에는 공개 부품만 비용 없이 내려준다.
+    // 증빙은 저장하지 않고 사진이 있으면 "사진 첨부"로 계산만 한다(hasPhoto). 현재 장착(탈거일 없음) 먼저.
+    const owner = req.user?.id != null && String(req.user.id) === String(rows[0].ownerId);
+    const parts = await db.query(
+      `SELECT id,brand,name,spec,installed_on::text AS "installedOn",removed_on::text AS "removedOn",
+       install_mileage AS "installMileage",remove_mileage AS "removeMileage",${owner ? "cost," : ""}
+       ${existingImageIdsSql("image_ids")} AS "imageIds",is_public AS "isPublic",cardinality(${existingImageIdsSql("image_ids")})>0 AS "hasPhoto"
+       FROM vehicle_parts WHERE vehicle_id=$1 AND ($2 OR is_public)
+       ORDER BY removed_on IS NULL DESC,installed_on DESC,id DESC`,
+      [req.params.id, owner],
+    );
     res.json({
       ...rows[0],
       ownerId: Number(rows[0].ownerId),
       records: records.rows,
+      parts: parts.rows,
     });
   });
   router.post("/garage/:id/records", auth, async (req, res) => {
@@ -694,6 +711,73 @@ export function communityRouter({ db, auth }) {
       [req.user.id, req.params.id, req.params.recordId],
     );
     if (!rowCount) fail(403, "본인 차량의 기록만 삭제할 수 있어요.");
+    res.json({ ok: true });
+  });
+  // 부품 장착·탈거 이력(MVP 단계 3). 현재 장착 = removed_on IS NULL. 탈거도 PUT으로 removedOn·removeMileage를 넣는다.
+  // 날짜는 기록(records)과 같은 형식 검사를 하고, 한국 날짜(KST) 기준 미래 날짜는 받지 않는다.
+  function partDate(value, optional, label) {
+    if (optional && (value == null || value === "")) return null;
+    if (isoDate(value, label) > kstToday()) fail(400, "미래 날짜는 입력할 수 없어요.");
+    return value;
+  }
+  async function partInput(body, userId) {
+    const installedOn = partDate(body?.installedOn, false, "장착일"),
+      removedOn = partDate(body?.removedOn, true, "탈거일");
+    const installMileage = integer(body?.installMileage ?? null, 0, 2000000, true),
+      removeMileage = integer(body?.removeMileage ?? null, 0, 2000000, true);
+    if (removedOn && removedOn < installedOn) fail(400, "탈거일은 장착일보다 빠를 수 없어요.");
+    if (removeMileage != null && installMileage != null && removeMileage < installMileage)
+      fail(400, "탈거 시 주행거리는 장착 시 주행거리보다 작을 수 없어요.");
+    const isPublic = body?.isPublic ?? true;
+    if (typeof isPublic !== "boolean") fail(400, "공개 여부를 확인해주세요.");
+    return [
+      text(body?.brand, 100),
+      text(body?.name, 150),
+      text(body?.spec, 200, false),
+      installedOn,
+      removedOn,
+      installMileage,
+      removeMileage,
+      integer(body?.cost ?? null, 0, 2000000000, true),
+      await images(body?.imageIds ?? [], userId),
+      isPublic,
+    ];
+  }
+  // 부품이 없을 때: 내 차량이면 404(다른 차량의 부품 경로 포함), 아니면 403.
+  async function partMissing(vehicleId, userId) {
+    const own = await db.query("SELECT 1 FROM owner_vehicles WHERE id=$1 AND owner_id=$2", [vehicleId, userId]);
+    if (own.rows.length) fail(404, "부품을 찾을 수 없어요.");
+    fail(403, "본인 차량의 부품만 관리할 수 있어요.");
+  }
+  router.post("/garage/:id/parts", auth, async (req, res) => {
+    const values = await partInput(req.body, req.user.id);
+    const { rows } = await db.query(
+      `INSERT INTO vehicle_parts(vehicle_id,brand,name,spec,installed_on,removed_on,install_mileage,remove_mileage,cost,image_ids,is_public)
+       SELECT id,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12 FROM owner_vehicles WHERE id=$1 AND owner_id=$2 RETURNING id`,
+      [req.params.id, req.user.id, ...values],
+    );
+    if (!rows.length) fail(403, "본인 차량에만 부품을 추가할 수 있어요.");
+    res.status(201).json(rows[0]);
+  });
+  // vehicle_id는 바꿀 수 없다(본문에서 받지 않는다).
+  router.put("/garage/:id/parts/:partId", auth, async (req, res) => {
+    const values = await partInput(req.body, req.user.id);
+    const { rows } = await db.query(
+      `UPDATE vehicle_parts p SET brand=$4,name=$5,spec=$6,installed_on=$7,removed_on=$8,install_mileage=$9,
+       remove_mileage=$10,cost=$11,image_ids=$12,is_public=$13,updated_at=NOW()
+       FROM owner_vehicles v WHERE p.vehicle_id=v.id AND v.id=$1 AND v.owner_id=$2 AND p.id=$3 RETURNING p.id`,
+      [req.params.id, req.user.id, req.params.partId, ...values],
+    );
+    if (!rows.length) await partMissing(req.params.id, req.user.id);
+    res.json(rows[0]);
+  });
+  // 부품을 지워도 그 사진은 남는다(미참조 이미지 정리는 회원 탈퇴에만 있다, 알려진 제한). 연결 글의 part_id는 NULL.
+  router.delete("/garage/:id/parts/:partId", auth, async (req, res) => {
+    const { rowCount } = await db.query(
+      `DELETE FROM vehicle_parts p USING owner_vehicles v WHERE p.vehicle_id=v.id AND v.id=$1 AND v.owner_id=$2 AND p.id=$3`,
+      [req.params.id, req.user.id, req.params.partId],
+    );
+    if (!rowCount) await partMissing(req.params.id, req.user.id);
     res.json({ ok: true });
   });
   return router;

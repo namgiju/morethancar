@@ -84,8 +84,7 @@ DB 커넥션 풀은 core 10 + board 10이다. 평시에는 최대 20개를 쓰�
 
 1. 반영될 변경(특히 `backend/src/main/resources/db/migration`의 새 파일)을 미리 확인한다.
 2. 새 Flyway 마이그레이션이 있으면 먼저 DB를 백업한다([DATABASE-MIGRATIONS.md](DATABASE-MIGRATIONS.md)).
-   - 과거 배포에서는 `pg_dump -Fc`로 백업했고, Neon 서버가 PostgreSQL 18이라 16 버전 `pg_dump`는 실패했다.
-   - 정해진 백업·복원 명령은 문서화되어 있지 않다(미검증).
+   - Neon 서버가 PostgreSQL 18이라 16 버전 `pg_dump`는 실패한다. 아래 "DB 백업과 복원 확인"을 따른다.
 3. 병합 결과를 실행 전에 확인한다.
    ```sh
    docker compose -f docker-compose.yml -f docker-compose.prod.yml config --services   # postgres가 없고 cloudflared가 있어야 한다
@@ -127,11 +126,42 @@ nginx의 IP 신뢰 경계·rate limit·HSTS 동작은 `scripts/nginx-forwarded-c
 - **서비스가 unhealthy로 남음**: Docker는 healthcheck 실패만으로 재시작하지 않는다. `logs`로 원인을 확인한 뒤 해당 서비스를 다시 올린다.
 - **메일이 발송되지 않음**: 서버 아웃바운드에서 SMTP 포트(587)가 막혀 있지 않은지 확인한다.
 
+## DB 백업과 복원 확인
+
+2026-11-02 V10 배포 전에 실제로 실행한 절차다. 운영 서버의 저장소 디렉터리에서 실행한다.
+접속 정보는 `.env`에서 읽고 화면이나 로그에 출력하지 않는다.
+
+```sh
+get() { grep -E "^$1=" .env | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'; }
+F=neon-pre-vNN-$(date -u +%Y%m%d-%H%M%S).dump
+docker run --rm -e PGPASSWORD="$(get DB_PASSWORD)" -e PGSSLMODE=require -v "$PWD/backups:/b" postgres:18 \
+  pg_dump -Fc -h "$(get DB_HOST)" -p "$(P=$(get DB_PORT); echo "${P:-5432}")" -U "$(get DB_USER)" -d "$(get DB_NAME)" -f /b/$F
+```
+
+만든 백업은 **임시 컨테이너에 복원해서** 쓸 수 있는지 확인한다(운영 DB는 건드리지 않는다).
+
+```sh
+docker run -d --rm --name restore-check -e POSTGRES_PASSWORD=check -v "$PWD/backups:/b:ro" postgres:18
+until docker exec restore-check pg_isready -h 127.0.0.1 -U postgres; do sleep 1; done
+docker exec restore-check pg_restore -U postgres -d postgres --no-owner --no-privileges /b/$F
+docker exec restore-check psql -U postgres -d postgres -Atc \
+  "SELECT max(version::int) FROM flyway_schema_history WHERE success; SELECT count(*) FROM users;"
+docker rm -f restore-check
+```
+
+- 백업 파일은 `backups/`(git 미추적)에 쌓인다. 2026-11-02 기준 약 460KB.
+- 확인한 것: 백업을 임시 PostgreSQL 18에 복원하면 Flyway 버전·행 수가 배포 전 상태와 맞는다.
+- **확인하지 않은 것: Neon(운영) 자체에 백업을 되돌려 넣는 복원.** 실제로 해야 하면 운영 서비스를 멈추고,
+  Neon 콘솔에서 새 브랜치(또는 새 DB)를 만들어 거기에 `pg_restore`한 뒤 `.env`의 접속 정보를 바꾸는 쪽이 안전하다.
+  기존 DB에 덮어쓰는 방식(`pg_restore --clean`)은 시험하지 않았다. Neon 무료 플랜의 시점 복원(History retention 6시간)도 선택지다.
+
 ## 되돌리기
 
 검증된 롤백 절차는 아직 없다. 실제로 롤백을 실행한 기록도 없다.
 
+- 배포 전 이미지를 `revcc-<서비스>:pre-vNN-rollback`처럼 태그해 두면 코드 롤백 때 빌드 없이 그 이미지로 다시 올릴 수 있다(2026-11-02 V10 배포에서 사용, 롤백 실행은 안 함).
+
 - 앱과 DB는 따로 되돌려야 한다. 이미지나 코드를 이전 버전으로 돌려도 DB 스키마와 데이터는 돌아가지 않는다.
 - Flyway는 적용된 마이그레이션을 자동으로 되돌리지 않는다. 이전 코드가 새 스키마에서 동작하는지는 마이그레이션마다 따로 확인해야 한다.
-- 스키마까지 되돌려야 하면 배포 전 백업으로 복원해야 한다. 복원 절차는 문서화되어 있지 않다.
+- 스키마까지 되돌려야 하면 배포 전 백업으로 복원해야 한다(위 "DB 백업과 복원 확인" — 운영 복원 자체는 미검증).
 - 기능별 되돌리기 범위는 해당 문서를 따른다(예: [MOTORSPORT-IMPORT.md](MOTORSPORT-IMPORT.md#되돌리기)).
