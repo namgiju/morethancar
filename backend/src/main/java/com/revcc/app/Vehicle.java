@@ -50,6 +50,9 @@ public class Vehicle {
     private String verificationStatus;
     @Column(name = "verified_at")
     private Instant verifiedAt;
+    // 보관 시각(V10). board PATCH /api/board/garage/:id/archive만 바꾸므로 core는 읽기만 한다(엔티티 저장이 덮어쓰지 않는다).
+    @Column(name = "archived_at", insertable = false, updatable = false)
+    private Instant archivedAt;
 
     // 이미 HTML 차고에서 사용하는 컬럼만 보존한다. 이번 API에는 사진 기능을 추가하지 않는다.
     @Column(name = "image_id")
@@ -133,6 +136,7 @@ public class Vehicle {
     public boolean isVerified() { return verified; }
     public String getVerificationStatus() { return verificationStatus; }
     public Instant getVerifiedAt() { return verifiedAt; }
+    public Instant getArchivedAt() { return archivedAt; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

@@ -104,14 +104,23 @@ export default function PostEditor({postId}: {postId?: number}) {
   const returnTo = post ? postUrl(post) : `/community${isCategory(searchParams.get('category')) ? `?category=${initialCategory}` : ''}`;
 
   // --- Load: wait for the session, then (edit) the post, then my vehicles. ---
-  const loadVehicles = useCallback(async (request: number, initial: Fields) => {
+  const loadVehicles = useCallback(async (request: number, initial: Fields, isNew: boolean) => {
     setVehicles('loading');
     try {
-      const cars = await fetchMyVehicles();
+      const mine = await fetchMyVehicles();
       if (request !== version.current) return;
+      // Archived vehicles (이전 차량) can't be newly linked; the vehicle this
+      // post is already linked to stays selectable so editing keeps the link.
+      const cars = mine.filter((c) => !c.archivedAt || String(c.id) === initial.vehicleId);
       // Like the legacy <select>: a link to a vehicle that isn't mine (any
-      // more) falls back to "연결하지 않음".
-      const linked = cars.some((c) => String(c.id) === initial.vehicleId) ? initial.vehicleId : '';
+      // more) falls back to "연결하지 않음". A new post with exactly one current
+      // vehicle starts linked to it (the user can still pick "연결하지 않음").
+      const current = cars.filter((c) => !c.archivedAt);
+      const linked = cars.some((c) => String(c.id) === initial.vehicleId)
+        ? initial.vehicleId
+        : isNew && current.length === 1
+          ? String(current[0].id)
+          : '';
       const start = {...initial, vehicleId: linked};
       setVehicles(cars);
       setFields((f) => ({...f, vehicleId: linked}));
@@ -194,7 +203,7 @@ export default function PostEditor({postId}: {postId?: number}) {
       loadedFields.current = initial;
       setFields(initial);
       setLoad({status: 'ready', post: existing});
-      await Promise.all([loadVehicles(request, initial), loadEvents(request, initial, existing?.linkedMotorsportEvent ?? null)]);
+      await Promise.all([loadVehicles(request, initial, !existing), loadEvents(request, initial, existing?.linkedMotorsportEvent ?? null)]);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey, postId]);
@@ -400,7 +409,7 @@ export default function PostEditor({postId}: {postId?: number}) {
                       <button
                         type="button"
                         className={styles.secondary}
-                        onClick={() => void loadVehicles(version.current, loadedFields.current)}
+                        onClick={() => void loadVehicles(version.current, loadedFields.current, !post)}
                       >
                         다시 확인
                       </button>
@@ -418,7 +427,7 @@ export default function PostEditor({postId}: {postId?: number}) {
                         <option value="">연결하지 않음</option>
                         {vehicles.map((car) => (
                           <option key={car.id} value={String(car.id)}>
-                            {`${car.manufacturer || ''} ${car.model} (${car.year})`.trim()}
+                            {`${car.manufacturer || ''} ${car.model} (${car.year})${car.archivedAt ? ' · 이전 차량' : ''}`.trim()}
                           </option>
                         ))}
                       </select>

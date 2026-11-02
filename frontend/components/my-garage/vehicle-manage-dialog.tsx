@@ -2,6 +2,7 @@
 
 import {useEffect, useRef, useState, type FormEvent} from 'react';
 import {
+  archiveVehicle,
   createVehicleRecord,
   deleteVehicleProfile,
   deleteVehicleRecord,
@@ -28,6 +29,7 @@ export default function VehicleManageDialog({
   vehicleId,
   verified,
   verificationStatus,
+  archived,
   onClose,
   onChanged,
 }: {
@@ -35,6 +37,8 @@ export default function VehicleManageDialog({
   // From /home's own vehicle list (Spring OwnerVehicle); GET /garage/:id does not carry verification.
   verified: boolean;
   verificationStatus: string | null;
+  // 이전 차량(보관). 보관·복원은 이 창에서 한다.
+  archived: boolean;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -117,12 +121,41 @@ export default function VehicleManageDialog({
     }
   }
 
+  function requestArchive() {
+    setConfirmSpec({
+      kind: 'confirm',
+      title: '차량을 보관할까요?',
+      message: '이전 차량으로 옮겨요. 정비·튜닝 기록과 연결된 글은 그대로 남고, 대표 차량이면 해제돼요. 언제든 복원할 수 있어요.',
+      confirmLabel: '보관',
+      onConfirm: async () => {
+        await archiveVehicle(vehicleId, true);
+        onChanged();
+        onClose();
+      },
+    });
+  }
+
+  async function restore() {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await archiveVehicle(vehicleId, false);
+      onChanged();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '차량을 복원하지 못했어요.');
+      setBusy(false);
+    }
+  }
+
   function requestDeleteVehicle() {
     setConfirmSpec({
       kind: 'confirm',
-      title: '차량을 삭제할까요?',
-      message: '차량과 정비·튜닝 기록을 함께 삭제합니다. 되돌릴 수 없습니다.',
-      confirmLabel: '삭제',
+      title: '차량을 영구 삭제할까요?',
+      message:
+        '차량과 정비·튜닝 기록을 함께 삭제하고 되돌릴 수 없어요. 연결된 글에서는 차량 정보가 사라져요. 팔았거나 더 타지 않는 차는 삭제 대신 보관하세요.',
+      confirmLabel: '영구 삭제',
       onConfirm: async () => {
         await deleteVehicleProfile(vehicleId);
         onChanged();
@@ -238,9 +271,30 @@ export default function VehicleManageDialog({
                 {error}
               </p>
             )}
+            <div className={styles.archiveBox}>
+              {archived ? (
+                <>
+                  <p className={styles.empty}>보관한 차량이에요(이전 차량). 복원하면 현재 차량으로 돌아와요.</p>
+                  <button type="button" className={styles.dialogCancel} disabled={busy} onClick={restore}>
+                    복원
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className={styles.empty}>
+                    {pending
+                      ? '인증 심사 중에는 보관할 수 없어요.'
+                      : '팔았거나 더 타지 않는 차는 보관하세요. 기록과 연결된 글은 그대로 남아요.'}
+                  </p>
+                  <button type="button" className={styles.dialogCancel} disabled={busy || pending} onClick={requestArchive}>
+                    보관
+                  </button>
+                </>
+              )}
+            </div>
             <div className={styles.dialogActions}>
               <button type="button" className={styles.dangerText} disabled={busy} onClick={requestDeleteVehicle}>
-                차량 삭제
+                영구 삭제
               </button>
               <button type="button" className={styles.dialogCancel} disabled={busy} onClick={onClose}>
                 닫기

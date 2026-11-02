@@ -130,6 +130,29 @@
   font-size: 13px;
 }
 
+/* Archive / restore row in the vehicle manage dialog (above the delete/save actions). */
+.archiveBox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.archiveBox button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* "이전 차량" (archived) heading under the current vehicle list. */
+.previousHeading {
+  margin: 18px 0 4px;
+  font-size: 14px;
+}
+
 .loginRequired {
   text-align: center;
   padding: 64px 16px;

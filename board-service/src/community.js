@@ -39,7 +39,7 @@ export function decodeImage(value) {
 const postSelect = `SELECT p.id,p.title,p.content,${unlessWithdrawnSql("u", "p.author_id")} AS "authorId",${displayNameSql("u")} AS username,
  ${isWithdrawnSql("u")} AS "authorWithdrawn",
  ${unlessWithdrawnSql("u", "p.vehicle_id")} AS "vehicleId",
- ${unlessWithdrawnSql("u", "(SELECT json_build_object('id',v.id,'model',v.model,'year',v.year,'verified',v.verified,'imageId',v.image_id) FROM owner_vehicles v WHERE v.id=p.vehicle_id AND v.owner_id=p.author_id)")} AS "linkedVehicle",
+ ${unlessWithdrawnSql("u", "(SELECT json_build_object('id',v.id,'model',v.model,'year',v.year,'verified',v.verified,'imageId',v.image_id,'archived',v.archived_at IS NOT NULL) FROM owner_vehicles v WHERE v.id=p.vehicle_id AND v.owner_id=p.author_id)")} AS "linkedVehicle",
  p.motorsport_event_id AS "motorsportEventId",
  (SELECT json_build_object('id',e.id,'kind',e.kind,'title',e.title,'startsOn',to_char(e.starts_on,'YYYY-MM-DD'),'endsOn',to_char(e.ends_on,'YYYY-MM-DD'))
   FROM motorsport_events e WHERE e.id=p.motorsport_event_id AND e.deleted_at IS NULL AND e.publication='PUBLISHED') AS "linkedMotorsportEvent",
@@ -101,7 +101,8 @@ export function communityRouter({ db, auth }) {
     return rows[0];
   };
   const images = (ids, userId) => validateOwnedImages(db, ids, userId);
-  async function postInput(body, userId) {
+  // keepVehicleId: 수정 중인 글에 이미 연결된 차량. 보관한 차량은 새로 연결할 수 없지만 기존 연결은 유지한다.
+  async function postInput(body, userId, keepVehicleId = null) {
     const {
       title,
       content,
@@ -114,10 +115,11 @@ export function communityRouter({ db, auth }) {
     let linked = null;
     if (body?.vehicleId != null && body.vehicleId !== "") {
       const { rows } = await db.query(
-        "SELECT id,model FROM owner_vehicles WHERE id=$1 AND owner_id=$2",
+        "SELECT id,model,archived_at IS NOT NULL AS archived FROM owner_vehicles WHERE id=$1 AND owner_id=$2",
         [positive(body.vehicleId), userId],
       );
       if (!rows.length) fail(403, "본인 차량만 연결할 수 있어요.");
+      if (rows[0].archived && rows[0].id !== keepVehicleId) fail(400, "보관한 차량은 새 글에 연결할 수 없어요.");
       linked = rows[0];
     }
     // 공개(PUBLISHED)·미삭제 일정만 연결할 수 있다 — 존재하지 않거나 초안/비공개/삭제된
@@ -251,7 +253,10 @@ export function communityRouter({ db, auth }) {
     res.json(rows[0]);
   });
   router.put("/posts/:id", auth, async (req, res) => {
-    const values = await postInput(req.body, req.user.id);
+    const current = Object.hasOwn(req.body ?? {}, "vehicleId")
+      ? (await db.query("SELECT vehicle_id FROM board_posts WHERE id=$1 AND author_id=$2 AND NOT deleted", [req.params.id, req.user.id])).rows[0]
+      : null;
+    const values = await postInput(req.body, req.user.id, current?.vehicle_id ?? null);
     const { rows } = await db.query(
       `UPDATE board_posts SET title=$1,content=$2,category=$4,
       vehicle=CASE WHEN NOT $10 AND vehicle_id IS NOT NULL THEN vehicle ELSE $5 END,
@@ -377,12 +382,18 @@ export function communityRouter({ db, auth }) {
       [req.user.id, bio, avatar, cover]);
     res.json({ok:true});
   });
+  // 보관한 차량은 대표 차량이 될 수 없다. FOR SHARE로 보관 처리(차량 행 FOR UPDATE)와 순서를 맞춘다 —
+  // 보관이 먼저 커밋되면 보관 여부를 다시 보고 거부하고, 이쪽이 먼저면 보관이 대표 차량을 해제한다.
   router.put("/profile/representative-vehicle", auth, async (req, res) => {
     const id = positive(req.body?.vehicleId);
     const {rowCount} = await db.query(`INSERT INTO member_profiles(user_id,representative_vehicle_id)
-      SELECT owner_id,id FROM owner_vehicles WHERE id=$1 AND owner_id=$2
+      SELECT owner_id,id FROM owner_vehicles WHERE id=$1 AND owner_id=$2 AND archived_at IS NULL FOR SHARE
       ON CONFLICT(user_id) DO UPDATE SET representative_vehicle_id=EXCLUDED.representative_vehicle_id`, [id,req.user.id]);
-    if (!rowCount) fail(403, "본인 차량만 대표 차량으로 설정할 수 있어요.");
+    if (!rowCount) {
+      const own = await db.query("SELECT 1 FROM owner_vehicles WHERE id=$1 AND owner_id=$2", [id, req.user.id]);
+      if (own.rows.length) fail(400, "보관한 차량은 대표 차량으로 설정할 수 없어요.");
+      fail(403, "본인 차량만 대표 차량으로 설정할 수 있어요.");
+    }
     res.json({ok:true});
   });
   router.get("/members/:id/guestbook", async (req, res) => {
@@ -426,20 +437,22 @@ export function communityRouter({ db, auth }) {
     );
     // 공개 프로필에는 등록증·차량번호·심사 정보를 포함하지 않는다.
     const vehicles = await db.query(
-      `SELECT id,manufacturer,model,year,trim,nickname,image_id AS "imageId",verified
-       FROM owner_vehicles WHERE owner_id=$1 ORDER BY verified DESC,id ASC`,
+      `SELECT id,manufacturer,model,year,trim,nickname,image_id AS "imageId",verified,archived_at AS "archivedAt"
+       FROM owner_vehicles WHERE owner_id=$1 ORDER BY archived_at IS NULL DESC,verified DESC,id ASC`,
       [req.params.id],
     );
     const settings = (await db.query(`SELECT bio,avatar_image_id AS "avatarImageId",cover_image_id AS "coverImageId",
       representative_vehicle_id AS "representativeVehicleId" FROM member_profiles WHERE user_id=$1`,[req.params.id])).rows[0] || {};
-    const verified = vehicles.rows.some((v) => v.verified);
+    // 인증 오너 인장은 지금 보유한(보관하지 않은) 인증 차량으로만 계산한다. 대표 차량도 보관 차량은 쓰지 않는다.
+    const current = vehicles.rows.filter((v) => !v.archivedAt);
+    const verified = current.some((v) => v.verified);
     res.json({
       ...rows[0],
       id: Number(rows[0].id),
       ...settings,
       avatarUrl: settings.avatarImageId ? `/api/board/images/${settings.avatarImageId}` : null,
       vehicles: vehicles.rows,
-      representativeVehicle: vehicles.rows.find(v=>v.id===settings.representativeVehicleId) ?? vehicles.rows[0] ?? null,
+      representativeVehicle: current.find(v=>v.id===settings.representativeVehicleId) ?? current[0] ?? null,
       verified,
       // 실제 인증 상태에서 계산하는 표시용 인장. 획득 이력은 생성하지 않는다.
       badges: verified ? [{ ...VERIFIED_OWNER_BADGE }] : [],
@@ -495,7 +508,7 @@ export function communityRouter({ db, auth }) {
   router.get("/garage/mine", auth, async (req, res) => {
     const { rows } = await db.query(
       `SELECT v.id,v.owner_id AS "ownerId",u.username,v.manufacturer,v.model,v.year,v.trim,v.bio,
-       v.nickname,v.image_id AS "imageId",v.verified,v.verification_status AS "verificationStatus",
+       v.nickname,v.image_id AS "imageId",v.verified,v.verification_status AS "verificationStatus",v.archived_at AS "archivedAt",
        (SELECT COUNT(*)::int FROM vehicle_records r WHERE r.vehicle_id=v.id) AS "recordCount"
        FROM owner_vehicles v JOIN users u ON u.id=v.owner_id
        WHERE v.owner_id=$1 ORDER BY v.id DESC`,
@@ -573,6 +586,41 @@ export function communityRouter({ db, auth }) {
       res.json(rows[0]);
     } catch (error) {
       // ROLLBACK까지 실패한 연결(끊김·시간 초과)은 풀에 돌려보내지 않고 버린다. 응답은 원래 오류로 한다.
+      await client.query("ROLLBACK").catch((rollbackError) => { broken = rollbackError; });
+      throw error;
+    } finally {
+      client.release(broken);
+    }
+  });
+  // 보관(archived=true)·복원(false). 기록·연결 글·인증 이력은 그대로 두고 archived_at만 바꾼다.
+  // 심사 중(PENDING) 차량은 보관할 수 없다(core의 인증 신청·승인과 같은 차량 행 잠금 안에서 판단).
+  // 보관하면 그 차량을 가리키던 대표 차량 설정을 같은 트랜잭션에서 해제한다. 복원해도 대표 차량은 되돌리지 않는다.
+  router.patch("/garage/:id/archive", auth, async (req, res) => {
+    const archived = req.body?.archived;
+    if (typeof archived !== "boolean") fail(400, "보관 여부를 확인해주세요.");
+    const client = await db.connect();
+    let broken;
+    try {
+      await client.query("BEGIN");
+      const stored = (await client.query(
+        "SELECT verification_status AS status FROM owner_vehicles WHERE id=$1 AND owner_id=$2 FOR UPDATE",
+        [req.params.id, req.user.id],
+      )).rows[0];
+      if (!stored) fail(403, "본인 차량만 보관할 수 있어요.");
+      if (archived && stored.status === "PENDING") fail(409, "인증 심사 중인 차량은 보관할 수 없어요.");
+      const { rows } = await client.query(
+        `UPDATE owner_vehicles SET archived_at=CASE WHEN $2 THEN COALESCE(archived_at,NOW()) END,updated_at=NOW()
+         WHERE id=$1 RETURNING id,archived_at AS "archivedAt"`,
+        [req.params.id, archived],
+      );
+      if (archived)
+        await client.query(
+          "UPDATE member_profiles SET representative_vehicle_id=NULL WHERE user_id=$1 AND representative_vehicle_id=$2",
+          [req.user.id, req.params.id],
+        );
+      await client.query("COMMIT");
+      res.json(rows[0]);
+    } catch (error) {
       await client.query("ROLLBACK").catch((rollbackError) => { broken = rollbackError; });
       throw error;
     } finally {

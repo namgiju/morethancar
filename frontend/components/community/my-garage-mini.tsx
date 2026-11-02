@@ -25,7 +25,8 @@ export default function MyGarageMini({user}: {user: SessionUser | null | undefin
     fetchMember(user.id)
       .then((member) => {
         if (current !== ticket.current) return;
-        const representative = member.representativeVehicle || member.vehicles[0] || null;
+        // representativeVehicle is already a current (non-archived) vehicle or null.
+        const representative = member.representativeVehicle || member.vehicles.find((v) => !v.archivedAt) || null;
         setVehicle(representative);
         setState(representative ? 'has-vehicle' : 'empty');
       })

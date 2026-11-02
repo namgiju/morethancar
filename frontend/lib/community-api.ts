@@ -259,6 +259,12 @@ export async function updateVehicleProfile(id: number, input: VehicleProfileInpu
   return apiFetch(`/api/board/garage/${id}`, jsonInit('PUT', input));
 }
 
+// PATCH /api/board/garage/:id/archive — owner only. Archive (archived=true) or
+// restore; records and linked posts stay. 409 while a verification is under review.
+export async function archiveVehicle(id: number, archived: boolean): Promise<{id: number; archivedAt: string | null}> {
+  return apiFetch(`/api/board/garage/${id}/archive`, jsonInit('PATCH', {archived}));
+}
+
 // DELETE /api/board/garage/:id — owner only. Deletes the vehicle's records
 // too (ON DELETE CASCADE); does not delete the core owner_vehicles row by
 // itself, see deleteOwnerVehicle.

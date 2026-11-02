@@ -73,7 +73,8 @@ export default function PostContext({post, author}: {post: CommunityPost; author
           <>
             {post.linkedVehicle && (
               <p className={styles.muted}>
-                {post.linkedVehicle.year} · {post.linkedVehicle.verified ? '인증 오너' : '등록 차량'}
+                {post.linkedVehicle.year} ·{' '}
+                {post.linkedVehicle.archived ? '이전 보유 차량' : post.linkedVehicle.verified ? '인증 오너' : '등록 차량'}
               </p>
             )}
             <strong>{model}</strong>

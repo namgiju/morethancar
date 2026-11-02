@@ -379,6 +379,42 @@ try {
     400,
   );
   assert.equal((await req(`/garage/${car.id}`)).records[0].cost, 90000);
+  // 차량 보관(MVP 단계 2): 보관·복원, 타인 403, 심사 중 409, 대표 차량 해제, 인장 계산 제외, 기록·연결 글 유지.
+  await req("/profile/representative-vehicle", "PUT", { vehicleId: car.id });
+  const linkedPost = await req("/posts", "POST", { title: "보관 전 연결 글", content: "내용", category: "free", vehicleId: car.id }, tokenA, 201);
+  await req(`/garage/${car.id}/archive`, "PATCH", { archived: true }, tokenB, 403);
+  await req(`/garage/${car.id}/archive`, "PATCH", { archived: "yes" }, tokenA, 400);
+  await setVerification(false, "PENDING");
+  await req(`/garage/${car.id}/archive`, "PATCH", { archived: true }, tokenA, 409);
+  await setVerification(true, "APPROVED");
+  const archivedCar = await req(`/garage/${car.id}/archive`, "PATCH", { archived: true });
+  assert.ok(archivedCar.archivedAt);
+  assert.equal((await db.query("SELECT representative_vehicle_id FROM member_profiles WHERE user_id=1")).rows[0].representative_vehicle_id, null);
+  const archivedMember = await req("/members/1", "GET", undefined, "");
+  assert.equal(archivedMember.verified, false);
+  assert.deepEqual(archivedMember.badges, []);
+  assert.equal(archivedMember.representativeVehicle, null);
+  assert.ok(archivedMember.vehicles.find((v) => v.id === car.id).archivedAt);
+  assert.ok((await req("/garage/mine")).find((v) => v.id === car.id).archivedAt);
+  await req("/profile/representative-vehicle", "PUT", { vehicleId: car.id }, tokenA, 400);
+  await req("/profile/representative-vehicle", "PUT", { vehicleId: car.id }, tokenB, 403);
+  assert.equal((await req(`/garage/${car.id}`)).records.length, 1);
+  assert.equal((await verification()).status, "APPROVED");
+  const archivedPostDetail = await req(`/posts/${linkedPost.id}`);
+  assert.equal(archivedPostDetail.vehicleId, car.id);
+  assert.equal(archivedPostDetail.linkedVehicle.archived, true);
+  // 보관 차량은 새 글·다른 글에 새로 연결할 수 없고, 이미 연결된 글은 그대로 수정할 수 있다.
+  await req("/posts", "POST", { title: "새 글", content: "내용", category: "free", vehicleId: car.id }, tokenA, 400);
+  await req(`/posts/${post.id}`, "PUT", { ...draft, vehicleId: car.id }, tokenA, 400);
+  await req(`/posts/${linkedPost.id}`, "PUT", { title: "보관 후 수정", content: "내용", category: "free", vehicleId: car.id });
+  assert.equal((await req(`/posts/${linkedPost.id}`)).vehicleId, car.id);
+  const restored = await req(`/garage/${car.id}/archive`, "PATCH", { archived: false });
+  assert.equal(restored.archivedAt, null);
+  const restoredMember = await req("/members/1", "GET", undefined, "");
+  assert.equal(restoredMember.verified, true);
+  assert.equal(restoredMember.representativeVehicle.id, car.id);
+  assert.equal((await req(`/posts/${linkedPost.id}`)).linkedVehicle.archived, false);
+  await req(`/posts/${linkedPost.id}`, "DELETE", {});
   await req(
     `/garage/${car.id}/records/${record.id}`,
     "DELETE",
@@ -406,7 +442,7 @@ try {
   await req(`/garage/${car.id}`, "DELETE", {});
   await req(`/garage/${car.id}`, "GET", undefined, tokenA, 404);
   console.log(
-    "PASS: author profile/statistics, derived verification badge, private field exclusion, related filters, Flyway migrations, image validation, posts, search/categories, ownership, likes/bookmarks, comments/replies, notifications, reports, garage/records, garage verification integrity, cascade deletion.",
+    "PASS: author profile/statistics, derived verification badge, private field exclusion, related filters, Flyway migrations, image validation, posts, search/categories, ownership, likes/bookmarks, comments/replies, notifications, reports, garage/records, garage verification integrity, vehicle archive, cascade deletion.",
   );
 } finally {
   if (server) {
