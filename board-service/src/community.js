@@ -4,7 +4,7 @@ import { existingImageIdsSql, publicImageSql } from "./image-references.js";
 import { Router } from "express";
 import { VERIFIED_OWNER_BADGE } from "./badges.js";
 
-import { fail, text, positive, integer, plainText } from "./validation.js";
+import { fail, text, positive, integer } from "./validation.js";
 import { validateOwnedImages } from "./owned-images.js";
 import { rateLimiter } from "./rate-limit.js";
 
@@ -514,11 +514,14 @@ export function communityRouter({ db, auth }) {
     );
     res.json(rows.map((v) => ({ ...v, ownerId: Number(v.ownerId) })));
   });
-  // keepYear: 수정 시 저장된 연식. Spring은 2100년까지 받으므로, 그대로 다시 보낸 연식은 이 범위 밖이어도 받는다
-  // (그렇지 않으면 그런 차량은 소개·사진도 고칠 수 없다). 새 값은 지금처럼 올해+1까지만 받는다.
-  function vehicleFields(body, userId, keepYear) {
-    const model = text(body?.model, 100),
-      year = keepYear != null && body?.year === keepYear ? keepYear : integer(body?.year, 1900, new Date().getFullYear() + 1);
+  // stored: 수정 시 잠그고 읽은 저장값({model, year}). Spring은 모델을 trim만 해서, 연식은 2100년까지 받아 저장한다.
+  // 저장값을 그대로 다시 보낸 모델·연식은 board 검증(태그 정리·올해+1)을 거치지 않고 저장값 그대로 둔다 —
+  // 그렇지 않으면 바꾸지 않은 값이 "변경"으로 판정되거나(409·인증 해제) 400이 나서 소개·사진도 고칠 수 없다.
+  // 사용자가 실제로 바꾼 값은 지금처럼 검증한다.
+  function vehicleFields(body, userId, stored) {
+    const sameModel = stored && typeof body?.model === "string" && body.model.trim() === stored.model.trim();
+    const model = sameModel ? stored.model : text(body?.model, 100),
+      year = stored && body?.year === stored.year ? stored.year : integer(body?.year, 1900, new Date().getFullYear() + 1);
     const trim = text(body?.trim, 100, false),
       bio = text(body?.bio, 1000, false);
     const imageId = body?.imageId == null ? null : positive(body.imageId);
@@ -553,11 +556,7 @@ export function communityRouter({ db, auth }) {
         [req.user.id, req.params.id],
       )).rows[0];
       if (!stored) fail(403, "본인 차량만 수정할 수 있어요.");
-      const values = vehicleFields(req.body, req.user.id, stored.year);
-      // Spring으로 등록한 모델은 trim만 거쳐 저장된다. 정리(plainText) 결과가 저장값을 정리한 것과 같으면
-      // 사용자가 모델을 바꾼 게 아니므로 저장값을 그대로 둔다(소개만 고쳤는데 409·인증 해제가 되지 않게).
-      const cleaned = (v) => { try { return plainText(v).trim(); } catch { return null; } };
-      if (cleaned(stored.model) === values[1]) values[1] = stored.model;
+      const values = vehicleFields(req.body, req.user.id, stored);
       const changed = "(model IS DISTINCT FROM $2 OR year IS DISTINCT FROM $3)";
       const approved = "(verified OR verification_status='APPROVED')";
       const { rows } = await client.query(

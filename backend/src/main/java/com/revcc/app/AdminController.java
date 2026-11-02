@@ -56,42 +56,50 @@ public class AdminController {
     public VerificationSummary approve(@PathVariable Integer id,
             @CookieValue(name = SharedSessionService.COOKIE, required = false) String token) {
         User admin = requireAdmin(token);
-        VehicleVerification verification = pendingVerification(id);
-        verification.approve(admin);
-        verification.getVehicle().approveVerification(Instant.now());
-        vehicles.saveAndFlush(verification.getVehicle());
-        return VerificationSummary.from(verifications.saveAndFlush(verification));
+        Review review = lockForReview(id);
+        if (!review.current())
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "차량의 현재 인증 신청이 아니어서 승인할 수 없습니다.");
+        review.verification().approve(admin);
+        review.vehicle().approveVerification(Instant.now());
+        vehicles.saveAndFlush(review.vehicle());
+        return VerificationSummary.from(verifications.saveAndFlush(review.verification()));
     }
 
+    // 현재 신청이 아닌(옛) PENDING 신청도 반려해 목록에서 정리할 수 있다. 이때 차량의 인증 상태는 건드리지 않는다.
     @Transactional
     @PostMapping("/vehicle-verifications/{id}/reject")
     public VerificationSummary reject(@PathVariable Integer id,
             @CookieValue(name = SharedSessionService.COOKIE, required = false) String token) {
         User admin = requireAdmin(token);
-        VehicleVerification verification = pendingVerification(id);
-        verification.reject(admin);
-        verification.getVehicle().rejectVerification();
-        vehicles.saveAndFlush(verification.getVehicle());
-        return VerificationSummary.from(verifications.saveAndFlush(verification));
+        Review review = lockForReview(id);
+        review.verification().reject(admin);
+        if (review.current()) {
+            review.vehicle().rejectVerification();
+            vehicles.saveAndFlush(review.vehicle());
+        }
+        return VerificationSummary.from(verifications.saveAndFlush(review.verification()));
     }
+
+    // current: 이 신청이 차량의 현재 심사 대상인지 — 차량이 PENDING이고 그 차량의 가장 최근 신청이다.
+    // 신청 행만 PENDING이고 차량 정보·상태가 그 뒤에 바뀌었거나, 예전 데이터에 PENDING 신청이 여러 개 남은 경우는 current가 아니다.
+    private record Review(Vehicle vehicle, VehicleVerification verification, boolean current) {}
 
     // 처리할 수 있는 신청은 심사 중(PENDING)인 것뿐이다. 이미 승인·반려된 예전 신청을 다시 승인하면
     // 핵심 필드 변경으로 해제된 인증이 새 서류 없이 되살아나고, 다시 반려하면 현재 인증이 지워진다.
     // 차량 → 신청 순서로 행을 잠그고(인증 신청과 같은 순서) 잠근 뒤의 최신 값으로 판단한다.
-    // 차량도 PENDING이어야 한다 — 신청 행만 PENDING인 상태로 차량 정보가 바뀌었다면 그 서류로 승인하지 않는다.
-    // 그 차량의 가장 최근 신청이어야 한다 — 예전 데이터에 PENDING 신청이 여러 개 남아 있어도 옛 서류로 처리하지 않는다.
     // (차량 행을 잠근 뒤라 그사이 새 신청이 끼어들지 못한다.)
-    private VehicleVerification pendingVerification(Integer id) {
+    private Review lockForReview(Integer id) {
         Integer vehicleId = verifications.findVehicleIdById(id).orElseThrow(() ->
             new ResponseStatusException(HttpStatus.NOT_FOUND, "인증 신청을 찾을 수 없습니다."));
         Vehicle vehicle = vehicles.findByIdForUpdate(vehicleId).orElseThrow(() ->
             new ResponseStatusException(HttpStatus.NOT_FOUND, "인증 신청을 찾을 수 없습니다."));
         VehicleVerification verification = verifications.findByIdForUpdate(id).orElseThrow(() ->
             new ResponseStatusException(HttpStatus.NOT_FOUND, "인증 신청을 찾을 수 없습니다."));
-        if (!"PENDING".equals(verification.getStatus()) || !"PENDING".equals(vehicle.getVerificationStatus())
-                || !id.equals(verifications.findLatestIdByVehicleId(vehicleId)))
+        if (!"PENDING".equals(verification.getStatus()))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 처리된 인증 신청입니다.");
-        return verification;
+        boolean current = "PENDING".equals(vehicle.getVerificationStatus())
+            && id.equals(verifications.findLatestIdByVehicleId(vehicleId));
+        return new Review(vehicle, verification, current);
     }
 
     private User requireAdmin(String token) {

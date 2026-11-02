@@ -139,6 +139,11 @@ class VehicleVerificationConcurrencyIntegrationTest {
             .andReturn().getResponse().getStatus());
         assertEquals(false, row(id).get("verified"));
         assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM vehicle_verifications WHERE id=?", String.class, request));
+        // 그런 신청은 반려로 정리할 수 있고, 차량 상태는 그대로다.
+        assertEquals(200, mvc.perform(post("/api/admin/vehicle-verifications/"+request+"/reject").cookie(session(admin)))
+            .andReturn().getResponse().getStatus());
+        assertEquals("REJECTED", jdbc.queryForObject("SELECT status FROM vehicle_verifications WHERE id=?", String.class, request));
+        assertNull(row(id).get("status"));
     }
 
     // 예전 데이터처럼 PENDING 신청이 둘 남아 있으면 최근 신청만 처리되고, 옛 서류로는 승인되지 않는다.
@@ -154,5 +159,9 @@ class VehicleVerificationConcurrencyIntegrationTest {
         assertEquals(200, mvc.perform(post("/api/admin/vehicle-verifications/"+latest+"/approve").cookie(a)).andReturn().getResponse().getStatus());
         assertEquals("APPROVED", row(id).get("status"));
         assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM vehicle_verifications WHERE id=?", String.class, older));
+        // 남은 옛 신청은 반려로 정리하고, 승인된 차량은 그대로다.
+        assertEquals(200, mvc.perform(post("/api/admin/vehicle-verifications/"+older+"/reject").cookie(a)).andReturn().getResponse().getStatus());
+        assertEquals("APPROVED", row(id).get("status"));
+        assertEquals(true, row(id).get("verified"));
     }
 }

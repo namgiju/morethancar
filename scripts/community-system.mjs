@@ -294,6 +294,16 @@ try {
     assert.equal(after.verified, status === "APPROVED");
     assert.equal((await db.query("SELECT model FROM owner_vehicles WHERE id=$1", [car.id])).rows[0].model, "M3 <b>G80</b>\u200b");
   }
+  // 사용자가 마크업만 지운 모델은 실제 변경이다(저장값으로 되돌리지 않는다).
+  await setVerification(false, null);
+  await edit({ model: "M3 G80" });
+  assert.equal((await db.query("SELECT model FROM owner_vehicles WHERE id=$1", [car.id])).rows[0].model, "M3 G80");
+  // board 정리로는 빈 값이 되는(text()가 거부하는) 저장 모델도 그대로 보내면 심사 중 소개를 고칠 수 있다.
+  await db.query("UPDATE owner_vehicles SET model='<b></b>' WHERE id=$1", [car.id]);
+  await setVerification(false, "PENDING");
+  await edit({ model: "<b></b>", bio: "정리 불가 모델 소개 수정" });
+  assert.equal((await verification()).status, "PENDING");
+  await edit({ model: "<i></i>" }, 400);
   await setVerification(false, null);
   await edit({});
   // 동시 요청: core 경로(인증 신청·관리자 승인)가 차량 행을 잡고 바꾸는 중이면 board 수정은 기다렸다가 커밋된 값으로 판단한다.
