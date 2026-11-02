@@ -4,7 +4,7 @@ import { existingImageIdsSql, publicImageSql } from "./image-references.js";
 import { Router } from "express";
 import { VERIFIED_OWNER_BADGE } from "./badges.js";
 
-import { fail, text, positive, integer } from "./validation.js";
+import { fail, text, positive, integer, plainText } from "./validation.js";
 import { validateOwnedImages } from "./owned-images.js";
 import { rateLimiter } from "./rate-limit.js";
 
@@ -534,6 +534,11 @@ export function communityRouter({ db, auth }) {
   // 심사 중(PENDING)이면 바꿀 수 없고, 승인된 차량에서 바꾸면 인증을 해제한다. SET·WHERE의 컬럼은 수정 전 값이다.
   router.put("/garage/:id", auth, async (req, res) => {
     const values = await vehicleInput(req.body, req.user.id);
+    // Spring으로 등록한 모델은 trim만 거쳐 저장된다. 정리(plainText) 결과가 저장값을 정리한 것과 같으면
+    // 사용자가 모델을 바꾼 게 아니므로 저장값을 그대로 둔다(소개만 고쳤는데 409·인증 해제가 되지 않게).
+    const stored = await db.query("SELECT model FROM owner_vehicles WHERE owner_id=$1 AND id=$2", [req.user.id, req.params.id]);
+    const cleaned = (v) => { try { return plainText(v).trim(); } catch { return null; } };
+    if (stored.rows.length && cleaned(stored.rows[0].model) === values[1]) values[1] = stored.rows[0].model;
     const changed = "(model IS DISTINCT FROM $2 OR year IS DISTINCT FROM $3)";
     const approved = "(verified OR verification_status='APPROVED')";
     const { rows } = await db.query(

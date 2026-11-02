@@ -284,6 +284,17 @@ try {
     await edit({});
   }
   await edit({ year: 2023 }); // 신청 전(NULL)은 자유롭게 수정
+  // Spring은 trim만 하고 저장하므로 board 정리(태그·보이지 않는 문자 제거)와 다를 수 있다. 저장값을 그대로 보낸 소개 수정은 모델 변경이 아니다.
+  for (const status of ["APPROVED", "PENDING"]) {
+    await db.query("UPDATE owner_vehicles SET model=$2,year=2024 WHERE id=$1", [car.id, "M3 <b>G80</b>\u200b"]);
+    await setVerification(status === "APPROVED", status);
+    await edit({ model: "M3 <b>G80</b>\u200b", bio: "소개만" });
+    const after = await verification();
+    assert.equal(after.status, status);
+    assert.equal(after.verified, status === "APPROVED");
+    assert.equal((await db.query("SELECT model FROM owner_vehicles WHERE id=$1", [car.id])).rows[0].model, "M3 <b>G80</b>\u200b");
+  }
+  await setVerification(false, null);
   await req(`/garage/${car.id}`, "PUT", { model: "변조", year: 2024 }, tokenB, 403);
   await edit({});
   await setVerification(true, "APPROVED");
