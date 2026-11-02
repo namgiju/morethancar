@@ -5,6 +5,8 @@ import {ApiError, fetchPublicVehicle} from '../../lib/community-api';
 import type {PublicVehicle, VehiclePart} from '../../lib/community-types';
 import {imageUrl, partPeriodLabel, postUrl} from '../../lib/format';
 import {kstToday} from '../../lib/motorsport';
+import {partShareText, partShareUrl} from '../../lib/part-share';
+import CopyTextButton from './copy-text-button';
 import CommunityPage, {useNotice} from './community-page';
 import MemberLink from './member-link';
 import {useCommunitySession} from './use-community-session';
@@ -101,6 +103,16 @@ function VehicleBody({vehicle: v, own}: {vehicle: PublicVehicle; own: boolean}) 
             후기: {p.title} →
           </a>
         ))}
+        {part.isPublic ? (
+          <>
+            <a className={styles.boardLink} href={partShareUrl(v.id, part.id).replace(/^https:\/\/[^/]+/, '')}>
+              공유 링크 →
+            </a>
+            <CopyTextButton text={partShareText(part, v, today)} />
+          </>
+        ) : (
+          <p className={styles.muted}>비공개 부품이라 공유 링크가 열리지 않아요(나만 볼 수 있어요).</p>
+        )}
         {own && !v.archivedAt && (
           <a className={styles.boardLink} href={`/community/new?category=parts&vehicleId=${v.id}&partId=${part.id}`}>
             후기 쓰기 →

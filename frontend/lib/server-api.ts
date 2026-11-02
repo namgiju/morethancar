@@ -3,6 +3,7 @@
 // `fetch` during SSR never goes through it, so this calls the backend origin
 // directly. All endpoints used here are public (no auth middleware in
 // board-service), so no session cookie needs to be forwarded.
+import type {PublicVehicle} from './community-types';
 import type {GarageEntry, Listing, Post, SiteStats} from './home-types';
 import {kstToday} from './motorsport';
 import type {PublicEvent} from './motorsport-types';
@@ -58,4 +59,14 @@ export async function fetchUpcomingMotorsportServer(limit = 3): Promise<PublicEv
   const query = new URLSearchParams({from, to, limit: String(limit)});
   const {events} = await serverApi<{events: PublicEvent[]}>(`/api/board/motorsport/events?${query}`);
   return events;
+}
+
+// Public vehicle detail as an anonymous viewer (no cookie is forwarded), so it
+// only ever contains public parts and never cost, review status or the plate.
+// null when the vehicle is missing or its owner withdrew (board 404).
+export async function fetchPublicVehicleServer(id: number): Promise<PublicVehicle | null> {
+  const res = await fetch(`${API_ORIGIN}/api/board/garage/${id}`, {cache: 'no-store'});
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`요청을 처리하지 못했습니다. (${res.status})`);
+  return res.json() as Promise<PublicVehicle>;
 }
