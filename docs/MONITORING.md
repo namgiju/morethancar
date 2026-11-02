@@ -73,6 +73,10 @@
 아래처럼 바꾼다(권장, 2026-10-27 — 운영자가 UptimeRobot에서 직접 바꿔야 하고 이 저장소 변경만으로는 반영되지 않는다).
 다른 서비스로 옮길 때도 같은 값을 쓴다.
 
+2026-11-02 적용 상태: 기존 세 모니터의 URL만 바꿨다 — `/api/health` → `/api/health/live`, `/api/board/health` → `/api/board/health/live`,
+`/` → `/login`(모두 5분 주기 유지, 이름도 URL과 같게 바꿈). 아래 표의 준비 확인 60분 모니터 두 개는 **아직 등록하지 않았다**.
+그래서 지금은 DB 장애를 외부 감시가 잡지 못한다(사용자가 503을 받아도 알림이 오지 않는다).
+
 | 모니터 | URL | 주기 | 깨우는 것 |
 |---|---|---|---|
 | morethancar core live | `https://morethancar.kr/api/health/live` | 5분 | 없음(DB 미접속) |
