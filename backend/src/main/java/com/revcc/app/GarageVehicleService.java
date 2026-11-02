@@ -52,7 +52,8 @@ public class GarageVehicleService {
     }
 
     private Vehicle owned(Integer id, Long userId) {
-        Vehicle vehicle = find(id);
+        Vehicle vehicle = vehicles.findByIdForUpdate(id).orElseThrow(() ->
+            new ResponseStatusException(HttpStatus.NOT_FOUND, "차량을 찾을 수 없습니다."));
         if (!vehicle.getUser().getId().equals(userId))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인 차량만 변경할 수 있습니다.");
         return vehicle;

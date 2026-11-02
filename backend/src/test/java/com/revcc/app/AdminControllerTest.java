@@ -70,12 +70,21 @@ class AdminControllerTest {
         verifyNoInteractions(verifications);
     }
 
+    // 관리자 승인/반려는 차량 → 신청 순서로 잠근 행을 읽는다.
+    private void stubLocked(int id, Vehicle vehicle, VehicleVerification verification) {
+        when(verifications.findVehicleIdById(id)).thenReturn(Optional.of(100 + id));
+        when(vehicles.findByIdForUpdate(100 + id)).thenReturn(Optional.of(vehicle));
+        when(verifications.findByIdForUpdate(id)).thenReturn(Optional.of(verification));
+        when(verifications.findLatestIdByVehicleId(100 + id)).thenReturn(id);
+    }
+
     @Test void adminApprovesVerificationAndVehicle() throws Exception {
         User owner = owner();
         GarageVehicleRequest request = new GarageVehicleRequest("Hyundai", "Avante N", 2024, "N", "DCT", "Blue", "my N", "desc", "123가4567");
         Vehicle vehicle = new Vehicle(owner, request);
+        vehicle.markVerificationPending();
         VehicleVerification verification = new VehicleVerification(vehicle, "image/png", new byte[]{1, 2, 3});
-        when(verifications.findById(5)).thenReturn(Optional.of(verification));
+        stubLocked(5, vehicle, verification);
 
         mvc.perform(post("/api/admin/vehicle-verifications/5/approve").cookie(new Cookie(SharedSessionService.COOKIE, "admin-token")))
             .andExpect(status().isOk())
@@ -90,12 +99,52 @@ class AdminControllerTest {
         Vehicle vehicle = new Vehicle(owner, request);
         vehicle.markVerificationPending();
         VehicleVerification verification = new VehicleVerification(vehicle, "image/png", new byte[]{1, 2, 3});
-        when(verifications.findById(6)).thenReturn(Optional.of(verification));
+        stubLocked(6, vehicle, verification);
 
         mvc.perform(post("/api/admin/vehicle-verifications/6/reject").cookie(new Cookie(SharedSessionService.COOKIE, "admin-token")))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("REJECTED"));
         org.junit.jupiter.api.Assertions.assertFalse(vehicle.isVerified());
         org.junit.jupiter.api.Assertions.assertEquals("REJECTED", vehicle.getVerificationStatus());
+    }
+
+    // 승인 뒤 핵심 필드를 바꿔 인증이 해제된 차량은 예전(이미 승인된) 신청으로 다시 승인되지 않는다. 반려도 마찬가지다.
+    @Test void processedRequestCannotBeApprovedOrRejectedAgain() throws Exception {
+        GarageVehicleRequest request = new GarageVehicleRequest("Hyundai", "Avante N", 2024, "N", "DCT", "Blue", "my N", "desc", "123가4567");
+        Vehicle vehicle = new Vehicle(owner(), request);
+        vehicle.markVerificationPending();
+        VehicleVerification verification = new VehicleVerification(vehicle, "image/png", new byte[]{1, 2, 3});
+        stubLocked(7, vehicle, verification);
+        Cookie admin = new Cookie(SharedSessionService.COOKIE, "admin-token");
+        mvc.perform(post("/api/admin/vehicle-verifications/7/approve").cookie(admin)).andExpect(status().isOk());
+        vehicle.update(new GarageVehicleRequest("Hyundai", "Elantra N", 2024, "N", "DCT", "Blue", "my N", "desc", "123가4567"));
+        org.junit.jupiter.api.Assertions.assertFalse(vehicle.isVerified());
+        clearInvocations(vehicles, verifications);
+
+        for (String action : new String[]{"approve", "reject"})
+            mvc.perform(post("/api/admin/vehicle-verifications/7/" + action).cookie(admin)).andExpect(status().isConflict());
+        org.junit.jupiter.api.Assertions.assertFalse(vehicle.isVerified());
+        org.junit.jupiter.api.Assertions.assertNull(vehicle.getVerificationStatus());
+        org.junit.jupiter.api.Assertions.assertEquals("APPROVED", verification.getStatus());
+        verify(vehicles, never()).saveAndFlush(any());
+        verify(verifications, never()).saveAndFlush(any());
+    }
+
+    // 같은 차량에 PENDING 신청이 둘 남아 있으면(예전 데이터) 최근 신청만 승인할 수 있다.
+    // 옛 신청은 반려해 목록에서 정리할 수 있지만, 차량의 인증 상태는 건드리지 않는다.
+    @Test void onlyTheLatestRequestOfTheVehicleCanBeApproved() throws Exception {
+        GarageVehicleRequest request = new GarageVehicleRequest("Hyundai", "Avante N", 2024, "N", "DCT", "Blue", "my N", "desc", "123가4567");
+        Vehicle vehicle = new Vehicle(owner(), request);
+        vehicle.markVerificationPending();
+        VehicleVerification older = new VehicleVerification(vehicle, "image/png", new byte[]{1});
+        stubLocked(8, vehicle, older);
+        when(verifications.findLatestIdByVehicleId(108)).thenReturn(9);
+        Cookie admin = new Cookie(SharedSessionService.COOKIE, "admin-token");
+        mvc.perform(post("/api/admin/vehicle-verifications/8/approve").cookie(admin)).andExpect(status().isConflict());
+        org.junit.jupiter.api.Assertions.assertEquals("PENDING", older.getStatus());
+        mvc.perform(post("/api/admin/vehicle-verifications/8/reject").cookie(admin))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
+        org.junit.jupiter.api.Assertions.assertEquals("PENDING", vehicle.getVerificationStatus());
+        verify(vehicles, never()).saveAndFlush(any());
     }
 }

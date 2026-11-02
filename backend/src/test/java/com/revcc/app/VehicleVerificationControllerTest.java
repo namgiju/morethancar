@@ -51,6 +51,7 @@ class VehicleVerificationControllerTest {
 
     @Test void ownerCanSubmitPendingRequest() throws Exception {
         when(vehicles.findById(1)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(1)).thenReturn(Optional.of(vehicle));
         when(vehicles.saveAndFlush(vehicle)).thenReturn(vehicle);
         mvc.perform(post("/api/garage/vehicles/1/verification").cookie(new Cookie(SharedSessionService.COOKIE, "owner-token"))
             .contentType(MediaType.APPLICATION_JSON).content("{\"data\":\"" + PNG + "\"}"))
@@ -61,6 +62,7 @@ class VehicleVerificationControllerTest {
 
     @Test void nonOwnerCannotSubmit() throws Exception {
         when(vehicles.findById(1)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(1)).thenReturn(Optional.of(vehicle));
         mvc.perform(post("/api/garage/vehicles/1/verification").cookie(new Cookie(SharedSessionService.COOKIE, "other-token"))
             .contentType(MediaType.APPLICATION_JSON).content("{\"data\":\"" + PNG + "\"}"))
             .andExpect(status().isForbidden());
@@ -70,18 +72,37 @@ class VehicleVerificationControllerTest {
     @Test void rejectsAlreadyPendingVehicle() throws Exception {
         vehicle.markVerificationPending();
         when(vehicles.findById(1)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(1)).thenReturn(Optional.of(vehicle));
         mvc.perform(post("/api/garage/vehicles/1/verification").cookie(new Cookie(SharedSessionService.COOKIE, "owner-token"))
             .contentType(MediaType.APPLICATION_JSON).content("{\"data\":\"" + PNG + "\"}"))
             .andExpect(status().isConflict());
         verifyNoInteractions(verifications);
     }
 
+    // 승인 뒤 핵심 필드를 바꿔 인증이 해제된 차량은 기존 신청 경로로 다시 PENDING이 된다.
+    @Test void vehicleWhoseVerificationWasClearedCanReapply() throws Exception {
+        vehicle.approveVerification(java.time.Instant.now());
+        vehicle.update(new GarageVehicleRequest("Hyundai", "Elantra N", 2024, "N", "DCT", "Blue", "my N", "desc", "123가4567"));
+        when(vehicles.findById(1)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(1)).thenReturn(Optional.of(vehicle));
+        when(vehicles.saveAndFlush(vehicle)).thenReturn(vehicle);
+        mvc.perform(post("/api/garage/vehicles/1/verification").cookie(new Cookie(SharedSessionService.COOKIE, "owner-token"))
+            .contentType(MediaType.APPLICATION_JSON).content("{\"data\":\"" + PNG + "\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.verified").value(false))
+            .andExpect(jsonPath("$.verificationStatus").value("PENDING"));
+        verify(verifications).saveAndFlush(any());
+    }
+
     @Test void rejectsInvalidImage() throws Exception {
         when(vehicles.findById(1)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(1)).thenReturn(Optional.of(vehicle));
         mvc.perform(post("/api/garage/vehicles/1/verification").cookie(new Cookie(SharedSessionService.COOKIE, "owner-token"))
             .contentType(MediaType.APPLICATION_JSON).content("{\"data\":\"data:text/plain;base64,aGk=\"}"))
             .andExpect(status().isBadRequest());
         verifyNoInteractions(verifications);
+        // 서류 검사는 차량 행을 잠그기 전에 끝난다(잘못된 서류로 잠금을 잡지 않는다).
+        verify(vehicles, never()).findByIdForUpdate(any());
     }
 
     @Test void documentIsVisibleToOwnerAndAdminOnly() throws Exception {

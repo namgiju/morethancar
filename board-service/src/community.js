@@ -514,14 +514,23 @@ export function communityRouter({ db, auth }) {
     );
     res.json(rows.map((v) => ({ ...v, ownerId: Number(v.ownerId) })));
   });
-  async function vehicleInput(body, userId) {
-    const model = text(body?.model, 100),
-      year = integer(body?.year, 1900, new Date().getFullYear() + 1);
+  // stored: 수정 시 잠그고 읽은 저장값({model, year}). Spring은 모델을 trim만 해서, 연식은 2100년까지 받아 저장한다.
+  // 저장값을 그대로 다시 보낸 모델·연식은 board 검증(태그 정리·올해+1)을 거치지 않고 저장값 그대로 둔다 —
+  // 그렇지 않으면 바꾸지 않은 값이 "변경"으로 판정되거나(409·인증 해제) 400이 나서 소개·사진도 고칠 수 없다.
+  // 사용자가 실제로 바꾼 값은 지금처럼 검증한다.
+  function vehicleFields(body, userId, stored) {
+    const sameModel = stored && typeof body?.model === "string" && body.model.trim() === stored.model.trim();
+    const model = sameModel ? stored.model : text(body?.model, 100),
+      year = stored && body?.year === stored.year ? stored.year : integer(body?.year, 1900, new Date().getFullYear() + 1);
     const trim = text(body?.trim, 100, false),
       bio = text(body?.bio, 1000, false);
     const imageId = body?.imageId == null ? null : positive(body.imageId);
-    if (imageId) await images([imageId], userId);
     return [userId, model, year, trim, bio, imageId];
+  }
+  async function vehicleInput(body, userId) {
+    const values = vehicleFields(body, userId);
+    if (values[5]) await images([values[5]], userId);
+    return values;
   }
   router.post("/garage", auth, async (req, res) => {
     const { rows } = await db.query(
@@ -530,14 +539,45 @@ export function communityRouter({ db, auth }) {
     );
     res.status(201).json(rows[0]);
   });
+  // 여기서 바꿀 수 있는 인증 핵심 필드는 모델·연식이다(제조사·번호판은 core API `PUT /api/garage/vehicles/:id`에서만 바꾼다).
+  // 심사 중(PENDING)이면 바꿀 수 없고, 승인된 차량에서 바꾸면 인증을 해제한다. SET·WHERE의 컬럼은 수정 전 값이다.
+  // 차량 행을 잠그고 최신 값을 읽은 뒤 같은 트랜잭션에서 UPDATE한다. core의 차량 수정·인증 신청·관리자 승인/반려도
+  // 같은 행을 잠그므로(GarageVehicleRepository.findByIdForUpdate) 서로 기다렸다가 커밋된 값으로 판단한다.
   router.put("/garage/:id", auth, async (req, res) => {
-    const values = await vehicleInput(req.body, req.user.id);
-    const { rows } = await db.query(
-      `UPDATE owner_vehicles SET model=$2,year=$3,trim=$4,bio=$5,image_id=$6,updated_at=NOW() WHERE owner_id=$1 AND id=$7 RETURNING id`,
-      [...values, req.params.id],
-    );
-    if (!rows.length) fail(403, "본인 차량만 수정할 수 있어요.");
-    res.json(rows[0]);
+    // 사진 소유 확인은 풀의 다른 연결을 쓰므로 트랜잭션 연결을 잡기 전에 끝낸다(동시 요청이 풀을 다 잡고 서로 기다리지 않게).
+    const imageId = req.body?.imageId == null ? null : positive(req.body.imageId);
+    if (imageId) await images([imageId], req.user.id);
+    const client = await db.connect();
+    let broken;
+    try {
+      await client.query("BEGIN");
+      const stored = (await client.query(
+        "SELECT model,year FROM owner_vehicles WHERE owner_id=$1 AND id=$2 FOR UPDATE",
+        [req.user.id, req.params.id],
+      )).rows[0];
+      if (!stored) fail(403, "본인 차량만 수정할 수 있어요.");
+      const values = vehicleFields(req.body, req.user.id, stored);
+      const changed = "(model IS DISTINCT FROM $2 OR year IS DISTINCT FROM $3)";
+      const approved = "(verified OR verification_status='APPROVED')";
+      const { rows } = await client.query(
+        `UPDATE owner_vehicles SET model=$2,year=$3,trim=$4,bio=$5,image_id=$6,updated_at=NOW(),
+           verified=CASE WHEN ${changed} THEN false ELSE verified END,
+           verification_status=CASE WHEN ${changed} AND ${approved} THEN NULL ELSE verification_status END,
+           verified_at=CASE WHEN ${changed} AND ${approved} THEN NULL ELSE verified_at END
+         WHERE owner_id=$1 AND id=$7 AND NOT (verification_status IS NOT DISTINCT FROM 'PENDING' AND ${changed})
+         RETURNING id`,
+        [...values, req.params.id],
+      );
+      if (!rows.length) fail(409, "인증 심사 중에는 차종·연식·번호판을 수정할 수 없어요.");
+      await client.query("COMMIT");
+      res.json(rows[0]);
+    } catch (error) {
+      // ROLLBACK까지 실패한 연결(끊김·시간 초과)은 풀에 돌려보내지 않고 버린다. 응답은 원래 오류로 한다.
+      await client.query("ROLLBACK").catch((rollbackError) => { broken = rollbackError; });
+      throw error;
+    } finally {
+      client.release(broken);
+    }
   });
   router.delete("/garage/:id", auth, async (req, res) => {
     const { rowCount } = await db.query(

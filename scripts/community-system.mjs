@@ -257,6 +257,94 @@ try {
     tokenB,
     403,
   );
+  // 인증 무결성(MVP 단계 1): 모델·연식은 심사 중 수정 불가(409), 승인 차량에서 바꾸면 인증 해제, 그 외 필드는 상태 유지.
+  const verification = async () =>
+    (await db.query("SELECT verified,verification_status AS status,verified_at AS at FROM owner_vehicles WHERE id=$1", [car.id])).rows[0];
+  const setVerification = (verified, status) =>
+    db.query("UPDATE owner_vehicles SET verified=$2,verification_status=$3,verified_at=CASE WHEN $2 THEN NOW() END WHERE id=$1", [car.id, verified, status]);
+  const edit = (body, expected = 200) =>
+    req(`/garage/${car.id}`, "PUT", { model: "아반떼 N", year: 2024, trim: "DCT", imageId: image.id, ...body }, tokenA, expected);
+  await setVerification(true, "APPROVED");
+  await edit({ model: " 아반떼 N ", bio: "소개만 수정" });
+  assert.deepEqual({ ...(await verification()), at: undefined }, { verified: true, status: "APPROVED", at: undefined });
+  assert.ok((await verification()).at);
+  await setVerification(false, "PENDING");
+  await edit({ year: 2023 }, 409);
+  await edit({ model: "아반떼 N 변경" }, 409);
+  await edit({ bio: "심사 중 소개 수정" });
+  assert.equal((await verification()).status, "PENDING");
+  await setVerification(false, "REJECTED");
+  await edit({ model: "아반떼 N 변경" });
+  assert.equal((await verification()).status, "REJECTED");
+  await edit({});
+  for (const changed of [{ model: "아반떼 N 변경" }, { year: 2023 }]) {
+    await setVerification(true, "APPROVED");
+    await edit(changed);
+    assert.deepEqual(await verification(), { verified: false, status: null, at: null });
+    await edit({});
+  }
+  await edit({ year: 2023 }); // 신청 전(NULL)은 자유롭게 수정
+  // Spring은 trim만 하고 저장하므로 board 정리(태그·보이지 않는 문자 제거)와 다를 수 있다. 저장값을 그대로 보낸 소개 수정은 모델 변경이 아니다.
+  for (const status of ["APPROVED", "PENDING"]) {
+    await db.query("UPDATE owner_vehicles SET model=$2,year=2024 WHERE id=$1", [car.id, "M3 <b>G80</b>\u200b"]);
+    await setVerification(status === "APPROVED", status);
+    await edit({ model: "M3 <b>G80</b>\u200b", bio: "소개만" });
+    const after = await verification();
+    assert.equal(after.status, status);
+    assert.equal(after.verified, status === "APPROVED");
+    assert.equal((await db.query("SELECT model FROM owner_vehicles WHERE id=$1", [car.id])).rows[0].model, "M3 <b>G80</b>\u200b");
+  }
+  // 사용자가 마크업만 지운 모델은 실제 변경이다(저장값으로 되돌리지 않는다).
+  await setVerification(false, null);
+  await edit({ model: "M3 G80" });
+  assert.equal((await db.query("SELECT model FROM owner_vehicles WHERE id=$1", [car.id])).rows[0].model, "M3 G80");
+  // board 정리로는 빈 값이 되는(text()가 거부하는) 저장 모델도 그대로 보내면 심사 중 소개를 고칠 수 있다.
+  await db.query("UPDATE owner_vehicles SET model='<b></b>' WHERE id=$1", [car.id]);
+  await setVerification(false, "PENDING");
+  await edit({ model: "<b></b>", bio: "정리 불가 모델 소개 수정" });
+  assert.equal((await verification()).status, "PENDING");
+  await edit({ model: "<i></i>" }, 400);
+  await setVerification(false, null);
+  await edit({});
+  // 동시 요청: core 경로(인증 신청·관리자 승인)가 차량 행을 잡고 바꾸는 중이면 board 수정은 기다렸다가 커밋된 값으로 판단한다.
+  const whileLocked = async (concurrentWrite, body, expected) => {
+    const other = await db.connect();
+    try {
+      await other.query("BEGIN");
+      await other.query("SELECT 1 FROM owner_vehicles WHERE id=$1 FOR UPDATE", [car.id]);
+      let settled = false;
+      const pending = edit(body, expected).finally(() => { settled = true; });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      assert.equal(settled, false, "board 수정이 잠금을 기다려야 한다");
+      await other.query(concurrentWrite, [car.id]);
+      await other.query("COMMIT");
+      await pending;
+    } finally {
+      other.release();
+    }
+  };
+  await whileLocked("UPDATE owner_vehicles SET verification_status='PENDING' WHERE id=$1", { year: 2023 }, 409);
+  assert.deepEqual(await verification(), { verified: false, status: "PENDING", at: null });
+  assert.equal((await db.query("SELECT year FROM owner_vehicles WHERE id=$1", [car.id])).rows[0].year, 2024);
+  await whileLocked("UPDATE owner_vehicles SET verified=true,verification_status='APPROVED',verified_at=NOW() WHERE id=$1", { bio: "승인 중 소개 수정" }, 200);
+  assert.equal((await verification()).status, "APPROVED");
+  assert.equal((await db.query("SELECT bio FROM owner_vehicles WHERE id=$1", [car.id])).rows[0].bio, "승인 중 소개 수정");
+  await whileLocked("UPDATE owner_vehicles SET bio='core에서 바뀐 소개' WHERE id=$1", { model: "아반떼 N 변경" }, 200);
+  assert.deepEqual(await verification(), { verified: false, status: null, at: null });
+  await edit({});
+  // Spring은 연식을 2100년까지 받는다. board 범위(올해+1) 밖의 저장된 연식은 그대로 보내면 받고(소개 수정 가능), 다른 값으로는 못 바꾼다.
+  const farYear = new Date().getFullYear() + 5;
+  await db.query("UPDATE owner_vehicles SET year=$2 WHERE id=$1", [car.id, farYear]);
+  await setVerification(false, "PENDING");
+  await edit({ year: farYear, bio: "먼 연식 소개 수정" });
+  assert.equal((await verification()).status, "PENDING");
+  await edit({ year: farYear + 1 }, 400);
+  await setVerification(false, null);
+  await edit({ year: farYear + 1 }, 400);
+  await edit({});
+  await req(`/garage/${car.id}`, "PUT", { model: "변조", year: 2024 }, tokenB, 403);
+  await edit({});
+  await setVerification(true, "APPROVED");
   await req(
     `/garage/${car.id}/records`,
     "POST",
@@ -318,7 +406,7 @@ try {
   await req(`/garage/${car.id}`, "DELETE", {});
   await req(`/garage/${car.id}`, "GET", undefined, tokenA, 404);
   console.log(
-    "PASS: author profile/statistics, derived verification badge, private field exclusion, related filters, Flyway migrations, image validation, posts, search/categories, ownership, likes/bookmarks, comments/replies, notifications, reports, garage/records, cascade deletion.",
+    "PASS: author profile/statistics, derived verification badge, private field exclusion, related filters, Flyway migrations, image validation, posts, search/categories, ownership, likes/bookmarks, comments/replies, notifications, reports, garage/records, garage verification integrity, cascade deletion.",
   );
 } finally {
   if (server) {

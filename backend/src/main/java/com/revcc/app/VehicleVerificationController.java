@@ -38,7 +38,10 @@ public class VehicleVerificationController {
             @CookieValue(name = SharedSessionService.COOKIE, required = false) String token,
             @RequestBody DocumentUpload upload) {
         Long userId = sessions.require(token).id();
-        Vehicle vehicle = vehicles.findById(vehicleId).orElseThrow(() ->
+        // 서류(최대 약 4MB) 디코딩·형식 검사는 잠금이 필요 없으므로 차량 행을 잠그기 전에 끝낸다.
+        DecodedImage image = decode(upload.data());
+        // 차량 수정·관리자 승인과 겹쳐도 최신 상태로 판단하도록 차량 행을 잠그고 읽는다.
+        Vehicle vehicle = vehicles.findByIdForUpdate(vehicleId).orElseThrow(() ->
             new ResponseStatusException(HttpStatus.NOT_FOUND, "차량을 찾을 수 없습니다."));
         if (!vehicle.getUser().getId().equals(userId))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인 차량만 인증을 신청할 수 있습니다.");
@@ -47,7 +50,6 @@ public class VehicleVerificationController {
         if (vehicle.isVerified())
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 오너 인증이 완료된 차량입니다.");
 
-        DecodedImage image = decode(upload.data());
         verifications.saveAndFlush(new VehicleVerification(vehicle, image.mime(), image.data()));
         vehicle.markVerificationPending();
         return GarageVehicleResponse.from(vehicles.saveAndFlush(vehicle));

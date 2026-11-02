@@ -9,7 +9,7 @@ import {
   updateVehicleProfile,
   uploadImage,
 } from '../../lib/community-api';
-import type {PublicVehicle, VehicleRecordKind} from '../../lib/community-types';
+import type {PublicVehicle, VehicleProfileInput, VehicleRecordKind} from '../../lib/community-types';
 import {imageUrl} from '../../lib/format';
 import CommunityDialog, {type DialogSpec} from '../community/community-dialog';
 import styles from './my-garage.module.css';
@@ -26,13 +26,20 @@ type State = {status: 'loading'} | {status: 'error'} | {status: 'ready'; vehicle
 // this lives entirely inside /home.
 export default function VehicleManageDialog({
   vehicleId,
+  verified,
+  verificationStatus,
   onClose,
   onChanged,
 }: {
   vehicleId: number;
+  // From /home's own vehicle list (Spring OwnerVehicle); GET /garage/:id does not carry verification.
+  verified: boolean;
+  verificationStatus: string | null;
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const pending = verificationStatus === 'PENDING';
+  const approved = verified || verificationStatus === 'APPROVED';
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [state, setState] = useState<State>({status: 'loading'});
   const [imageId, setImageId] = useState<number | null>(null);
@@ -70,22 +77,39 @@ export default function VehicleManageDialog({
     }
   }
 
+  async function saveProfile(input: VehicleProfileInput) {
+    await updateVehicleProfile(vehicleId, input);
+    onChanged();
+    load();
+  }
+
   async function submitEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || state.status !== 'ready') return;
+    const form = new FormData(event.currentTarget);
+    // 심사 중에는 차종·연식 칸이 비활성(폼 값에 없음)이므로 저장된 값을 그대로 보낸다.
+    const input: VehicleProfileInput = {
+      model: pending ? state.vehicle.model : String(form.get('model') || '').trim(),
+      year: pending ? state.vehicle.year : Number(form.get('year')),
+      trim: String(form.get('trim') || '').trim(),
+      bio: String(form.get('bio') || '').trim(),
+      imageId,
+    };
+    // 서버는 trim한 값으로 비교한다. 인증 차량의 차종·연식을 바꾸면 인증이 해제되므로 먼저 확인받는다.
+    if (approved && (input.model !== state.vehicle.model.trim() || input.year !== state.vehicle.year)) {
+      setConfirmSpec({
+        kind: 'confirm',
+        title: '오너 인증이 해제돼요',
+        message: '저장하면 오너 인증이 해제되고 다시 신청해야 해요.',
+        confirmLabel: '저장',
+        onConfirm: () => saveProfile(input),
+      });
+      return;
+    }
     setBusy(true);
     setError('');
-    const form = new FormData(event.currentTarget);
     try {
-      await updateVehicleProfile(vehicleId, {
-        model: String(form.get('model') || '').trim(),
-        year: Number(form.get('year')),
-        trim: String(form.get('trim') || '').trim(),
-        bio: String(form.get('bio') || '').trim(),
-        imageId,
-      });
-      onChanged();
-      load();
+      await saveProfile(input);
     } catch (e) {
       setError(e instanceof Error ? e.message : '차량 정보를 저장하지 못했어요.');
     } finally {
@@ -172,14 +196,15 @@ export default function VehicleManageDialog({
       {state.status === 'ready' && (
         <>
           <form onSubmit={submitEdit}>
+            {pending && <p className={styles.notice}>인증 심사 중에는 차종·연식을 수정할 수 없어요.</p>}
             <label>
               차종
-              <input name="model" defaultValue={state.vehicle.model} required maxLength={100} disabled={busy} />
+              <input name="model" defaultValue={state.vehicle.model} required maxLength={100} disabled={busy || pending} />
             </label>
             <div className={styles.formRow}>
               <label>
                 연식
-                <input name="year" type="number" defaultValue={state.vehicle.year} min={1900} max={2100} required disabled={busy} />
+                <input name="year" type="number" defaultValue={state.vehicle.year} min={1900} max={2100} required disabled={busy || pending} />
               </label>
               <label>
                 트림
