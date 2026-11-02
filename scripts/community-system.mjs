@@ -295,6 +295,43 @@ try {
     assert.equal((await db.query("SELECT model FROM owner_vehicles WHERE id=$1", [car.id])).rows[0].model, "M3 <b>G80</b>\u200b");
   }
   await setVerification(false, null);
+  await edit({});
+  // 동시 요청: core 경로(인증 신청·관리자 승인)가 차량 행을 잡고 바꾸는 중이면 board 수정은 기다렸다가 커밋된 값으로 판단한다.
+  const whileLocked = async (concurrentWrite, body, expected) => {
+    const other = await db.connect();
+    try {
+      await other.query("BEGIN");
+      await other.query("SELECT 1 FROM owner_vehicles WHERE id=$1 FOR UPDATE", [car.id]);
+      let settled = false;
+      const pending = edit(body, expected).finally(() => { settled = true; });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      assert.equal(settled, false, "board 수정이 잠금을 기다려야 한다");
+      await other.query(concurrentWrite, [car.id]);
+      await other.query("COMMIT");
+      await pending;
+    } finally {
+      other.release();
+    }
+  };
+  await whileLocked("UPDATE owner_vehicles SET verification_status='PENDING' WHERE id=$1", { year: 2023 }, 409);
+  assert.deepEqual(await verification(), { verified: false, status: "PENDING", at: null });
+  assert.equal((await db.query("SELECT year FROM owner_vehicles WHERE id=$1", [car.id])).rows[0].year, 2024);
+  await whileLocked("UPDATE owner_vehicles SET verified=true,verification_status='APPROVED',verified_at=NOW() WHERE id=$1", { bio: "승인 중 소개 수정" }, 200);
+  assert.equal((await verification()).status, "APPROVED");
+  assert.equal((await db.query("SELECT bio FROM owner_vehicles WHERE id=$1", [car.id])).rows[0].bio, "승인 중 소개 수정");
+  await whileLocked("UPDATE owner_vehicles SET bio='core에서 바뀐 소개' WHERE id=$1", { model: "아반떼 N 변경" }, 200);
+  assert.deepEqual(await verification(), { verified: false, status: null, at: null });
+  await edit({});
+  // Spring은 연식을 2100년까지 받는다. board 범위(올해+1) 밖의 저장된 연식은 그대로 보내면 받고(소개 수정 가능), 다른 값으로는 못 바꾼다.
+  const farYear = new Date().getFullYear() + 5;
+  await db.query("UPDATE owner_vehicles SET year=$2 WHERE id=$1", [car.id, farYear]);
+  await setVerification(false, "PENDING");
+  await edit({ year: farYear, bio: "먼 연식 소개 수정" });
+  assert.equal((await verification()).status, "PENDING");
+  await edit({ year: farYear + 1 }, 400);
+  await setVerification(false, null);
+  await edit({ year: farYear + 1 }, 400);
+  await edit({});
   await req(`/garage/${car.id}`, "PUT", { model: "변조", year: 2024 }, tokenB, 403);
   await edit({});
   await setVerification(true, "APPROVED");

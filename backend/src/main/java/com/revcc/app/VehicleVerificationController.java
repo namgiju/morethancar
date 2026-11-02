@@ -38,7 +38,8 @@ public class VehicleVerificationController {
             @CookieValue(name = SharedSessionService.COOKIE, required = false) String token,
             @RequestBody DocumentUpload upload) {
         Long userId = sessions.require(token).id();
-        Vehicle vehicle = vehicles.findById(vehicleId).orElseThrow(() ->
+        // 차량 수정·관리자 승인과 겹쳐도 최신 상태로 판단하도록 차량 행을 잠그고 읽는다.
+        Vehicle vehicle = vehicles.findByIdForUpdate(vehicleId).orElseThrow(() ->
             new ResponseStatusException(HttpStatus.NOT_FOUND, "차량을 찾을 수 없습니다."));
         if (!vehicle.getUser().getId().equals(userId))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인 차량만 인증을 신청할 수 있습니다.");

@@ -45,6 +45,7 @@ class GarageVehicleServiceTest {
     @Test void rejectsOtherOwnersUpdateAndDelete() {
         Vehicle vehicle = new Vehicle(owner(), request);
         when(vehicles.findById(15)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(15)).thenReturn(Optional.of(vehicle));
         assertEquals(403, assertThrows(ResponseStatusException.class, () -> service.update(15, 9L, request)).getStatusCode().value());
         assertEquals(403, assertThrows(ResponseStatusException.class, () -> service.delete(15, 9L)).getStatusCode().value());
         verify(vehicles, never()).saveAndFlush(any());
@@ -54,6 +55,7 @@ class GarageVehicleServiceTest {
     @Test void ownerCanUpdateAndDeleteAndMissingVehicleIs404() {
         Vehicle vehicle = new Vehicle(owner(), request);
         when(vehicles.findById(15)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(15)).thenReturn(Optional.of(vehicle));
         when(vehicles.saveAndFlush(vehicle)).thenReturn(vehicle);
         assertEquals(7L, service.update(15, 7L, request).userId());
         service.delete(15, 7L);
@@ -63,6 +65,7 @@ class GarageVehicleServiceTest {
 
     private Vehicle saved(Vehicle vehicle) {
         when(vehicles.findById(15)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(15)).thenReturn(Optional.of(vehicle));
         when(vehicles.saveAndFlush(vehicle)).thenReturn(vehicle);
         return vehicle;
     }
@@ -126,6 +129,7 @@ class GarageVehicleServiceTest {
     @Test void publicProfileHidesLicensePlateButOwnListKeepsIt() {
         Vehicle vehicle = new Vehicle(owner(), request);
         when(vehicles.findById(15)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(15)).thenReturn(Optional.of(vehicle));
         when(vehicles.findByUserIdOrderByIdDesc(7L)).thenReturn(List.of(vehicle));
         assertNull(service.profile(15).licensePlate());
         assertEquals("123가4567", service.mine(7L).get(0).licensePlate());

@@ -51,6 +51,7 @@ class VehicleVerificationControllerTest {
 
     @Test void ownerCanSubmitPendingRequest() throws Exception {
         when(vehicles.findById(1)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(1)).thenReturn(Optional.of(vehicle));
         when(vehicles.saveAndFlush(vehicle)).thenReturn(vehicle);
         mvc.perform(post("/api/garage/vehicles/1/verification").cookie(new Cookie(SharedSessionService.COOKIE, "owner-token"))
             .contentType(MediaType.APPLICATION_JSON).content("{\"data\":\"" + PNG + "\"}"))
@@ -61,6 +62,7 @@ class VehicleVerificationControllerTest {
 
     @Test void nonOwnerCannotSubmit() throws Exception {
         when(vehicles.findById(1)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(1)).thenReturn(Optional.of(vehicle));
         mvc.perform(post("/api/garage/vehicles/1/verification").cookie(new Cookie(SharedSessionService.COOKIE, "other-token"))
             .contentType(MediaType.APPLICATION_JSON).content("{\"data\":\"" + PNG + "\"}"))
             .andExpect(status().isForbidden());
@@ -70,6 +72,7 @@ class VehicleVerificationControllerTest {
     @Test void rejectsAlreadyPendingVehicle() throws Exception {
         vehicle.markVerificationPending();
         when(vehicles.findById(1)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(1)).thenReturn(Optional.of(vehicle));
         mvc.perform(post("/api/garage/vehicles/1/verification").cookie(new Cookie(SharedSessionService.COOKIE, "owner-token"))
             .contentType(MediaType.APPLICATION_JSON).content("{\"data\":\"" + PNG + "\"}"))
             .andExpect(status().isConflict());
@@ -81,6 +84,7 @@ class VehicleVerificationControllerTest {
         vehicle.approveVerification(java.time.Instant.now());
         vehicle.update(new GarageVehicleRequest("Hyundai", "Elantra N", 2024, "N", "DCT", "Blue", "my N", "desc", "123가4567"));
         when(vehicles.findById(1)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(1)).thenReturn(Optional.of(vehicle));
         when(vehicles.saveAndFlush(vehicle)).thenReturn(vehicle);
         mvc.perform(post("/api/garage/vehicles/1/verification").cookie(new Cookie(SharedSessionService.COOKIE, "owner-token"))
             .contentType(MediaType.APPLICATION_JSON).content("{\"data\":\"" + PNG + "\"}"))
@@ -92,6 +96,7 @@ class VehicleVerificationControllerTest {
 
     @Test void rejectsInvalidImage() throws Exception {
         when(vehicles.findById(1)).thenReturn(Optional.of(vehicle));
+        when(vehicles.findByIdForUpdate(1)).thenReturn(Optional.of(vehicle));
         mvc.perform(post("/api/garage/vehicles/1/verification").cookie(new Cookie(SharedSessionService.COOKIE, "owner-token"))
             .contentType(MediaType.APPLICATION_JSON).content("{\"data\":\"data:text/plain;base64,aGk=\"}"))
             .andExpect(status().isBadRequest());

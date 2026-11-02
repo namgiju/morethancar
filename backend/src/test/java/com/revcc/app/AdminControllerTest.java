@@ -70,12 +70,20 @@ class AdminControllerTest {
         verifyNoInteractions(verifications);
     }
 
+    // 관리자 승인/반려는 차량 → 신청 순서로 잠근 행을 읽는다.
+    private void stubLocked(int id, Vehicle vehicle, VehicleVerification verification) {
+        when(verifications.findVehicleIdById(id)).thenReturn(Optional.of(100 + id));
+        when(vehicles.findByIdForUpdate(100 + id)).thenReturn(Optional.of(vehicle));
+        when(verifications.findByIdForUpdate(id)).thenReturn(Optional.of(verification));
+    }
+
     @Test void adminApprovesVerificationAndVehicle() throws Exception {
         User owner = owner();
         GarageVehicleRequest request = new GarageVehicleRequest("Hyundai", "Avante N", 2024, "N", "DCT", "Blue", "my N", "desc", "123가4567");
         Vehicle vehicle = new Vehicle(owner, request);
+        vehicle.markVerificationPending();
         VehicleVerification verification = new VehicleVerification(vehicle, "image/png", new byte[]{1, 2, 3});
-        when(verifications.findById(5)).thenReturn(Optional.of(verification));
+        stubLocked(5, vehicle, verification);
 
         mvc.perform(post("/api/admin/vehicle-verifications/5/approve").cookie(new Cookie(SharedSessionService.COOKIE, "admin-token")))
             .andExpect(status().isOk())
@@ -90,7 +98,7 @@ class AdminControllerTest {
         Vehicle vehicle = new Vehicle(owner, request);
         vehicle.markVerificationPending();
         VehicleVerification verification = new VehicleVerification(vehicle, "image/png", new byte[]{1, 2, 3});
-        when(verifications.findById(6)).thenReturn(Optional.of(verification));
+        stubLocked(6, vehicle, verification);
 
         mvc.perform(post("/api/admin/vehicle-verifications/6/reject").cookie(new Cookie(SharedSessionService.COOKIE, "admin-token")))
             .andExpect(status().isOk())
@@ -105,7 +113,7 @@ class AdminControllerTest {
         Vehicle vehicle = new Vehicle(owner(), request);
         vehicle.markVerificationPending();
         VehicleVerification verification = new VehicleVerification(vehicle, "image/png", new byte[]{1, 2, 3});
-        when(verifications.findById(7)).thenReturn(Optional.of(verification));
+        stubLocked(7, vehicle, verification);
         Cookie admin = new Cookie(SharedSessionService.COOKIE, "admin-token");
         mvc.perform(post("/api/admin/vehicle-verifications/7/approve").cookie(admin)).andExpect(status().isOk());
         vehicle.update(new GarageVehicleRequest("Hyundai", "Elantra N", 2024, "N", "DCT", "Blue", "my N", "desc", "123가4567"));

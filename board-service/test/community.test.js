@@ -120,16 +120,22 @@ function createApp({db,redis}) {
     ? Promise.resolve({rows:[{version:0,status:'ACTIVE',suspended_until:null}]}) : query(sql,values)}});
 }
 
-test("garage PUT: 심사 중 모델·연식 변경은 409, 타인 차량은 403, 인증 해제는 같은 UPDATE 안에서", async (t) => {
+test("garage PUT: 차량 행을 잠그고 읽은 뒤 같은 트랜잭션에서 UPDATE, 심사 중 모델·연식 변경은 409, 타인 차량은 403", async (t) => {
   const calls = [];
   let owned = true;
   const app = createApp({
     redis: { get: async () => JSON.stringify({ id: 7, username: "owner" }) },
-    db: { query: async (sql, values) => {
-      calls.push({ sql, values });
-      if (sql.startsWith("UPDATE owner_vehicles")) return { rows: [] };
-      return { rows: owned ? [{ "?column?": 1 }] : [] };
-    } },
+    db: {
+      query: async () => ({ rows: [] }),
+      connect: async () => ({
+        query: async (sql, values) => {
+          calls.push({ sql, values });
+          if (sql.startsWith("SELECT model,year")) return { rows: owned ? [{ model: "아반떼 N", year: 2024 }] : [] };
+          return { rows: [] };
+        },
+        release: () => calls.push({ sql: "release" }),
+      }),
+    },
   });
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
@@ -142,10 +148,12 @@ test("garage PUT: 심사 중 모델·연식 변경은 409, 타인 차량은 403,
   const conflict = await put();
   assert.equal(conflict.status, 409);
   assert.equal((await conflict.json()).message, "인증 심사 중에는 차종·연식·번호판을 수정할 수 없어요.");
-  const update = calls.find((c) => c.sql.startsWith("UPDATE owner_vehicles"));
-  assert.deepEqual(update.values.slice(0, 3), [7, "아반떼 N", 2023]);
-  assert.match(update.sql, /WHERE owner_id=\$1 AND id=\$7 AND NOT \(verification_status IS NOT DISTINCT FROM 'PENDING'/);
-  assert.match(update.sql, /verification_status=CASE WHEN/);
+  assert.deepEqual(calls.map((c) => c.sql.split(/\s/)[0]), ["BEGIN", "SELECT", "UPDATE", "ROLLBACK", "release"]);
+  assert.match(calls[1].sql, /WHERE owner_id=\$1 AND id=\$2 FOR UPDATE/);
+  assert.deepEqual(calls[2].values.slice(0, 3), [7, "아반떼 N", 2023]);
+  assert.match(calls[2].sql, /AND NOT \(verification_status IS NOT DISTINCT FROM 'PENDING'/);
   owned = false;
+  calls.length = 0;
   assert.equal((await put()).status, 403);
+  assert.deepEqual(calls.map((c) => c.sql.split(/\s/)[0]), ["BEGIN", "SELECT", "ROLLBACK", "release"]);
 });

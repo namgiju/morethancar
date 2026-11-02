@@ -514,9 +514,11 @@ export function communityRouter({ db, auth }) {
     );
     res.json(rows.map((v) => ({ ...v, ownerId: Number(v.ownerId) })));
   });
-  async function vehicleInput(body, userId) {
+  // keepYear: 수정 시 저장된 연식. Spring은 2100년까지 받으므로, 그대로 다시 보낸 연식은 이 범위 밖이어도 받는다
+  // (그렇지 않으면 그런 차량은 소개·사진도 고칠 수 없다). 새 값은 지금처럼 올해+1까지만 받는다.
+  async function vehicleInput(body, userId, keepYear) {
     const model = text(body?.model, 100),
-      year = integer(body?.year, 1900, new Date().getFullYear() + 1);
+      year = keepYear != null && body?.year === keepYear ? keepYear : integer(body?.year, 1900, new Date().getFullYear() + 1);
     const trim = text(body?.trim, 100, false),
       bio = text(body?.bio, 1000, false);
     const imageId = body?.imageId == null ? null : positive(body.imageId);
@@ -532,30 +534,42 @@ export function communityRouter({ db, auth }) {
   });
   // 여기서 바꿀 수 있는 인증 핵심 필드는 모델·연식이다(제조사·번호판은 core API `PUT /api/garage/vehicles/:id`에서만 바꾼다).
   // 심사 중(PENDING)이면 바꿀 수 없고, 승인된 차량에서 바꾸면 인증을 해제한다. SET·WHERE의 컬럼은 수정 전 값이다.
+  // 차량 행을 잠그고 최신 값을 읽은 뒤 같은 트랜잭션에서 UPDATE한다. core의 차량 수정·인증 신청·관리자 승인/반려도
+  // 같은 행을 잠그므로(GarageVehicleRepository.findByIdForUpdate) 서로 기다렸다가 커밋된 값으로 판단한다.
   router.put("/garage/:id", auth, async (req, res) => {
-    const values = await vehicleInput(req.body, req.user.id);
-    // Spring으로 등록한 모델은 trim만 거쳐 저장된다. 정리(plainText) 결과가 저장값을 정리한 것과 같으면
-    // 사용자가 모델을 바꾼 게 아니므로 저장값을 그대로 둔다(소개만 고쳤는데 409·인증 해제가 되지 않게).
-    const stored = await db.query("SELECT model FROM owner_vehicles WHERE owner_id=$1 AND id=$2", [req.user.id, req.params.id]);
-    const cleaned = (v) => { try { return plainText(v).trim(); } catch { return null; } };
-    if (stored.rows.length && cleaned(stored.rows[0].model) === values[1]) values[1] = stored.rows[0].model;
-    const changed = "(model IS DISTINCT FROM $2 OR year IS DISTINCT FROM $3)";
-    const approved = "(verified OR verification_status='APPROVED')";
-    const { rows } = await db.query(
-      `UPDATE owner_vehicles SET model=$2,year=$3,trim=$4,bio=$5,image_id=$6,updated_at=NOW(),
-         verified=CASE WHEN ${changed} THEN false ELSE verified END,
-         verification_status=CASE WHEN ${changed} AND ${approved} THEN NULL ELSE verification_status END,
-         verified_at=CASE WHEN ${changed} AND ${approved} THEN NULL ELSE verified_at END
-       WHERE owner_id=$1 AND id=$7 AND NOT (verification_status IS NOT DISTINCT FROM 'PENDING' AND ${changed})
-       RETURNING id`,
-      [...values, req.params.id],
-    );
-    if (!rows.length) {
-      const own = await db.query("SELECT 1 FROM owner_vehicles WHERE owner_id=$1 AND id=$2", [req.user.id, req.params.id]);
-      if (own.rows.length) fail(409, "인증 심사 중에는 차종·연식·번호판을 수정할 수 없어요.");
-      fail(403, "본인 차량만 수정할 수 있어요.");
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+      const stored = (await client.query(
+        "SELECT model,year FROM owner_vehicles WHERE owner_id=$1 AND id=$2 FOR UPDATE",
+        [req.user.id, req.params.id],
+      )).rows[0];
+      if (!stored) fail(403, "본인 차량만 수정할 수 있어요.");
+      const values = await vehicleInput(req.body, req.user.id, stored.year);
+      // Spring으로 등록한 모델은 trim만 거쳐 저장된다. 정리(plainText) 결과가 저장값을 정리한 것과 같으면
+      // 사용자가 모델을 바꾼 게 아니므로 저장값을 그대로 둔다(소개만 고쳤는데 409·인증 해제가 되지 않게).
+      const cleaned = (v) => { try { return plainText(v).trim(); } catch { return null; } };
+      if (cleaned(stored.model) === values[1]) values[1] = stored.model;
+      const changed = "(model IS DISTINCT FROM $2 OR year IS DISTINCT FROM $3)";
+      const approved = "(verified OR verification_status='APPROVED')";
+      const { rows } = await client.query(
+        `UPDATE owner_vehicles SET model=$2,year=$3,trim=$4,bio=$5,image_id=$6,updated_at=NOW(),
+           verified=CASE WHEN ${changed} THEN false ELSE verified END,
+           verification_status=CASE WHEN ${changed} AND ${approved} THEN NULL ELSE verification_status END,
+           verified_at=CASE WHEN ${changed} AND ${approved} THEN NULL ELSE verified_at END
+         WHERE owner_id=$1 AND id=$7 AND NOT (verification_status IS NOT DISTINCT FROM 'PENDING' AND ${changed})
+         RETURNING id`,
+        [...values, req.params.id],
+      );
+      if (!rows.length) fail(409, "인증 심사 중에는 차종·연식·번호판을 수정할 수 없어요.");
+      await client.query("COMMIT");
+      res.json(rows[0]);
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
-    res.json(rows[0]);
   });
   router.delete("/garage/:id", auth, async (req, res) => {
     const { rowCount } = await db.query(
