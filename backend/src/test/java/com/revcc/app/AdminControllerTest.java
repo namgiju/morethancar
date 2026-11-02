@@ -98,4 +98,26 @@ class AdminControllerTest {
         org.junit.jupiter.api.Assertions.assertFalse(vehicle.isVerified());
         org.junit.jupiter.api.Assertions.assertEquals("REJECTED", vehicle.getVerificationStatus());
     }
+
+    // 승인 뒤 핵심 필드를 바꿔 인증이 해제된 차량은 예전(이미 승인된) 신청으로 다시 승인되지 않는다. 반려도 마찬가지다.
+    @Test void processedRequestCannotBeApprovedOrRejectedAgain() throws Exception {
+        GarageVehicleRequest request = new GarageVehicleRequest("Hyundai", "Avante N", 2024, "N", "DCT", "Blue", "my N", "desc", "123가4567");
+        Vehicle vehicle = new Vehicle(owner(), request);
+        vehicle.markVerificationPending();
+        VehicleVerification verification = new VehicleVerification(vehicle, "image/png", new byte[]{1, 2, 3});
+        when(verifications.findById(7)).thenReturn(Optional.of(verification));
+        Cookie admin = new Cookie(SharedSessionService.COOKIE, "admin-token");
+        mvc.perform(post("/api/admin/vehicle-verifications/7/approve").cookie(admin)).andExpect(status().isOk());
+        vehicle.update(new GarageVehicleRequest("Hyundai", "Elantra N", 2024, "N", "DCT", "Blue", "my N", "desc", "123가4567"));
+        org.junit.jupiter.api.Assertions.assertFalse(vehicle.isVerified());
+        clearInvocations(vehicles, verifications);
+
+        for (String action : new String[]{"approve", "reject"})
+            mvc.perform(post("/api/admin/vehicle-verifications/7/" + action).cookie(admin)).andExpect(status().isConflict());
+        org.junit.jupiter.api.Assertions.assertFalse(vehicle.isVerified());
+        org.junit.jupiter.api.Assertions.assertNull(vehicle.getVerificationStatus());
+        org.junit.jupiter.api.Assertions.assertEquals("APPROVED", verification.getStatus());
+        verify(vehicles, never()).saveAndFlush(any());
+        verify(verifications, never()).saveAndFlush(any());
+    }
 }

@@ -56,7 +56,7 @@ public class AdminController {
     public VerificationSummary approve(@PathVariable Integer id,
             @CookieValue(name = SharedSessionService.COOKIE, required = false) String token) {
         User admin = requireAdmin(token);
-        VehicleVerification verification = findVerification(id);
+        VehicleVerification verification = pendingVerification(id);
         verification.approve(admin);
         verification.getVehicle().approveVerification(Instant.now());
         vehicles.saveAndFlush(verification.getVehicle());
@@ -68,11 +68,20 @@ public class AdminController {
     public VerificationSummary reject(@PathVariable Integer id,
             @CookieValue(name = SharedSessionService.COOKIE, required = false) String token) {
         User admin = requireAdmin(token);
-        VehicleVerification verification = findVerification(id);
+        VehicleVerification verification = pendingVerification(id);
         verification.reject(admin);
         verification.getVehicle().rejectVerification();
         vehicles.saveAndFlush(verification.getVehicle());
         return VerificationSummary.from(verifications.saveAndFlush(verification));
+    }
+
+    // 처리할 수 있는 신청은 심사 중(PENDING)인 것뿐이다. 이미 승인·반려된 예전 신청을 다시 승인하면
+    // 핵심 필드 변경으로 해제된 인증이 새 서류 없이 되살아나고, 다시 반려하면 현재 인증이 지워진다.
+    private VehicleVerification pendingVerification(Integer id) {
+        VehicleVerification verification = findVerification(id);
+        if (!"PENDING".equals(verification.getStatus()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 처리된 인증 신청입니다.");
+        return verification;
     }
 
     private VehicleVerification findVerification(Integer id) {
