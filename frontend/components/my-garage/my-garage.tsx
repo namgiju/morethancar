@@ -5,6 +5,7 @@ import {usePathname} from 'next/navigation';
 import {fetchMember, fetchMyGarageVehicles, setRepresentativeVehicle} from '../../lib/community-api';
 import type {CommunityMember, OwnerVehicle} from '../../lib/community-types';
 import {carUrl, imageUrl} from '../../lib/format';
+import {kakaoWithdrawMessage} from '../../lib/kakao-withdraw';
 import BadgeList from '../community/badge-list';
 import CommunityHeader from '../community/community-header';
 import {useNotice} from '../community/community-page';
@@ -42,6 +43,20 @@ export default function MyGarage() {
   const [verifyVehicleId, setVerifyVehicleId] = useState<number | null>(null);
   const [profileEditOpen, setProfileEditOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawResult, setWithdrawResult] = useState<{code: string; message: string} | null>(null);
+
+  // Kakao withdrawal comes back here as ?kakaoWithdraw=<code> when it did not
+  // finish (LATER-1). Show the reason in the withdrawal dialog once, then drop
+  // the query so a reload doesn't repeat it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('kakaoWithdraw');
+    const message = kakaoWithdrawMessage(code, params.get('reason'));
+    if (!code || !message) return;
+    window.history.replaceState(null, '', window.location.pathname);
+    setWithdrawResult({code, message});
+    setWithdrawOpen(true);
+  }, []);
 
   const load = useCallback(() => {
     if (!session) return;
@@ -235,7 +250,15 @@ export default function MyGarage() {
           onSaved={() => setReloadKey((k) => k + 1)}
         />
       )}
-      {withdrawOpen && <WithdrawDialog onClose={() => setWithdrawOpen(false)} />}
+      {withdrawOpen && session && (
+        <WithdrawDialog
+          result={withdrawResult}
+          onClose={() => {
+            setWithdrawOpen(false);
+            setWithdrawResult(null);
+          }}
+        />
+      )}
       <SiteFooter />
     </div>
   );

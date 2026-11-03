@@ -364,3 +364,10 @@ export async function fetchWithdrawInfo(): Promise<WithdrawInfo> {
 export async function withdrawAccount(input: WithdrawInput): Promise<{message: string}> {
   return apiFetch('/api/auth/withdraw', jsonInit('POST', input));
 }
+
+// POST /api/auth/kakao/withdraw (Spring core, LATER-1) — Kakao account
+// withdrawal start. Returns the Kakao re-login URL; the browser then navigates
+// there and the result comes back as /home?kakaoWithdraw=<code>.
+export async function startKakaoWithdraw(confirm: boolean): Promise<{url: string}> {
+  return apiFetch('/api/auth/kakao/withdraw', jsonInit('POST', {confirm}));
+}
