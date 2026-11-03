@@ -23,8 +23,9 @@ class WithdrawnAccountAuthTest {
     private final KakaoOAuthService kakao = mock(KakaoOAuthService.class);
     private final KakaoStateService kakaoState = mock(KakaoStateService.class);
     private final LoginAttemptLimiter attempts = mock(LoginAttemptLimiter.class);
+    private final WithdrawalBlocks blocks = mock(WithdrawalBlocks.class);
     private final AuthController controller = new AuthController(users, sessions, kakao, kakaoState, attempts,
-        org.mockito.Mockito.mock(WithdrawalService.class), org.mockito.Mockito.mock(WithdrawalBlocks.class));
+        mock(WithdrawalService.class), blocks, new KakaoAccountService(users, blocks));
 
     private static User withdrawn(User user) { user.markWithdrawn(Instant.now()); return user; }
 
@@ -59,11 +60,11 @@ class WithdrawnAccountAuthTest {
 
     @Test void kakaoLoginIsRefusedWithoutTouchingTheAccount() throws Exception {
         User user = withdrawn(new User("kakao-gone", "hash", 91L));
-        when(kakaoState.verify("s", "s")).thenReturn(true);
+        when(kakaoState.consume("s", "s")).thenReturn(KakaoStateService.Consumed.LOGIN_STATE);
         when(kakaoState.clearCookie()).thenReturn("REVCC_OAUTH_STATE=; Max-Age=0");
         when(kakao.exchange("code")).thenReturn(new KakaoOAuthService.KakaoUser(91L, "새 닉네임"));
         when(users.lockByKakaoId(91L)).thenReturn(Optional.of(user));
-        var response = controller.kakaoCallback("code", "s", "s");
+        var response = controller.kakaoCallback("code", null, "s", "s", null);
         assertEquals(403, response.getStatusCode().value());
         assertEquals("kakao-gone", user.getUsername()); // 닉네임 갱신도 하지 않는다.
         verify(users, never()).saveAndFlush(any());
@@ -98,7 +99,7 @@ class WithdrawnAccountAuthTest {
     }
 
     @Test void kakaoNicknamesThatLookLikeSystemNamesAreNotUsedAsUsernames() throws Exception {
-        when(kakaoState.verify("s", "s")).thenReturn(true);
+        when(kakaoState.consume("s", "s")).thenReturn(KakaoStateService.Consumed.LOGIN_STATE);
         when(kakaoState.clearCookie()).thenReturn("REVCC_OAUTH_STATE=; Max-Age=0");
         when(kakao.exchange("new")).thenReturn(new KakaoOAuthService.KakaoUser(12345L, "관리자"));
         when(users.lockByKakaoId(12345L)).thenReturn(Optional.empty());
@@ -106,13 +107,13 @@ class WithdrawnAccountAuthTest {
         when(users.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
         when(sessions.create(any())).thenReturn("t");
         when(sessions.cookie("t", false)).thenReturn("REVCC_SESSION=t; HttpOnly");
-        assertEquals(302, controller.kakaoCallback("new", "s", "s").getStatusCode().value());
+        assertEquals(302, controller.kakaoCallback("new", null, "s", "s", null).getStatusCode().value());
         verify(users).saveAndFlush(argThat(u -> "카카오사용자_2345".equals(u.getUsername())));
 
         User existing = new User("old-name", "hash", 777L);
         when(kakao.exchange("rename")).thenReturn(new KakaoOAuthService.KakaoUser(777L, "탈퇴한 회원"));
         when(users.lockByKakaoId(777L)).thenReturn(Optional.of(existing));
-        assertEquals(302, controller.kakaoCallback("rename", "s", "s").getStatusCode().value());
+        assertEquals(302, controller.kakaoCallback("rename", null, "s", "s", null).getStatusCode().value());
         assertEquals("old-name", existing.getUsername());
     }
 

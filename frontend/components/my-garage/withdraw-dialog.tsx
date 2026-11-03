@@ -1,10 +1,14 @@
 'use client';
 
 import {useEffect, useRef, useState, type FormEvent} from 'react';
-import {fetchWithdrawInfo, withdrawAccount} from '../../lib/community-api';
+import {fetchWithdrawInfo, startKakaoWithdraw, withdrawAccount} from '../../lib/community-api';
 import styles from './my-garage.module.css';
 
-type State = {status: 'loading'} | {status: 'error'} | {status: 'blocked'; message: string} | {status: 'ready'};
+type State =
+  | {status: 'loading'}
+  | {status: 'error'}
+  | {status: 'blocked'; message: string}
+  | {status: 'ready'; method: 'PASSWORD' | 'KAKAO'};
 
 // Member withdrawal (formerly home.js's withdrawAccount() panel): same
 // notice lines, same server-driven block reasons (admin / reserved listings
@@ -13,19 +17,29 @@ type State = {status: 'loading'} | {status: 'error'} | {status: 'blocked'; messa
 // On success this does a full navigation to "/": the server already revoked
 // the session cookie, so a plain reload is enough and matches the legacy
 // location.assign("/").
-const NOTICE_LINES = [
-  '탈퇴하면 되돌릴 수 없고, 같은 아이디·이메일로는 30일 동안 다시 가입할 수 없습니다.',
-  '작성한 글과 댓글은 남고 작성자는 "탈퇴한 회원"으로 표시됩니다.',
-  '내 차고(차량·정비기록·자동차등록증)와 프로필, 좋아요·북마크·찜·알림은 삭제됩니다.',
+//
+// Kakao accounts (LATER-1): instead of a password, the confirm checkbox +
+// POST /api/auth/kakao/withdraw returns a Kakao re-login URL and the browser
+// goes there. Kakao's callback ends on "/" (done) or back on /home with
+// ?kakaoWithdraw=<code>, which my-garage passes in as `result`.
+const COMMON_LINES = [
+  '작성한 글과 댓글은 남고 작성자는 "탈퇴한 회원"으로 표시됩니다. 글에 연결된 차량·부품 표시는 사라집니다.',
+  '내 차고(현재·이전 차량, 정비기록, 부품 이력, 자동차등록증)와 프로필, 좋아요·북마크·찜·알림은 삭제됩니다.',
   '판매중 매물은 비공개로 닫히고, 판매완료 매물은 연락처만 지워진 채 남습니다.',
 ];
+const PASSWORD_LINES = ['탈퇴하면 되돌릴 수 없고, 같은 아이디·이메일로는 30일 동안 다시 가입할 수 없습니다.', ...COMMON_LINES];
+const KAKAO_LINES = [
+  '탈퇴하면 되돌릴 수 없고, 같은 카카오 계정·아이디로는 30일 동안 다시 가입할 수 없습니다.',
+  ...COMMON_LINES,
+  '카카오 로그인으로 본인을 다시 확인한 뒤 morethancar와 카카오 계정의 연결을 끊고 탈퇴합니다.',
+];
 
-export default function WithdrawDialog({onClose}: {onClose: () => void}) {
+export default function WithdrawDialog({onClose, result}: {onClose: () => void; result?: string | null}) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const confirmRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<State>({status: 'loading'});
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(result ?? '');
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -38,10 +52,8 @@ export default function WithdrawDialog({onClose}: {onClose: () => void}) {
             status: 'blocked',
             message: `예약중인 매물이 ${info.reservedListings}개 있습니다. 거래를 마치거나 판매중으로 바꾼 뒤 탈퇴해주세요.`,
           });
-        else if (info.method === 'KAKAO')
-          setState({status: 'blocked', message: '카카오 계정은 카카오 재인증으로 탈퇴해야 합니다. 이 기능은 아직 준비 중입니다.'});
         else if (!info.available) setState({status: 'blocked', message: '지금은 회원 탈퇴를 처리할 수 없습니다. 관리자에게 문의해주세요.'});
-        else setState({status: 'ready'});
+        else setState({status: 'ready', method: info.method});
       })
       .catch(() => setState({status: 'error'}));
   }, []);
@@ -52,8 +64,20 @@ export default function WithdrawDialog({onClose}: {onClose: () => void}) {
     setBusy(true);
     setError('');
     const form = new FormData(event.currentTarget);
+    const confirmed = confirmRef.current?.checked ?? false;
+    if (state.status === 'ready' && state.method === 'KAKAO') {
+      try {
+        const {url} = await startKakaoWithdraw(confirmed);
+        // Keep busy: the page is leaving for Kakao. The state cookie lives 5 minutes.
+        window.location.assign(url);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : '회원 탈퇴를 시작하지 못했어요.');
+        setBusy(false);
+      }
+      return;
+    }
     try {
-      await withdrawAccount({password: String(form.get('password') || ''), confirm: confirmRef.current?.checked ?? false});
+      await withdrawAccount({password: String(form.get('password') || ''), confirm: confirmed});
       window.location.assign('/');
     } catch (e) {
       setError(e instanceof Error ? e.message : '회원 탈퇴에 실패했어요.');
@@ -76,9 +100,10 @@ export default function WithdrawDialog({onClose}: {onClose: () => void}) {
       {state.status === 'error' && <p>정보를 불러오지 못했어요.</p>}
       {state.status === 'blocked' && (
         <>
-          {NOTICE_LINES.map((line) => (
+          {PASSWORD_LINES.map((line) => (
             <p key={line}>{line}</p>
           ))}
+          {result && <p className={styles.dialogError}>{result}</p>}
           <p className={styles.dialogError} role="alert">
             {state.message}
           </p>
@@ -91,13 +116,15 @@ export default function WithdrawDialog({onClose}: {onClose: () => void}) {
       )}
       {state.status === 'ready' && (
         <form onSubmit={submit}>
-          {NOTICE_LINES.map((line) => (
+          {(state.method === 'KAKAO' ? KAKAO_LINES : PASSWORD_LINES).map((line) => (
             <p key={line}>{line}</p>
           ))}
-          <label>
-            현재 비밀번호
-            <input type="password" name="password" autoComplete="current-password" required maxLength={255} disabled={busy} />
-          </label>
+          {state.method === 'PASSWORD' && (
+            <label>
+              현재 비밀번호
+              <input type="password" name="password" autoComplete="current-password" required maxLength={255} disabled={busy} />
+            </label>
+          )}
           <label>
             <input ref={confirmRef} type="checkbox" required disabled={busy} /> 위 내용을 확인했고 탈퇴에 동의합니다.
           </label>
@@ -111,7 +138,7 @@ export default function WithdrawDialog({onClose}: {onClose: () => void}) {
               취소
             </button>
             <button type="submit" className={styles.dangerText} disabled={busy}>
-              {busy ? '처리 중…' : '회원 탈퇴'}
+              {busy ? '처리 중…' : state.method === 'KAKAO' ? '카카오로 다시 인증하고 탈퇴' : '회원 탈퇴'}
             </button>
           </div>
         </form>
