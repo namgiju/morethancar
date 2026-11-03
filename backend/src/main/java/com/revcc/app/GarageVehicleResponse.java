@@ -18,10 +18,11 @@ public record GarageVehicleResponse(
             vehicle.getArchivedAt());
     }
 
-    // 번호판은 소유자 본인 화면(내 차고 목록/등록/수정)에서만 내려주고,
-    // 인증 없이 누구나 조회 가능한 공개 프로필 응답에서는 제거한다.
-    public GarageVehicleResponse withoutLicensePlate() {
+    // 인증 없이 누구나 조회하는 공개 프로필 응답(GET /api/vehicles/{id}). 번호판과 심사 정보(심사 상태·인증 시각)는
+    // 소유자 본인 화면(내 차고 목록/등록/수정, GET /api/garage/vehicles)과 관리자 인증 목록에서만 내려준다.
+    // 공개해도 되는 것은 인증 여부(verified)뿐이다 — board 공개 차고(GET /api/board/garage/:id)와 같은 규칙(MVP 단계 4).
+    public GarageVehicleResponse publicView() {
         return new GarageVehicleResponse(id, userId, manufacturer, model, modelYear, trim, transmission,
-            color, nickname, description, createdAt, updatedAt, username, null, verified, verificationStatus, verifiedAt, archivedAt);
+            color, nickname, description, createdAt, updatedAt, username, null, verified, null, null, archivedAt);
     }
 }

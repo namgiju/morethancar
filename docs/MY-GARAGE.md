@@ -36,7 +36,7 @@
 | --- | --- |
 | POST `/api/garage/vehicles` | 로그인 필수, 201 및 Location |
 | GET `/api/garage/vehicles` | 로그인 필수, 본인 차량만 반환 |
-| GET `/api/vehicles/{vehicleId}` | 공개 프로필, 소유자 username 포함 |
+| GET `/api/vehicles/{vehicleId}` | 공개 프로필, 소유자 username 포함. 번호판·심사 상태·인증 시각은 비운다(인증 여부 `verified`만, 2026-11-03) |
 | PUT `/api/garage/vehicles/{vehicleId}` | 소유자만 수정 |
 | DELETE `/api/garage/vehicles/{vehicleId}` | 소유자만 삭제, 204 |
 
@@ -46,10 +46,8 @@
 
 ## 화면과 실행
 
-- `/garage`: 실제 로그인/회원가입, 내 차량 목록, 등록 버튼
-- `/garage/new`: 8개 차량 정보 입력 후 생성한 프로필로 이동
-- `/vehicles/{vehicleId}`: 공개 차량 프로필 및 소유자 username
-- `/garage/{vehicleId}/edit`: 소유자의 차량 수정
+- `/garage`, `/garage/new`, `/garage/{vehicleId}/edit`: **2026-11-03부터 `/home`으로 이동(307)** — 메뉴에 연결되지 않은 예전 화면이고, 등록·수정 폼이 차량번호를 보내지 않아 저장이 항상 400이었다(`next.config.ts` redirects). 화면 코드는 남겨 두었다. 실제 내 차고는 `/home`.
+- `/vehicles/{vehicleId}`: 공개 차량 프로필 및 소유자 username(그대로 열린다)
 - 프로필에서 소유자만 수정/삭제 버튼을 볼 수 있다. 실제 권한은 서버에서도 검사한다.
 
 기존 HTML 사이트와 Next.js 차고를 함께 실행:
