@@ -34,8 +34,12 @@ export default function LoginForm() {
       setMessage({text: '회원가입이 완료되었습니다. 새 계정으로 로그인해주세요.', kind: 'success'});
     else if (searchParams.get('reset') === '1')
       setMessage({text: '비밀번호가 변경되었습니다. 다시 로그인해주세요.', kind: 'success'});
-    else if (searchParams.get('kakaoWithdraw') === 'SESSION_EXPIRED')
-      setMessage({text: kakaoWithdrawMessage('SESSION_EXPIRED') ?? '', kind: 'error'});
+    else {
+      // Kakao withdrawal that lost its session (LATER-1): SESSION_EXPIRED, or
+      // UNLINKED_NOT_WITHDRAWN when the Kakao link was already cut.
+      const kakaoWithdraw = kakaoWithdrawMessage(searchParams.get('kakaoWithdraw'), searchParams.get('reason'));
+      if (kakaoWithdraw) setMessage({text: kakaoWithdraw, kind: 'error'});
+    }
   }, [searchParams]);
 
   // Like the legacy message(): move focus to the status line so it's read out.

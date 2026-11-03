@@ -2,12 +2,13 @@
 
 import {useEffect, useRef, useState, type FormEvent} from 'react';
 import {fetchWithdrawInfo, startKakaoWithdraw, withdrawAccount} from '../../lib/community-api';
+import {KEEP_WHEN_BLOCKED} from '../../lib/kakao-withdraw';
 import styles from './my-garage.module.css';
 
 type State =
   | {status: 'loading'}
   | {status: 'error'}
-  | {status: 'blocked'; message: string}
+  | {status: 'blocked'; message: string; method: 'PASSWORD' | 'KAKAO'}
   | {status: 'ready'; method: 'PASSWORD' | 'KAKAO'};
 
 // Member withdrawal (formerly home.js's withdrawAccount() panel): same
@@ -34,26 +35,40 @@ const KAKAO_LINES = [
   '카카오 로그인으로 본인을 다시 확인한 뒤 morethancar와 카카오 계정의 연결을 끊고 탈퇴합니다.',
 ];
 
-export default function WithdrawDialog({onClose, result}: {onClose: () => void; result?: string | null}) {
+type Result = {code: string; message: string} | null;
+
+export default function WithdrawDialog({onClose, result}: {onClose: () => void; result?: Result}) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const confirmRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<State>({status: 'loading'});
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(result ?? '');
+  const [error, setError] = useState(result?.message ?? '');
+
+  // Back from Kakao's login page restores this page from the bfcache with
+  // busy still true; let the user act again.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setBusy(false);
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (dialog && !dialog.open) dialog.showModal();
     fetchWithdrawInfo()
       .then((info) => {
-        if (info.admin) setState({status: 'blocked', message: '관리자·운영자 권한을 먼저 해제해야 탈퇴할 수 있습니다.'});
+        const method = info.method;
+        if (info.admin) setState({status: 'blocked', method, message: '관리자·운영자 권한을 먼저 해제해야 탈퇴할 수 있습니다.'});
         else if (info.reservedListings > 0)
           setState({
             status: 'blocked',
+            method,
             message: `예약중인 매물이 ${info.reservedListings}개 있습니다. 거래를 마치거나 판매중으로 바꾼 뒤 탈퇴해주세요.`,
           });
-        else if (!info.available) setState({status: 'blocked', message: '지금은 회원 탈퇴를 처리할 수 없습니다. 관리자에게 문의해주세요.'});
-        else setState({status: 'ready', method: info.method});
+        else if (!info.available) setState({status: 'blocked', method, message: '지금은 회원 탈퇴를 처리할 수 없습니다. 관리자에게 문의해주세요.'});
+        else setState({status: 'ready', method});
       })
       .catch(() => setState({status: 'error'}));
   }, []);
@@ -97,13 +112,22 @@ export default function WithdrawDialog({onClose, result}: {onClose: () => void; 
     >
       <h2 id="withdraw-title">회원 탈퇴</h2>
       {state.status === 'loading' && <p>탈퇴 가능 여부를 확인하고 있어요.</p>}
-      {state.status === 'error' && <p>정보를 불러오지 못했어요.</p>}
+      {state.status === 'error' && (
+        <>
+          {result && (
+            <p className={styles.dialogError} role="alert">
+              {result.message}
+            </p>
+          )}
+          <p>정보를 불러오지 못했어요.</p>
+        </>
+      )}
       {state.status === 'blocked' && (
         <>
-          {PASSWORD_LINES.map((line) => (
+          {(state.method === 'KAKAO' ? KAKAO_LINES : PASSWORD_LINES).map((line) => (
             <p key={line}>{line}</p>
           ))}
-          {result && <p className={styles.dialogError}>{result}</p>}
+          {result && KEEP_WHEN_BLOCKED.has(result.code) && <p className={styles.dialogError}>{result.message}</p>}
           <p className={styles.dialogError} role="alert">
             {state.message}
           </p>

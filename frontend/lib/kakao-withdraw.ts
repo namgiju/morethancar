@@ -11,6 +11,10 @@ const REASONS: Record<string, string> = {
   SESSION_EXPIRED: '로그인 상태가 바뀌었어요. 다시 로그인한 뒤',
 };
 
+// Codes whose message still matters when the dialog is blocked for another
+// reason (the blocked message already covers RESERVED_LISTINGS / ADMIN_ROLE).
+export const KEEP_WHEN_BLOCKED = new Set(['UNLINKED_NOT_WITHDRAWN']);
+
 export function kakaoWithdrawMessage(code: string | null, reason?: string | null): string | null {
   switch (code) {
     case null:
@@ -25,8 +29,9 @@ export function kakaoWithdrawMessage(code: string | null, reason?: string | null
     case 'KAKAO_MISMATCH':
       return '이 계정에 연결된 카카오 계정과 다른 계정으로 인증해 탈퇴하지 않았어요. 연결된 카카오 계정으로 다시 시도해주세요.';
     case 'UNLINK_FAILED':
-    case 'KAKAO_FAILED':
       return '카카오 연결 해제에 실패해 탈퇴하지 않았어요. 잠시 후 다시 시도해주세요.';
+    case 'KAKAO_FAILED':
+      return '카카오 인증을 마치지 못해 탈퇴하지 않았어요. 잠시 후 다시 시도해주세요.';
     case 'RESERVED_LISTINGS':
       return '예약중인 매물이 있어 탈퇴하지 않았어요. 거래를 마치거나 판매중으로 바꾼 뒤 탈퇴해주세요.';
     case 'ADMIN_ROLE':

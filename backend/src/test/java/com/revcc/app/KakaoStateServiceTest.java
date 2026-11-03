@@ -21,8 +21,8 @@ class KakaoStateServiceTest {
         when(values.getAndDelete("revcc:oauth:state:" + state)).thenReturn("1", (String) null);
         KakaoStateService service = new KakaoStateService(redis, false);
 
-        assertTrue(service.verify(state, state), "정상 state는 로그인 진행이 허용되어야 한다");
-        assertFalse(service.verify(state, state), "이미 사용한 state는 재사용을 거부해야 한다");
+        assertNotNull(service.consume(state, state), "정상 state는 로그인 진행이 허용되어야 한다");
+        assertNull(service.consume(state, state), "이미 사용한 state는 재사용을 거부해야 한다");
     }
 
     @Test void missingStateIsRejectedWithoutTouchingRedis() {
@@ -30,8 +30,8 @@ class KakaoStateServiceTest {
         KakaoStateService service = new KakaoStateService(redis, false);
         String cookieOnly = "a".repeat(43);
 
-        assertFalse(service.verify(null, cookieOnly), "state 파라미터 없음은 거부되어야 한다");
-        assertFalse(service.verify(cookieOnly, null), "state 쿠키 없음도 거부되어야 한다");
+        assertNull(service.consume(null, cookieOnly), "state 파라미터 없음은 거부되어야 한다");
+        assertNull(service.consume(cookieOnly, null), "state 쿠키 없음도 거부되어야 한다");
         verifyNoInteractions(redis);
     }
 
@@ -42,7 +42,7 @@ class KakaoStateServiceTest {
         KakaoStateService service = new KakaoStateService(redis, false);
 
         // 공격자가 자신의 정상 state를 피해자 브라우저에 재생하는 시나리오: 쿠키는 다르므로 거부.
-        assertFalse(service.verify("e".repeat(43), "f".repeat(43)));
+        assertNull(service.consume("e".repeat(43), "f".repeat(43)));
         verify(values, never()).getAndDelete(anyString());
     }
 
@@ -55,14 +55,14 @@ class KakaoStateServiceTest {
         when(values.getAndDelete("revcc:oauth:state:" + state)).thenReturn(null);
         KakaoStateService service = new KakaoStateService(redis, false);
 
-        assertFalse(service.verify(state, state), "만료된 state는 거부되어야 한다");
+        assertNull(service.consume(state, state), "만료된 state는 거부되어야 한다");
     }
 
     @Test void malformedStateIsRejectedWithoutTouchingRedis() {
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
         KakaoStateService service = new KakaoStateService(redis, false);
 
-        assertFalse(service.verify("too-short", "too-short"));
+        assertNull(service.consume("too-short", "too-short"));
         verifyNoInteractions(redis);
     }
 
@@ -103,14 +103,13 @@ class KakaoStateServiceTest {
         assertEquals("withdraw:5:3:" + KakaoStateService.hash(token), stored.getValue());
         assertFalse(stored.getValue().contains(token), "세션 토큰 원문은 저장하지 않는다");
 
-        when(values.getAndDelete("revcc:oauth:state:" + state)).thenReturn(stored.getValue(), stored.getValue());
+        when(values.getAndDelete("revcc:oauth:state:" + state)).thenReturn(stored.getValue());
         var consumed = service.consume(state, state);
         assertEquals(KakaoStateService.Purpose.WITHDRAW, consumed.purpose());
         assertTrue(consumed.startedBy(session, token));
         assertFalse(consumed.startedBy(session, "u".repeat(43)), "다른 세션 토큰");
         assertFalse(consumed.startedBy(new SharedSessionService.SessionUser(6L, "x", "USER", 3), token), "다른 회원");
         assertFalse(consumed.startedBy(new SharedSessionService.SessionUser(5L, "kakao", "USER", 4), token), "세션 버전이 바뀜");
-        assertFalse(service.verify(state, state), "탈퇴용 state로는 로그인 콜백을 통과할 수 없다");
     }
 
     @Test void loginStateIsNeverStartedByAnySessionAndUnknownValuesAreRejected() {

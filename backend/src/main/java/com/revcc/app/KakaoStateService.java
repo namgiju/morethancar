@@ -79,12 +79,6 @@ public class KakaoStateService {
         return new Consumed(Purpose.WITHDRAW, Long.parseLong(parts[0]), Long.parseLong(parts[1]), parts[2]);
     }
 
-    /** 로그인 전용 검증(기존 호출 호환). 탈퇴용 state도 소비되지만 로그인으로는 인정하지 않는다. */
-    public boolean verify(String state, String cookieState) {
-        Consumed consumed = consume(state, cookieState);
-        return consumed != null && consumed.purpose() == Purpose.LOGIN;
-    }
-
     public String cookie(String state) {
         return ResponseCookie.from(COOKIE, state).path("/api/auth/kakao").httpOnly(true)
             .sameSite("Lax").secure(secure).maxAge(TTL).build().toString();

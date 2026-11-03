@@ -9,10 +9,11 @@ test('no code means no message', () => {
 });
 
 test('every server code has its own message and unknown codes fall back', () => {
-  const codes = ['CANCELLED', 'SESSION_CHANGED', 'SESSION_EXPIRED', 'KAKAO_MISMATCH', 'UNLINK_FAILED', 'RESERVED_LISTINGS', 'ADMIN_ROLE', 'UNLINKED_NOT_WITHDRAWN'];
+  const codes = ['CANCELLED', 'SESSION_CHANGED', 'SESSION_EXPIRED', 'KAKAO_MISMATCH', 'UNLINK_FAILED', 'KAKAO_FAILED', 'RESERVED_LISTINGS', 'ADMIN_ROLE', 'UNLINKED_NOT_WITHDRAWN'];
   const fallback = kakaoWithdrawMessage('SOMETHING_NEW');
   for (const code of codes) assert.notEqual(kakaoWithdrawMessage(code), fallback, code);
   assert.equal(kakaoWithdrawMessage('UNAVAILABLE'), fallback);
+  assert.doesNotMatch(kakaoWithdrawMessage('KAKAO_FAILED'), /연결 해제/, 'no unlink was attempted');
 });
 
 test('unlinked-but-not-withdrawn says the Kakao link is gone, gives the reason, and warns about the second consent', () => {

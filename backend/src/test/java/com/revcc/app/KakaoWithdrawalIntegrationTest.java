@@ -137,6 +137,7 @@ class KakaoWithdrawalIntegrationTest {
         Started s=start(c);
         MvcResult done=callback(s,c,"good-code",null);
         assertEquals("/",location(done));
+        assertEquals("no-store",done.getResponse().getHeader("Cache-Control"));
         assertEquals(0,done.getResponse().getCookie(SharedSessionService.COOKIE).getMaxAge(),"세션 쿠키 삭제");
         assertEquals(0,done.getResponse().getCookie(KakaoStateService.COOKIE).getMaxAge(),"state 쿠키 삭제");
         verify(kakao).unlinkIfSameUser("good-code",kakaoId);
@@ -229,6 +230,21 @@ class KakaoWithdrawalIntegrationTest {
         when(kakao.unlinkIfSameUser("retry",k.getKakaoId())).thenReturn(KakaoOAuthService.UnlinkResult.UNLINKED);
         assertEquals("/",location(callback(start(c),c,"retry",null)));
         assertEquals("WITHDRAWN",userRow(k).get("account_status"));
+    }
+
+    @Test void sessionInvalidatedAfterUnlinkSendsTheNoticeToTheLoginPage(CapturedOutput output) throws Exception {
+        User k=kakaoUser(); Cookie c=session(k);
+        // 연결을 끊는 사이 다른 곳(비밀번호 변경·관리자 처리)에서 세션 버전이 올라간다. 계정은 탈퇴되지 않았다.
+        when(kakao.unlinkIfSameUser("code",k.getKakaoId())).thenAnswer(call -> {
+            jdbc.update("UPDATE users SET auth_version=COALESCE(auth_version,0)+1 WHERE id=?",k.getId());
+            return KakaoOAuthService.UnlinkResult.UNLINKED;
+        });
+        MvcResult r=callback(start(c),c,"code",null);
+        // /home은 로그인 없이 안내를 띄울 수 없으므로 로그인 화면에서 "연결은 끊겼지만 탈퇴 미완료"를 알린다.
+        assertEquals("/login?next=%2Fhome&kakaoWithdraw=UNLINKED_NOT_WITHDRAWN&reason=SESSION_EXPIRED",location(r));
+        assertEquals("no-store",r.getResponse().getHeader("Cache-Control"));
+        assertNotEquals("WITHDRAWN",userRow(k).get("account_status"));
+        assertTrue(output.getOut().contains("Kakao unlinked but withdrawal not completed: user="+k.getId()+" reason=SESSION_EXPIRED"));
     }
 
     @Test void startIsRateLimitedPerAddress() throws Exception {

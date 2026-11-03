@@ -233,11 +233,7 @@ public class AuthController {
     private ResponseEntity<?> kakaoWithdrawCallback(KakaoStateService.Consumed consumed, String code, String error, String sessionToken) {
         SharedSessionService.SessionUser session;
         try { session = sessions.require(sessionToken); }
-        catch (org.springframework.web.server.ResponseStatusException e) {
-            // 다른 탭에서 이미 탈퇴를 마쳐 세션이 무효가 된 경우는 완료로, 그 밖에는 다시 로그인 안내.
-            return alreadyWithdrawn(consumed.userId()) ? withdrawDone(sessionToken)
-                : withdrawRedirect("/login?next=%2Fhome&kakaoWithdraw=SESSION_EXPIRED");
-        }
+        catch (org.springframework.web.server.ResponseStatusException e) { return sessionGone(consumed.userId(), sessionToken, false); }
         catch (RuntimeException e) { return withdrawRedirect("/home?kakaoWithdraw=UNAVAILABLE"); } // 세션 확인 중 DB 오류 등. 아무것도 바꾸지 않았다.
         if (!consumed.startedBy(session, sessionToken)) return withdrawRedirect("/home?kakaoWithdraw=SESSION_CHANGED");
         if (code == null) return withdrawRedirect("/home?kakaoWithdraw=" + ("access_denied".equals(error) ? "CANCELLED" : "KAKAO_FAILED"));
@@ -245,8 +241,7 @@ public class AuthController {
         try { kakaoId = withdrawals.precheckKakao(session.id(), session.version()); }
         catch (WithdrawalService.Refusal e) { return withdrawRedirect("/home?kakaoWithdraw=" + e.body().get("code")); }
         catch (org.springframework.web.server.ResponseStatusException e) {
-            if (e.getStatusCode().value() == 401)
-                return alreadyWithdrawn(session.id()) ? withdrawDone(sessionToken) : withdrawRedirect("/login?next=%2Fhome&kakaoWithdraw=SESSION_EXPIRED");
+            if (e.getStatusCode().value() == 401) return sessionGone(session.id(), sessionToken, false);
             return withdrawRedirect("/home?kakaoWithdraw=UNAVAILABLE");
         } catch (RuntimeException e) {
             log.warn("Kakao withdrawal precheck failed: user={} reason={}", session.id(), e.getClass().getSimpleName());
@@ -267,13 +262,14 @@ public class AuthController {
         try {
             withdrawals.withdrawKakao(session.id(), session.version(), kakaoId);
         } catch (RuntimeException e) {
-            // 같은 회원이 다른 탭에서 먼저 탈퇴를 마친 경우(세션 버전이 올라가 401): 이 탭도 탈퇴 완료로 안내한다.
-            if (e instanceof org.springframework.web.server.ResponseStatusException rs && rs.getStatusCode().value() == 401
-                    && alreadyWithdrawn(session.id()))
-                return withdrawDone(sessionToken);
+            if (e instanceof org.springframework.web.server.ResponseStatusException rs && !(e instanceof WithdrawalService.Refusal)
+                    && rs.getStatusCode().value() == 401) {
+                if (!alreadyWithdrawn(session.id()))
+                    log.warn("Kakao unlinked but withdrawal not completed: user={} reason=SESSION_EXPIRED", session.id());
+                return sessionGone(session.id(), sessionToken, true);
+            }
             String reason = e instanceof WithdrawalService.Refusal r ? String.valueOf(r.body().get("code"))
-                : e instanceof org.springframework.web.server.ResponseStatusException rs
-                    ? (rs.getStatusCode().value() == 401 ? "SESSION_EXPIRED" : "UNAVAILABLE") : "DB_ERROR";
+                : e instanceof org.springframework.web.server.ResponseStatusException ? "UNAVAILABLE" : "DB_ERROR";
             log.warn("Kakao unlinked but withdrawal not completed: user={} reason={}", session.id(),
                 "DB_ERROR".equals(reason) ? reason + "/" + e.getClass().getSimpleName() : reason);
             return withdrawRedirect("/home?kakaoWithdraw=UNLINKED_NOT_WITHDRAWN&reason=" + reason);
@@ -286,8 +282,19 @@ public class AuthController {
         try { sessions.revoke(sessionToken); }
         catch (RuntimeException e) { log.warn("Session key cleanup after withdrawal failed: {}", e.getClass().getSimpleName()); }
         return ResponseEntity.status(302).location(URI.create("/"))
+            .header(HttpHeaders.CACHE_CONTROL, "no-store")
             .header(HttpHeaders.SET_COOKIE, sessions.cookie("", true))
             .header(HttpHeaders.SET_COOKIE, kakaoState.clearCookie()).build();
+    }
+
+    /**
+     * 콜백 도중 세션이 무효(401)가 된 경우의 공통 처리. 다른 탭에서 이미 탈퇴를 마쳤으면 이 탭도 완료(/)로 안내한다.
+     * 아니면 다시 로그인하라고 안내하되, 이미 카카오 연결을 끊은 뒤라면 그 사실을 로그인 화면에서 알린다(/home은 로그인 없이 안내를 못 띄운다).
+     */
+    private ResponseEntity<?> sessionGone(long userId, String sessionToken, boolean unlinked) {
+        if (alreadyWithdrawn(userId)) return withdrawDone(sessionToken);
+        return withdrawRedirect(unlinked ? "/login?next=%2Fhome&kakaoWithdraw=UNLINKED_NOT_WITHDRAWN&reason=SESSION_EXPIRED"
+            : "/login?next=%2Fhome&kakaoWithdraw=SESSION_EXPIRED");
     }
 
     private boolean alreadyWithdrawn(long userId) {

@@ -43,17 +43,18 @@ export default function MyGarage() {
   const [verifyVehicleId, setVerifyVehicleId] = useState<number | null>(null);
   const [profileEditOpen, setProfileEditOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
-  const [withdrawResult, setWithdrawResult] = useState<string | null>(null);
+  const [withdrawResult, setWithdrawResult] = useState<{code: string; message: string} | null>(null);
 
   // Kakao withdrawal comes back here as ?kakaoWithdraw=<code> when it did not
   // finish (LATER-1). Show the reason in the withdrawal dialog once, then drop
   // the query so a reload doesn't repeat it.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const message = kakaoWithdrawMessage(params.get('kakaoWithdraw'), params.get('reason'));
-    if (!message) return;
+    const code = params.get('kakaoWithdraw');
+    const message = kakaoWithdrawMessage(code, params.get('reason'));
+    if (!code || !message) return;
     window.history.replaceState(null, '', window.location.pathname);
-    setWithdrawResult(message);
+    setWithdrawResult({code, message});
     setWithdrawOpen(true);
   }, []);
 

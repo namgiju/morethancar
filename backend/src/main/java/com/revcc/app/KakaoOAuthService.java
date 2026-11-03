@@ -68,7 +68,8 @@ public class KakaoOAuthService {
 
     /**
      * 탈퇴 재인증: 인가 코드로 토큰을 받고, 그 카카오 사용자가 expectedKakaoId일 때만 앱 연결을 끊는다.
-     * 다른 카카오 계정이면 끊지 않고 DIFFERENT_ACCOUNT. 교환·조회·연결 끊기의 HTTP 실패는 OAuthFailure(허용된 코드만)이고,
+     * 다른 카카오 계정이면 끊지 않고 DIFFERENT_ACCOUNT. 그 계정은 토큰 교환으로 앱에 연결된 채 남지만 끊지 않는다 —
+     * 다른 회원의 카카오 계정일 수 있어, 끊으면 그 회원의 로그인 연결을 남이 해제하게 된다. 교환·조회·연결 끊기의 HTTP 실패는 OAuthFailure(허용된 코드만)이고,
      * 연결 끊기 응답의 회원번호가 다르면 실패로 본다. 응답을 못 받은 경우(timeout)는 실제로 끊겼을 수도 있다 — 호출자는 실패로 처리한다.
      */
     public UnlinkResult unlinkIfSameUser(String code, long expectedKakaoId) throws Exception {
