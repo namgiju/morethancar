@@ -65,6 +65,7 @@ class VehicleVerificationListIntegrationTest {
             if (i == 0) pendingId = id;
         }
         Cookie c = admin();
+        try {
         int before = output.getOut().length();
         JsonNode first = list(c, prefix.toUpperCase(), 1);
         String listSql = output.getOut().substring(before);
@@ -90,5 +91,12 @@ class VehicleVerificationListIntegrationTest {
             .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "private, no-store"))
             .andReturn().getResponse().getContentAsByteArray();
         assertArrayEquals(new byte[]{0, 1, 2, 3}, document);
+        // 빈 검색어는 전체(이 테스트의 23건 포함).
+        assertTrue(list(c, "", 1).get("total").asInt() >= 23);
+        } finally {
+            // 공유 테스트 DB에 남기지 않는다(차량을 지우면 인증 신청도 CASCADE). 관리자 계정도 지운다.
+            jdbc.update("DELETE FROM owner_vehicles WHERE owner_id=?", owner);
+            jdbc.update("DELETE FROM users WHERE id=? OR username LIKE 'vl-admin-%'", owner);
+        }
     }
 }

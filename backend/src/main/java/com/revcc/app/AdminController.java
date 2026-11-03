@@ -57,7 +57,7 @@ public class AdminController {
         if (page < 1 || page > 100000 || q.length() > 100) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         String pattern = "%" + q.trim().toLowerCase(java.util.Locale.ROOT)
             .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
-        var result = verifications.findSummaries(pattern,
+        var result = verifications.findSummaries(q.isBlank(), pattern,
             org.springframework.data.domain.PageRequest.of(page - 1, VERIFICATION_PAGE_SIZE));
         return Map.of("items", result.getContent(), "total", result.getTotalElements(), "page", page,
             "pageSize", VERIFICATION_PAGE_SIZE);

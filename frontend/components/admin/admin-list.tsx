@@ -42,7 +42,9 @@ type Props<T> = {
 export type AdminListHandle = {
   // Reloads the current page in place (no filter/page reset) — for after a
   // row's own detail dialog changes it (member edit, report review).
-  reload: () => void;
+  // Resolves when that reload settles (success or error), so a caller can keep
+  // its own buttons disabled until the refreshed rows are on screen.
+  reload: () => Promise<void>;
 };
 
 // Generic "search + filters + table + pager" list, modeled on
@@ -69,7 +71,7 @@ function AdminListInner<T>(
       const ticket = ++ticketRef.current;
       setLoading(true);
       setError('');
-      load({q, page: targetPage})
+      return load({q, page: targetPage})
         .then((res) => {
           if (ticket !== ticketRef.current) return;
           setResult(res);

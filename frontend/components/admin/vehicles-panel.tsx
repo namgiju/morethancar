@@ -18,14 +18,19 @@ export default function VehiclesPanel({onAccessDenied}: {onAccessDenied: () => v
   const listRef = useRef<AdminListHandle>(null);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
-  const load = useCallback((params: {q: string; page: number}) => fetchVehicleVerifications(params), []);
+  // 검색·페이지 이동으로 목록을 새로 불러올 때 이전 처리 오류를 지운다.
+  const load = useCallback((params: {q: string; page: number}) => {
+    setError('');
+    return fetchVehicleVerifications(params);
+  }, []);
 
   async function decide(id: number, action: 'approve' | 'reject') {
     setBusyId(id);
     setError('');
     try {
       await decideVehicleVerification(id, action);
-      listRef.current?.reload();
+      // 새 목록이 그려질 때까지 이 행의 버튼을 막아 둔다(같은 신청을 두 번 처리해 409가 나지 않게).
+      await listRef.current?.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : '처리하지 못했어요.');
     } finally {

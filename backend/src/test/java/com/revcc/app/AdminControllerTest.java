@@ -75,7 +75,7 @@ class AdminControllerTest {
     // 목록은 서류 원본 없이 필요한 칸만 고르는 findSummaries로 페이지 단위로 읽는다(엔티티 전체 조회 금지).
     @Test void adminListsVerificationSummariesPageByPage() throws Exception {
         var row = new AdminController.VerificationSummary(5, 105, "driver", "12가3456", "Hyundai", "Avante", 2022, "PENDING", java.time.Instant.parse("2026-11-01T00:00:00Z"));
-        when(verifications.findSummaries(eq("%dr\\%i\\_v%"), any())).thenReturn(
+        when(verifications.findSummaries(eq(false), eq("%dr\\%i\\_v%"), any())).thenReturn(
             new org.springframework.data.domain.PageImpl<>(List.of(row), org.springframework.data.domain.PageRequest.of(1, 20), 21));
         mvc.perform(get("/api/admin/vehicle-verifications").param("q", " Dr%i_V ").param("page", "2")
                 .cookie(new Cookie(SharedSessionService.COOKIE, "admin-token")))
@@ -84,10 +84,13 @@ class AdminControllerTest {
             .andExpect(jsonPath("$.items[0].id").value(5)).andExpect(jsonPath("$.items[0].licensePlate").value("12가3456"))
             .andExpect(jsonPath("$.items[0].status").value("PENDING"));
         var pageable = org.mockito.ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
-        verify(verifications).findSummaries(eq("%dr\\%i\\_v%"), pageable.capture());
+        verify(verifications).findSummaries(eq(false), eq("%dr\\%i\\_v%"), pageable.capture());
         assertEquals(1, pageable.getValue().getPageNumber());
         assertEquals(20, pageable.getValue().getPageSize());
-        verify(verifications, never()).findAll();
+        verifyNoMoreInteractions(verifications); // 엔티티 전체를 읽는 다른 조회는 하지 않는다
+        when(verifications.findSummaries(eq(true), eq("%%"), any())).thenReturn(org.springframework.data.domain.Page.empty());
+        mvc.perform(get("/api/admin/vehicle-verifications").cookie(new Cookie(SharedSessionService.COOKIE, "admin-token")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0)).andExpect(jsonPath("$.page").value(1));
         mvc.perform(get("/api/admin/vehicle-verifications").param("page", "0").cookie(new Cookie(SharedSessionService.COOKIE, "admin-token")))
             .andExpect(status().isBadRequest());
     }
