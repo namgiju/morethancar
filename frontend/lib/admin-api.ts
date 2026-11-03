@@ -126,9 +126,14 @@ export async function fetchAdminBadges(): Promise<AdminBadge[]> {
   return apiFetch<AdminBadge[]>('/api/board/admin/badges');
 }
 
-// GET /api/admin/vehicle-verifications (Spring core)
-export async function fetchVehicleVerifications(): Promise<VehicleVerification[]> {
-  return apiFetch<VehicleVerification[]>('/api/admin/vehicle-verifications');
+// GET /api/admin/vehicle-verifications (Spring core) — 20 per page, pending
+// first then newest. q matches username or plate. No document data in the list;
+// the document is opened one at a time via verificationDocumentUrl.
+export async function fetchVehicleVerifications(params: {q?: string; page?: number}): Promise<Page<VehicleVerification>> {
+  const query = new URLSearchParams();
+  if (params.q) query.set('q', params.q);
+  query.set('page', String(params.page ?? 1));
+  return apiFetch<Page<VehicleVerification>>(`/api/admin/vehicle-verifications?${query}`);
 }
 
 // POST /api/admin/vehicle-verifications/:id/approve|reject (Spring core)

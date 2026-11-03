@@ -16,8 +16,17 @@ const config: NextConfig = {
     return [{source: '/api/:path*', destination: `${backendOrigin}/api/:path*`}];
   },
   async redirects() {
-    if (PARTS_MARKET_ENABLED) return [];
+    // 예전 프로토타입 "My Garage"의 차량 목록·등록·수정 화면(app/(owners)/garage). 메뉴·링크 어디에도 연결되지
+    // 않고(docs/design/MORETHANCAR_DESIGN_BRIEF.md), 등록·수정은 core가 요구하는 차량번호를 보내지 않아 항상
+    // 400이었다. 실제 내 차고(/home)로 보낸다. 코드는 그대로 두고, 307(임시)이라 브라우저가 영구히 기억하지 않는다.
+    // 공개 차량 프로필 /vehicles/:id는 대상이 아니다(그대로 열린다).
+    const legacyGarage = [
+      {source: '/garage', destination: '/home', permanent: false},
+      {source: '/garage/:path*', destination: '/home', permanent: false},
+    ];
+    if (PARTS_MARKET_ENABLED) return legacyGarage;
     return [
+      ...legacyGarage,
       {source: '/parts', destination: '/community?category=parts', permanent: false},
       {source: '/parts/:path*', destination: '/community?category=parts', permanent: false},
     ];

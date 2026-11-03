@@ -1,9 +1,10 @@
 'use client';
 
-import {useCallback, useEffect, useState} from 'react';
-import {ApiError, decideVehicleVerification, fetchVehicleVerifications, verificationDocumentUrl} from '../../lib/admin-api';
+import {useCallback, useRef, useState} from 'react';
+import {decideVehicleVerification, fetchVehicleVerifications, verificationDocumentUrl} from '../../lib/admin-api';
 import type {VehicleVerification} from '../../lib/admin-types';
 import {VERIFICATION_STATUS_LABELS} from '../../lib/admin-format';
+import AdminList, {type AdminListHandle} from './admin-list';
 import styles from './admin.module.css';
 
 const CHIP_CLASS = {ok: styles.chipOk, pending: styles.chipPending, blocked: styles.chipBlocked} as const;
@@ -11,33 +12,25 @@ const CHIP_CLASS = {ok: styles.chipOk, pending: styles.chipPending, blocked: sty
 // 차량 인증 관리 — assignment-frontend/js/admin.js의
 // renderVehicleVerifications()/decide() 포팅. 자동차등록증 원본은 이 화면과
 // 신청 본인만 볼 수 있다(쿠키 인증 링크, fetch 없이 새 탭으로 연다).
+// 목록은 다른 운영 목록과 같은 AdminList(검색 + 20건 페이지, 심사 중 먼저)로
+// 과거 신청까지 넘겨 볼 수 있다. 목록 응답에는 서류 원본이 없다.
 export default function VehiclesPanel({onAccessDenied}: {onAccessDenied: () => void}) {
-  const [items, setItems] = useState<VehicleVerification[] | null>(null);
+  const listRef = useRef<AdminListHandle>(null);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
-
-  const load = useCallback(() => {
+  // 검색·페이지 이동으로 목록을 새로 불러올 때 이전 처리 오류를 지운다.
+  const load = useCallback((params: {q: string; page: number}) => {
     setError('');
-    fetchVehicleVerifications()
-      .then(setItems)
-      .catch((e) => {
-        if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
-          onAccessDenied();
-          return;
-        }
-        setError('차량 인증 목록을 불러오지 못했어요.');
-      });
-  }, [onAccessDenied]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+    return fetchVehicleVerifications(params);
+  }, []);
 
   async function decide(id: number, action: 'approve' | 'reject') {
     setBusyId(id);
+    setError('');
     try {
       await decideVehicleVerification(id, action);
-      load();
+      // 새 목록이 그려질 때까지 이 행의 버튼을 막아 둔다(같은 신청을 두 번 처리해 409가 나지 않게).
+      await listRef.current?.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : '처리하지 못했어요.');
     } finally {
@@ -50,80 +43,63 @@ export default function VehiclesPanel({onAccessDenied}: {onAccessDenied: () => v
       <h2>차량 인증 관리</h2>
       <p className={styles.empty}>실제 인증 신청 데이터입니다. 자동차등록증 원본은 이 화면(관리자)과 신청 본인만 볼 수 있습니다.</p>
       {error && <p className={styles.empty}>{error}</p>}
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>사용자</th>
-              <th>차량번호</th>
-              <th>제조사/모델</th>
-              <th>연식</th>
-              <th>신청일</th>
-              <th>등록증</th>
-              <th>상태</th>
-              <th>처리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!items ? (
-              <tr>
-                <td colSpan={8}>불러오는 중…</td>
-              </tr>
-            ) : items.length === 0 ? (
-              <tr>
-                <td colSpan={8}>신청된 인증이 없어요.</td>
-              </tr>
-            ) : (
-              items.map((item) => {
-                const [chipText, chipKind] = VERIFICATION_STATUS_LABELS[item.status] || [item.status, 'pending'];
-                return (
-                  <tr key={item.id}>
-                    <td>{item.username}</td>
-                    <td>{item.licensePlate}</td>
-                    <td>
-                      {item.manufacturer} {item.model}
-                    </td>
-                    <td>{item.modelYear}</td>
-                    <td>{new Date(item.requestedAt).toLocaleDateString('ko-KR')}</td>
-                    <td>
-                      <a className={styles.textLink} href={verificationDocumentUrl(item.id)} target="_blank" rel="noopener">
-                        이미지 보기
-                      </a>
-                    </td>
-                    <td>
-                      <span className={`${styles.chip} ${CHIP_CLASS[chipKind]}`}>{chipText}</span>
-                    </td>
-                    <td>
-                      {item.status === 'PENDING' ? (
-                        <>
-                          <button
-                            type="button"
-                            className={styles.secondary}
-                            disabled={busyId === item.id}
-                            onClick={() => decide(item.id, 'approve')}
-                          >
-                            승인
-                          </button>{' '}
-                          <button
-                            type="button"
-                            className={styles.dangerText}
-                            disabled={busyId === item.id}
-                            onClick={() => decide(item.id, 'reject')}
-                          >
-                            거절
-                          </button>
-                        </>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+      <AdminList<VehicleVerification>
+        ref={listRef}
+        searchLabel="차량 인증 신청 검색"
+        searchPlaceholder="사용자 / 차량번호 검색"
+        load={load}
+        getRowKey={(item) => item.id}
+        onAccessDenied={onAccessDenied}
+        emptyText="신청된 인증이 없어요."
+        columns={[
+          {header: '사용자', render: (item) => item.username},
+          {header: '차량번호', render: (item) => item.licensePlate},
+          {header: '제조사/모델', render: (item) => `${item.manufacturer} ${item.model}`},
+          {header: '연식', render: (item) => item.modelYear},
+          {header: '신청일', render: (item) => new Date(item.requestedAt).toLocaleDateString('ko-KR')},
+          {
+            header: '등록증',
+            render: (item) => (
+              <a className={styles.textLink} href={verificationDocumentUrl(item.id)} target="_blank" rel="noopener">
+                이미지 보기
+              </a>
+            ),
+          },
+          {
+            header: '상태',
+            render: (item) => {
+              const [chipText, chipKind] = VERIFICATION_STATUS_LABELS[item.status] || [item.status, 'pending'];
+              return <span className={`${styles.chip} ${CHIP_CLASS[chipKind]}`}>{chipText}</span>;
+            },
+          },
+          {
+            header: '처리',
+            render: (item) =>
+              item.status === 'PENDING' ? (
+                <>
+                  <button
+                    type="button"
+                    className={styles.secondary}
+                    disabled={busyId === item.id}
+                    onClick={() => decide(item.id, 'approve')}
+                  >
+                    승인
+                  </button>{' '}
+                  <button
+                    type="button"
+                    className={styles.dangerText}
+                    disabled={busyId === item.id}
+                    onClick={() => decide(item.id, 'reject')}
+                  >
+                    거절
+                  </button>
+                </>
+              ) : (
+                '-'
+              ),
+          },
+        ]}
+      />
     </section>
   );
 }

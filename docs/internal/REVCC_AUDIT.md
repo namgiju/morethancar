@@ -216,7 +216,7 @@
 - 운영 DB가 Neon(서버리스 Postgres, 커밋 `66396be`)인데 Spring 10 + Node 10=20 커넥션이 Neon 플랜의 동시 연결 한도 대비 적절한지 코드상 확인/검증된 바 없음.
 
 **[P2] 무제한 조회(pagination 누락)**
-- `AdminController.java:46-51` `GET /api/admin/vehicle-verifications` → `findAllByOrderByIdDesc()`, Pageable 없이 전체 반환. 차량 인증 신청이 쌓이면 문제.
+- `AdminController.java:46-51` `GET /api/admin/vehicle-verifications` → `findAllByOrderByIdDesc()`, Pageable 없이 전체 반환. 차량 인증 신청이 쌓이면 문제. → 2026-11-03 해결: 서류 원본 없이 필요한 칸만·20건 페이지(`findSummaries`), 화면도 페이지 목록(MORETHANCAR_NEXT_TASKS.md §5 2026-11-03).
 - `PasswordMigrationRunner.java:30` `users.findAll()` — 앱 기동할 때마다(1회성 의도지만 매 배포마다 재실행) 전체 유저 로드.
 
 **잘 구현된 부분 (근거 있음, 수정 불필요)**

@@ -5,7 +5,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 
 /** 관리자 전용 API. 화면에서 메뉴를 숨기는 것과 별개로 role을 서버에서 다시 검증한다. */
@@ -44,11 +43,24 @@ public class AdminController {
         }
     }
 
+    static final int VERIFICATION_PAGE_SIZE = 20;
+
+    /**
+     * 인증 신청 목록(페이지당 20건, 심사 중 먼저·최근 순). 서류 원본은 읽지 않는다(VehicleVerificationRepository.findSummaries).
+     * 응답 모양은 다른 관리자 목록과 같은 {items,total,page,pageSize}. q는 아이디·차량번호 부분 일치.
+     */
     @GetMapping("/vehicle-verifications")
-    public List<VerificationSummary> verifications(
-            @CookieValue(name = SharedSessionService.COOKIE, required = false) String token) {
+    public Map<String, Object> verifications(
+            @CookieValue(name = SharedSessionService.COOKIE, required = false) String token,
+            @RequestParam(defaultValue = "") String q, @RequestParam(defaultValue = "1") int page) {
         requireAdmin(token);
-        return verifications.findAllByOrderByIdDesc().stream().map(VerificationSummary::from).toList();
+        if (page < 1 || page > 100000 || q.length() > 100) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        String pattern = "%" + q.trim().toLowerCase(java.util.Locale.ROOT)
+            .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        var result = verifications.findSummaries(q.isBlank(), pattern,
+            org.springframework.data.domain.PageRequest.of(page - 1, VERIFICATION_PAGE_SIZE));
+        return Map.of("items", result.getContent(), "total", result.getTotalElements(), "page", page,
+            "pageSize", VERIFICATION_PAGE_SIZE);
     }
 
     @Transactional
