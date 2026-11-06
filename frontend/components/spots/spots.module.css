@@ -79,84 +79,108 @@
   gap: 10px;
 }
 
+/* Filter controls: one shape for chips, region select, sort segment and the
+   nearby button — 40px rounded rectangles (8px), 14px text, ~16px side padding. */
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.chips button {
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
+/* .toolbar .nearbyButton (not bare .nearbyButton): .shell button { font: inherit }
+   would otherwise outrank the 14px size. */
+.chips button,
+.toolbar select,
+.segment button,
+.toolbar .nearbyButton {
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
   background: #fff;
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1;
   color: var(--text);
+  white-space: nowrap;
 }
 
-.chips button:hover {
-  border-color: var(--line-strong);
+.chips button:hover:not(:disabled),
+.segment button:hover:not(:disabled),
+.nearbyButton:hover:not(:disabled) {
+  border-color: var(--muted);
 }
 
-.chips button[aria-pressed='true'] {
+.chips button[aria-pressed='true'],
+.segment button[aria-pressed='true'] {
   background: var(--ink);
   border-color: var(--ink);
   color: #fff;
   font-weight: 700;
 }
 
+/* macOS Chrome draws the native arrow flush against the right border, so it
+   looked like it spilled out of the box. Draw our own chevron with room on the right. */
 .toolbar select {
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  background: #fff;
-  font-size: 12px;
-  color: var(--text);
+  max-width: 100%;
+  padding-right: 38px;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%232c302b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px 8px;
+  cursor: pointer;
 }
 
+/* Joined toggle: only the outer corners are rounded; inner borders overlap. */
 .segment {
   display: inline-flex;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  padding: 2px;
 }
 
 .segment button {
-  border: 0;
-  background: none;
-  padding: 3px 11px;
-  border-radius: 999px;
-  font-size: 12px;
-  color: var(--muted);
+  position: relative;
+  border-radius: 0;
+}
+
+.segment button + button {
+  margin-left: -1px;
+}
+
+.segment button:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.segment button:last-child {
+  border-radius: 0 8px 8px 0;
 }
 
 .segment button[aria-pressed='true'] {
-  background: var(--ink);
-  color: #fff;
+  z-index: 1;
+}
+
+/* Location applied: soft green, not the lime accent. */
+.toolbar .nearbyButton[data-active] {
+  background: #eef6e2;
+  border-color: #c5dea6;
+  color: var(--lime-ink);
   font-weight: 700;
 }
 
-.nearbyButton {
-  height: 32px;
-  padding: 0 14px;
-  border: 1px solid var(--lime-ink);
-  border-radius: 999px;
-  background: var(--lime);
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
+.chips button:focus-visible,
+.toolbar select:focus-visible,
+.segment button:focus-visible,
+.nearbyButton:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  z-index: 2;
 }
 
-.nearbyButton:hover {
-  background: var(--lime-hover);
-}
-
+.chips button:disabled,
+.toolbar select:disabled,
+.segment button:disabled,
 .nearbyButton:disabled {
-  opacity: 0.6;
-  cursor: default;
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .locationNotice {
