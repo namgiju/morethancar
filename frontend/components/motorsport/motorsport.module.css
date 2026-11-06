@@ -998,10 +998,25 @@
   border-top: 1px solid var(--line);
 }
 
+/* 답글은 세로줄 대신 이름 앞의 짧은 ㄴ자 표시로 구분한다(커뮤니티 댓글 .reply와 같은 모양,
+   components/community/post-detail.module.css). ㄴ의 바닥은 이름 줄의 가운데에 온다. */
 .commentItem[data-reply] {
+  position: relative;
   margin-left: 18px;
-  padding-left: 12px;
-  border-left: 2px solid var(--line);
+  padding-left: 22px;
+}
+
+.commentItem[data-reply]::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 0;
+  width: 12px;
+  height: 8px;
+  border-left: 1.5px solid var(--line-strong);
+  border-bottom: 1.5px solid var(--line-strong);
+  border-bottom-left-radius: 2px;
+  pointer-events: none;
 }
 
 .commentMeta {
