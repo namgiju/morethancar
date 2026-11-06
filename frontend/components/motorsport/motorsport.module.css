@@ -867,6 +867,274 @@
   color: var(--muted);
 }
 
+/* ---------- Event detail page: detail + comments ---------- */
+/* ≥1024px: 상세(왼쪽)와 댓글(오른쪽, 화면에 붙어 따라오고 길면 안에서 스크롤). 그보다 좁으면 한 줄로 쌓는다. */
+.detailLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 20px;
+  align-items: start;
+}
+
+.detailMain {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* 상세 카드는 article이라 app/globals.css의 옛 article { margin: 12px 0 }을 받는다 — 댓글 칸과 위쪽을 맞춘다. */
+.detailMain .detailPanel {
+  max-width: none;
+  margin: 0;
+}
+
+.commentPanel {
+  position: sticky;
+  top: 88px;
+  max-height: calc(100vh - 108px);
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
+.commentForm {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.commentForm textarea,
+.commentActionForm textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.commentForm textarea:focus-visible,
+.commentActionForm textarea:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.commentFormFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.commentCount {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.shell .commentSubmit {
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.shell .commentSubmit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.replyLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.commentLogin {
+  margin: 4px 0 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.commentLogin a {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.commentError {
+  margin: 0;
+  font-size: 12px;
+  color: #a43e3e;
+}
+
+.commentList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.commentItem {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+/* 답글은 세로줄 대신 이름 앞의 짧은 ㄴ자 표시로 구분한다(커뮤니티 댓글 .reply와 같은 모양,
+   components/community/post-detail.module.css). ㄴ의 바닥은 이름 줄의 가운데에 온다. */
+.commentItem[data-reply] {
+  position: relative;
+  margin-left: 18px;
+  padding-left: 22px;
+}
+
+.commentItem[data-reply]::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  left: 0;
+  width: 12px;
+  height: 13px;
+  border-left: 1.5px solid var(--line-strong);
+  border-bottom: 1.5px solid var(--line-strong);
+  border-bottom-left-radius: 2px;
+  pointer-events: none;
+}
+
+.commentMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.commentAuthor {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.commentAuthor:hover {
+  text-decoration: underline;
+}
+
+.commentAuthorMuted {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.commentBody {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.commentItem[data-deleted] .commentBody {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.commentActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.shell .commentTextButton {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.shell .commentTextButton:hover:not(:disabled) {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.commentActionForm {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.commentActionText {
+  margin: 0;
+  font-size: 13px;
+}
+
+.commentActionButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  align-items: center;
+}
+
+.shell .commentDangerButton {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid #a43e3e;
+  border-radius: 8px;
+  background: #fff;
+  color: #a43e3e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shell .commentTextButton:focus-visible,
+.shell .commentSubmit:focus-visible,
+.shell .commentDangerButton:focus-visible,
+.commentAuthor:focus-visible,
+.commentLogin a:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.shell .commentDangerButton:disabled,
+.shell .commentTextButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1023px) {
+  .detailLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .commentPanel {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 860px) {
   .container {

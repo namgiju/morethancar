@@ -109,6 +109,30 @@ export type AdminReport = {
 
 export type ReportReviewInput = {status: 'resolved' | 'dismissed'; note: string};
 
+// GET /api/board/admin/event-comment-reports (일정 댓글 신고, board-service/src/motorsport-comments.js)
+export type AdminEventCommentReport = {
+  id: number;
+  commentId: number;
+  eventId: number;
+  eventTitle: string;
+  // 신고 검토용 원문(삭제된 댓글도 원문 그대로).
+  content: string;
+  author: string;
+  reporter: string;
+  reason: string;
+  status: ReportStatus;
+  commentDeleted: boolean;
+  deletedReason: 'AUTHOR' | 'ADMIN' | null;
+  moderationNote: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  reviewer: string | null;
+  resolutionNote: string | null;
+};
+
+// deleteComment=true는 status 'resolved'와만 함께 쓸 수 있다(검토 메모가 삭제 사유가 된다).
+export type EventCommentReviewInput = ReportReviewInput & {deleteComment?: boolean};
+
 export type VerificationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 // GET /api/admin/vehicle-verifications

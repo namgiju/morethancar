@@ -4,6 +4,7 @@ import morgan from "morgan";
 import { marketRouter } from "./market.js";
 import { communityRouter } from "./community.js";
 import { motorsportAdminRouter, motorsportRouter } from "./motorsport.js";
+import { eventCommentReportsAdminRouter, motorsportCommentsRouter } from "./motorsport-comments.js";
 import { spotsAdminRouter, spotsRouter } from "./spots.js";
 import { evAdminRouter, evRouter } from "./ev.js";
 
@@ -91,8 +92,12 @@ export function createApp({ db, redis, healthTimeoutMs = 3_000 }) {
   app.use("/api/board/admin/spots", spotsAdminRouter({ db, auth }));
   // 전기차 정책 관리자 쓰기 API(STEP 7). MANAGER 이상이라 ADMIN 전용 adminRouter보다 먼저 붙인다.
   app.use("/api/board/admin/ev", evAdminRouter({ db, auth }));
+  // 일정 댓글 신고 검토는 게시글 신고와 같이 ADMIN 전용(라우터 안에서 requireCurrentAdmin).
+  app.use("/api/board/admin/event-comment-reports", eventCommentReportsAdminRouter({ db, auth }));
   app.use("/api/board/admin", adminRouter({ db, auth }));
   app.use("/api/board/motorsport", motorsportRouter({ db }));
+  // 일정 댓글(V12). 공개 조회는 누구나, 쓰기·삭제·신고는 로그인 회원.
+  app.use("/api/board/motorsport", motorsportCommentsRouter({ db, auth }));
   app.use("/api/board/spots", spotsRouter({ db }));
   // 전기차 정책·정보 허브 공개 조회(STEP 2).
   app.use("/api/board/ev", evRouter({ db }));

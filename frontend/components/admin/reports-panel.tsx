@@ -7,6 +7,7 @@ import {adminDate, REPORT_STATUS_LABELS} from '../../lib/admin-format';
 import {postUrl} from '../../lib/format';
 import AdminList, {type AdminListHandle} from './admin-list';
 import ReportDialog from './report-dialog';
+import EventCommentReports from './event-comment-reports';
 import styles from './admin.module.css';
 
 const STATUS_FILTERS: Record<ReportStatus | '', string> = {
@@ -17,7 +18,7 @@ const STATUS_FILTERS: Record<ReportStatus | '', string> = {
 };
 
 // 신고 관리 — assignment-frontend/js/admin.js의 reports 패널 포팅.
-export default function ReportsPanel({onAccessDenied}: {onAccessDenied: () => void}) {
+function PostReports({onAccessDenied}: {onAccessDenied: () => void}) {
   const [status, setStatus] = useState<ReportStatus | ''>('');
   const [reviewTarget, setReviewTarget] = useState<AdminReport | null>(null);
   const listRef = useRef<AdminListHandle>(null);
@@ -28,8 +29,7 @@ export default function ReportsPanel({onAccessDenied}: {onAccessDenied: () => vo
   );
 
   return (
-    <section className={styles.panel}>
-      <h2>신고 관리</h2>
+    <>
       <AdminList<AdminReport>
         ref={listRef}
         searchLabel="신고 검색"
@@ -104,6 +104,24 @@ export default function ReportsPanel({onAccessDenied}: {onAccessDenied: () => vo
           onReviewed={() => listRef.current?.reload()}
         />
       )}
+    </>
+  );
+}
+
+// 신고 대상: 게시글(community_reports)과 모터스포츠 일정 댓글(motorsport_comment_reports, V12).
+export default function ReportsPanel({onAccessDenied}: {onAccessDenied: () => void}) {
+  const [target, setTarget] = useState<'post' | 'eventComment'>('post');
+  return (
+    <section className={styles.panel}>
+      <h2>신고 관리</h2>
+      <label className={styles.reportTarget}>
+        신고 대상
+        <select value={target} onChange={(e) => setTarget(e.target.value as 'post' | 'eventComment')}>
+          <option value="post">게시글</option>
+          <option value="eventComment">모터스포츠 일정 댓글</option>
+        </select>
+      </label>
+      {target === 'post' ? <PostReports onAccessDenied={onAccessDenied} /> : <EventCommentReports onAccessDenied={onAccessDenied} />}
     </section>
   );
 }

@@ -7,6 +7,7 @@ import {KIND_LABELS, PHASE_LABELS, SCOPE_LABELS, type PublicEvent} from '../../l
 import {fetchPosts} from '../../lib/community-api';
 import type {CommunityPost} from '../../lib/community-types';
 import {imageUrl, postUrl} from '../../lib/format';
+import MotorsportComments from './motorsport-comments';
 import styles from './motorsport.module.css';
 
 const STATUS_NOTE: Record<PublicEvent['status'], string | null> = {
@@ -45,10 +46,13 @@ export default function MotorsportDetail({id}: {id: number}) {
       ) : error || !event ? (
         <p className={styles.empty}>{error || '일정을 찾을 수 없어요.'}</p>
       ) : (
-        <>
-          <EventDetailBody event={event} />
-          <LinkedPosts eventId={event.id} />
-        </>
+        <div className={styles.detailLayout}>
+          <div className={styles.detailMain}>
+            <EventDetailBody event={event} />
+            <LinkedPosts eventId={event.id} />
+          </div>
+          <MotorsportComments eventId={event.id} />
+        </div>
       )}
     </div>
   );
