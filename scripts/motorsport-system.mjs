@@ -78,9 +78,13 @@ try {
   const today = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
   const logCount = async () => Number((await db.query("SELECT count(*) FROM content_admin_logs")).rows[0].count);
 
-  // 기존 게시글 API는 그대로이고 새 컬럼을 내보내지 않는다.
+  // 게시글 목록은 일정 연결을 camelCase 필드로만 내보낸다(c81c99c 이후 계약, community.js postSelect).
+  // 연결 없는 기존 글은 둘 다 null이고, DB 컬럼명은 응답에 새지 않는다.
   const listed = (await req("/api/board/posts?limit=5")).find((p) => p.id === oldPost);
-  assert.ok(listed && !("motorsport_event_id" in listed) && !("motorsportEventId" in listed));
+  assert.ok(listed, "기존 글이 목록에 있어야 한다");
+  assert.ok(!("motorsport_event_id" in listed));
+  assert.equal(listed.motorsportEventId, null);
+  assert.equal(listed.linkedMotorsportEvent, null);
 
   // --- 2. 권한 ---
   for (const token of [undefined, tokens.u, tokens.x]) {
