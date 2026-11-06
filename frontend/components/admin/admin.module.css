@@ -414,6 +414,33 @@
   outline-offset: -1px;
 }
 
+/* 신고 관리: 게시글 / 일정 댓글 신고 대상 선택 */
+.reportTarget {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.reportTarget select {
+  height: 36px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 0 10px;
+}
+
+.reportTarget select:focus {
+  outline: 2px solid var(--ink);
+  outline-offset: -1px;
+}
+
 .count {
   margin: 0 0 10px;
   color: var(--muted);

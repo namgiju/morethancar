@@ -10,6 +10,8 @@
 // /api/admin/members endpoints below) — intentionally not wrapped here.
 import {ApiError} from './community-api';
 import type {
+  AdminEventCommentReport,
+  EventCommentReviewInput,
   AdminBadge,
   AdminMember,
   AdminOverview,
@@ -119,6 +121,23 @@ export async function fetchAdminReports(params: {q?: string; status?: ReportStat
 // PATCH /api/board/admin/reports/:id
 export async function reviewReport(id: number, input: ReportReviewInput): Promise<{id: number; status: ReportStatus; reviewedAt: string}> {
   return apiFetch(`/api/board/admin/reports/${id}`, jsonInit('PATCH', input));
+}
+
+// GET /api/board/admin/event-comment-reports
+export async function fetchEventCommentReports(params: {q?: string; status?: ReportStatus | ''; page?: number}): Promise<Page<AdminEventCommentReport>> {
+  const query = new URLSearchParams();
+  if (params.q) query.set('q', params.q);
+  if (params.status) query.set('status', params.status);
+  query.set('page', String(params.page ?? 1));
+  return apiFetch<Page<AdminEventCommentReport>>(`/api/board/admin/event-comment-reports?${query}`);
+}
+
+// PATCH /api/board/admin/event-comment-reports/:id
+export async function reviewEventCommentReport(
+  id: number,
+  input: EventCommentReviewInput,
+): Promise<{id: number; status: ReportStatus; reviewedAt: string}> {
+  return apiFetch(`/api/board/admin/event-comment-reports/${id}`, jsonInit('PATCH', input));
 }
 
 // GET /api/board/admin/badges
