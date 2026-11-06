@@ -321,11 +321,12 @@
 }
 
 /* A reply is marked by a short ㄴ before its meta row instead of a line from
-   the divider above. The marker starts at the comment's top padding, so it
+   the divider above. The marker starts inside the comment's top padding, so it
    never touches the parent's border-bottom; its foot ends at the meta row's
-   middle (16px padding + 18px line-height / 2), and the author name starts
-   10px after it. Meta, date and body all sit on the same left edge
-   (padding-left), so wrapped lines line up too. */
+   middle (16px padding + 18px line-height / 2 = 25px), and the author name
+   starts 10px after it. The vertical stroke is 13px, same as the motorsport
+   event comment replies (motorsport.module.css). Meta, date and body all sit
+   on the same left edge (padding-left), so wrapped lines line up too. */
 .reply {
   position: relative;
   margin-left: 24px;
@@ -335,10 +336,10 @@
 .reply::before {
   content: '';
   position: absolute;
-  top: 18px;
+  top: 12px;
   left: 0;
   width: 12px;
-  height: 8px;
+  height: 13px;
   border-left: 1.5px solid var(--line-strong, #c9ccc4);
   border-bottom: 1.5px solid var(--line-strong, #c9ccc4);
   border-bottom-left-radius: 2px;
