@@ -326,11 +326,14 @@
   filter: brightness(0.8);
 }
 
+/* .shell button { font: inherit } outranks .bar's font-size, so the title
+   size is set here directly (series label .barSeries keeps the inherited size). */
 .barTitle {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .barArrow {
