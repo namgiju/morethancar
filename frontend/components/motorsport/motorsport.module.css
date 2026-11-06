@@ -1009,10 +1009,10 @@
 .commentItem[data-reply]::before {
   content: '';
   position: absolute;
-  top: 4px;
+  top: 9px;
   left: 0;
   width: 12px;
-  height: 18px;
+  height: 13px;
   border-left: 1.5px solid var(--line-strong);
   border-bottom: 1.5px solid var(--line-strong);
   border-bottom-left-radius: 2px;
