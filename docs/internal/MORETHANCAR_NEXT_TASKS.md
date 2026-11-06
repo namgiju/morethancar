@@ -1334,10 +1334,10 @@ _(작업 중 발견하면 여기에 "STEP 번호 — 파일:설명" 형식으로
 - NOW-4-3(2026-11-02) — 외부 스캐너가 준비 확인 `/api/health`를 직접 부른다(02:03 UTC, 176.100.243.133). 부를 때마다 Neon이 깨어난다. 빈도가 높아지면 준비 확인 경로를 외부에서 막거나 제한하는 방안을 따로 판단한다(지금은 그대로 둠).
 - LATER-4 MVP 단계 1(2026-11-02) — `AdminController.approve`·`VehicleVerification.approve()`는 신청 행이 PENDING인지 확인하지 않는다. 승인/반려가 끝난 예전 신청 행을 관리자가 다시 승인하면 차량이 `approveVerification()`으로 다시 인증된다 — 단계 1로 인증이 해제된 차량도 새 서류 없이 되살아날 수 있다. → **해결(2026-11-02, 같은 단계 1 브랜치)**: 승인·반려를 PENDING 신청만 허용(409). 관리자 화면은 원래 PENDING 행에만 버튼을 보여 줬다.
 
-- LATER-4 MVP 단계 2(2026-11-02) — `scripts/motorsport-system.mjs`가 게시글 목록 응답에 `motorsport_event_id`/`motorsportEventId`가 없어야 한다고 단언하지만(83행 부근), `postSelect`는 `motorsportEventId`를 내려준다. 단계 2 코드를 빼고 실행해도 같은 단언에서 실패하므로 기존 불일치다(어느 쪽이 의도인지 확인 필요, 수정하지 않음). CI는 이 수동 시스템 테스트를 돌리지 않는다.
+- ~~LATER-4 MVP 단계 2(2026-11-02) — `scripts/motorsport-system.mjs`가 게시글 목록 응답에 `motorsport_event_id`/`motorsportEventId`가 없어야 한다고 단언하지만(83행 부근), `postSelect`는 `motorsportEventId`를 내려준다. 단계 2 코드를 빼고 실행해도 같은 단언에서 실패하므로 기존 불일치다(어느 쪽이 의도인지 확인 필요, 수정하지 않음). CI는 이 수동 시스템 테스트를 돌리지 않는다.~~ → **해결(2026-11-06, `fix/motorsport-system-contract`)**: 의도는 `c81c99c`의 계약(글–일정 연결, 목록·상세가 `motorsportEventId`·`linkedMotorsportEvent`를 내려줌)이고 단언이 1단계(`13ed78f`) 기대에 머물러 있었다. 단언을 현재 계약으로 바꿈 — 연결 없는 기존 글은 `motorsportEventId`·`linkedMotorsportEvent` 둘 다 null, DB 컬럼명 `motorsport_event_id`는 응답에 없음. API 코드는 바꾸지 않았다. `scripts/run-board-system.sh` 8개 전부 PASS.
 
 - ~~LATER-4 MVP 단계 3(2026-11-02) — 기존 `GET /api/board/garage/:id`가 정비 기록(`vehicle_records`)의 `cost`를 누구에게나(비로그인 포함) 내려준다.~~ → **해결(단계 4, 2026-11-02)**: 소유자에게만 `cost`, 그 외 응답에는 키 없음.
-- LATER-4 MVP 단계 3(2026-11-02) — 위 단계 2의 motorsport-system 실패 항목에 근거 추가: 단계 1 이전 커밋 `10f2589`에서도 같은 단언으로 실패하고, 단언 도입 `13ed78f` 뒤 `c81c99c`가 응답에 `motorsportEventId`를 넣었다.
+- ~~LATER-4 MVP 단계 3(2026-11-02) — 위 단계 2의 motorsport-system 실패 항목에 근거 추가: 단계 1 이전 커밋 `10f2589`에서도 같은 단언으로 실패하고, 단언 도입 `13ed78f` 뒤 `c81c99c`가 응답에 `motorsportEventId`를 넣었다.~~ → 위 항목과 함께 해결(2026-11-06).
 
 - LATER-4 MVP 단계 4 배포(2026-11-02) — **Neon 정지 상태에서 깨어나는 데 1분 가까이 걸린 적이 있다**(UTC 06:00:51~06:01:56 DB 요청 503, 평소 재기동은 1초 안팎). core·board의 연결 대기는 5초(`DB_CONNECTION_TIMEOUT_MS`)라 그동안 요청이 모두 503이 된다. 자동 정지(NOW-4-3)의 대가로, 드물게라도 반복되면 연결 대기 시간을 늘리거나 첫 연결 재시도, 또는 정지 해제(비용 증가)를 판단해야 한다. 원인(Neon 쪽 지연)은 콘솔 시작 시각으로만 추정했다 — 수정하지 않음, 관찰 대상.
 
