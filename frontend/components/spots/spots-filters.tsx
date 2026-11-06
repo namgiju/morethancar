@@ -22,7 +22,7 @@ type Props = {
   onMobileViewChange: (view: 'list' | 'map') => void;
 };
 
-// 상단 툴바: 카테고리(전체/와인딩/심레이싱), 지역, 거리순/최신순, 내 주변 찾기, 모바일 목록/지도 전환.
+// 상단 툴바: 카테고리(전체/와인딩/심레이싱), 지역, 거리순/최신순, 내 주변(위치 찾기), 모바일 목록/지도 전환.
 export default function SpotsFilters({
   category,
   onCategoryChange,
@@ -65,8 +65,15 @@ export default function SpotsFilters({
       </div>
 
       <div className={styles.filterGroup}>
-        <button type="button" className={styles.nearbyButton} onClick={onFindNearby} disabled={locating}>
-          {locating ? '위치 확인 중…' : hasLocation ? '내 주변 다시 찾기' : '📍 내 주변 찾기'}
+        <button
+          type="button"
+          className={styles.nearbyButton}
+          onClick={onFindNearby}
+          disabled={locating}
+          data-active={hasLocation || undefined}
+          aria-label={locating ? undefined : hasLocation ? '내 주변 다시 찾기 (현재 위치 적용됨)' : '내 주변 찾기'}
+        >
+          {locating ? '위치 확인 중…' : '내 주변'}
         </button>
         <div className={`${styles.segment} ${styles.mobileOnly}`} role="group" aria-label="목록·지도 전환">
           <button type="button" aria-pressed={mobileView === 'list'} onClick={() => onMobileViewChange('list')}>
